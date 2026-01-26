@@ -1,0 +1,164 @@
+<!-- ========================================
+     HOT Channel Finder - Advanced Filter Modal
+     ======================================== -->
+<div id="advancedFilterModal" class="fixed inset-0 z-50 hidden" aria-labelledby="filter-modal-title" role="dialog"
+    aria-modal="true">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeAdvancedFilterModal()">
+    </div>
+
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                class="relative transform overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 text-left shadow-2xl transition-all w-full max-w-2xl">
+
+                <!-- Modal Header -->
+                <div
+                    class="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-red-500/10 rounded-lg">
+                            <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white" id="filter-modal-title">⚙️ 고급 필터</h3>
+                    </div>
+                    <button onclick="closeAdvancedFilterModal()"
+                        class="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-slate-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="px-6 py-6 space-y-6">
+
+                    <!-- 1. 일일 조회수 기준 -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-3">일일 조회수 기준</label>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="selectGrowthPeriod('none')" id="period-none"
+                                class="growth-period-btn px-6 py-2.5 rounded-lg bg-red-600 text-white font-bold shadow-lg transition-all border-2 border-red-500">
+                                없음
+                            </button>
+                            <button onclick="selectGrowthPeriod('1day')" id="period-1day"
+                                class="growth-period-btn px-6 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                1일
+                            </button>
+                            <button onclick="selectGrowthPeriod('7days')" id="period-7days"
+                                class="growth-period-btn px-6 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                7일
+                            </button>
+                            <button onclick="selectGrowthPeriod('30days')" id="period-30days"
+                                class="growth-period-btn px-6 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                30일
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-700"></div>
+
+                    <!-- 2. 성장 기준 -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-3">성장 기준</label>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="selectGrowthMetric('total_views')" id="growth-total_views"
+                                class="growth-metric-btn px-6 py-2.5 rounded-lg bg-red-600 text-white font-bold shadow-lg transition-all border-2 border-red-500">
+                                총 조회수
+                            </button>
+                            <button onclick="selectGrowthMetric('subscribers')" id="growth-subscribers"
+                                class="growth-metric-btn px-6 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                구독수
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">* 조회 증감 기준 혹은 구독 증감 기준에서 선택하실 수 있습니다</p>
+                    </div>
+
+                    <div class="border-t border-slate-700"></div>
+
+                    <!-- 3. 구독자 범위 -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-3">구독자 범위</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-500 mb-1 block">최소</label>
+                                <input type="number" id="filterSubMin" placeholder="0"
+                                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500 mb-1 block">최대</label>
+                                <input type="number" id="filterSubMax" placeholder="10000000"
+                                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-700"></div>
+
+                    <!-- 4. 영상 수 범위 -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-3">영상 수 범위</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-500 mb-1 block">최소</label>
+                                <input type="number" id="filterVideoMin" placeholder="0"
+                                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500 mb-1 block">최대</label>
+                                <input type="number" id="filterVideoMax" placeholder="1000"
+                                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-700"></div>
+
+                    <!-- 5. 국가 -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-300 mb-3">국가</label>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="selectFilterCountry('KR')" id="filter-country-KR"
+                                class="filter-country-btn flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-bold shadow-lg transition-all border-2 border-red-500">
+                                🇰🇷 대한민국
+                            </button>
+                            <button onclick="selectFilterCountry('US')" id="filter-country-US"
+                                class="filter-country-btn flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                🇺🇸 미국
+                            </button>
+                            <button onclick="selectFilterCountry('JP')" id="filter-country-JP"
+                                class="filter-country-btn flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                🇯🇵 일본
+                            </button>
+                            <button onclick="selectFilterCountry('OTHER')" id="filter-country-OTHER"
+                                class="filter-country-btn flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border-2 border-transparent">
+                                🌏 그 외
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                            💡 <strong>한국으로 보고요</strong><br>
+                            '한국 선택'시 한국어 제목/채널 영상만 분석합니다.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div
+                    class="bg-slate-800/50 px-6 py-4 border-t border-slate-700 flex justify-between items-center gap-3">
+                    <button onclick="resetAdvancedFilters()"
+                        class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-all">
+                        초기화
+                    </button>
+                    <button onclick="applyAdvancedFilters()"
+                        class="px-8 py-2.5 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold rounded-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                        필터 적용
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

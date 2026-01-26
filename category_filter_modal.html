@@ -1,0 +1,97 @@
+<!-- ========================================
+     카테고리 필터 모달
+     ======================================== -->
+<div id="categoryFilterModal" class="fixed inset-0 z-50 hidden" aria-labelledby="category-modal-title" role="dialog"
+    aria-modal="true">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeCategoryFilterModal()">
+    </div>
+
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                class="relative transform overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 text-left shadow-2xl transition-all w-full max-w-4xl">
+
+                <!-- Modal Header -->
+                <div
+                    class="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-yellow-500/10 rounded-lg">
+                            📁
+                        </div>
+                        <h3 class="text-xl font-bold text-white" id="category-modal-title">📁 카테고리 필터 (총 <span
+                                id="categoryTotalCount">0</span>개 채널)</h3>
+                    </div>
+                    <button onclick="closeCategoryFilterModal()"
+                        class="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-slate-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="px-6 py-6">
+                    <!-- Country Selection -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-slate-300 mb-3">국가 선택</label>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="selectCategoryFilterCountry('KR')" id="cat-filter-country-KR"
+                                class="cat-filter-country-btn flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border border-transparent">
+                                🇰🇷 대한민국
+                            </button>
+                            <button onclick="selectCategoryFilterCountry('US')" id="cat-filter-country-US"
+                                class="cat-filter-country-btn flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border border-transparent">
+                                🇺🇸 미국
+                            </button>
+                            <button onclick="selectCategoryFilterCountry('JP')" id="cat-filter-country-JP"
+                                class="cat-filter-country-btn flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border border-transparent">
+                                🇯🇵 일본
+                            </button>
+                            <button onclick="selectCategoryFilterCountry('OTHER')" id="cat-filter-country-OTHER"
+                                class="cat-filter-country-btn flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-medium transition-all border border-transparent">
+                                🌏 그 외
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Grid -->
+                    <label class="block text-sm font-bold text-slate-300 mb-3">카테고리 선택 (복수 선택 가능)</label>
+                    <div id="categoryFilterGrid" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <!-- Categories will be populated here -->
+                    </div>
+
+                    <!-- Selected Category Channels -->
+                    <div id="selectedCategorySection" class="hidden mt-6">
+                        <div class="border-t border-slate-700 pt-4">
+                            <h4 class="text-lg font-bold text-white mb-4" id="selectedCategoryTitle"></h4>
+                            <div id="selectedCategoryChannels" class="space-y-3 max-h-96 overflow-y-auto">
+                                <!-- Channels will be listed here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div
+                    class="bg-slate-800/50 px-6 py-4 border-t border-slate-700 flex justify-between items-center gap-3">
+                    <p class="text-xs text-slate-400">
+                        * 국가와 카테고리를 선택 후 검색하세요.
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="closeCategoryFilterModal()"
+                            class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-all">
+                            닫기
+                        </button>
+                        <button onclick="searchCategoryFilterDB()"
+                            class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg shadow-lg hover:shadow-brand-500/20 transition-all flex items-center gap-2">
+                            <span>🔍</span>
+                            <span>DB 검색</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

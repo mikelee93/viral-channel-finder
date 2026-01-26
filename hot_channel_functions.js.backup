@@ -1,0 +1,617 @@
+// ========================================
+// HOT Channel Finder - Advanced Filter Functions
+// ========================================
+
+// Filter state
+let advancedFilterState = {
+    contentType: 'shorts',
+    growthMetric: 'total_views',
+    subscriberMin: 0,
+    subscriberMax: 10000000,
+    videoCountMin: 0,
+    videoCountMax: 1000,
+    country: 'KR'
+};
+
+// Open Advanced Filter Modal
+function openAdvancedFilterModal() {
+    const modal = document.getElementById('advancedFilterModal');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+
+    // Restore current state
+    selectContentType(advancedFilterState.contentType, false);
+    selectGrowthMetric(advancedFilterState.growthMetric, false);
+    selectFilterCountry(advancedFilterState.country, false);
+
+    document.getElementById('filterSubMin').value = advancedFilterState.subscriberMin || '';
+    document.getElementById('filterSubMax').value = advancedFilterState.subscriberMax || '';
+    document.getElementById('filterVideoMin').value = advancedFilterState.videoCountMin || '';
+    document.getElementById('filterVideoMax').value = advancedFilterState.videoCountMax || '';
+}
+
+// Close Advanced Filter Modal
+function closeAdvancedFilterModal() {
+    const modal = document.getElementById('advancedFilterModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Select Content Type
+function selectContentType(type, updateState = true) {
+    if (updateState) {
+        advancedFilterState.contentType = type;
+    }
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.content-type-btn').forEach(btn => {
+        btn.classList.remove('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+        btn.classList.add('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+    });
+
+    // Add active class to selected button
+    const selectedBtn = document.getElementById(`content-${type}`);
+    if (selectedBtn) {
+        selectedBtn.classList.remove('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+        selectedBtn.classList.add('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+    }
+}
+
+// Select Growth Metric
+function selectGrowthMetric(metric, updateState = true) {
+    if (updateState) {
+        advancedFilterState.growthMetric = metric;
+    }
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.growth-metric-btn').forEach(btn => {
+        btn.classList.remove('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+        btn.classList.add('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+    });
+
+    // Add active class to selected button
+    const selectedBtn = document.getElementById(`growth-${metric}`);
+    if (selectedBtn) {
+        selectedBtn.classList.remove('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+        selectedBtn.classList.add('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+    }
+}
+
+// Select Filter Country
+function selectFilterCountry(country, updateState = true) {
+    if (updateState) {
+        advancedFilterState.country = country;
+    }
+
+    // Remove active class from all buttons
+    document.querySelectorAll('.filter-country-btn').forEach(btn => {
+        btn.classList.remove('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+        btn.classList.add('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+    });
+
+    // Add active class to selected button
+    const selectedBtn = document.getElementById(`filter-country-${country}`);
+    if (selectedBtn) {
+        selectedBtn.classList.remove('bg-slate-700', 'text-slate-300', 'border-transparent', 'font-medium');
+        selectedBtn.classList.add('bg-red-600', 'text-white', 'border-red-500', 'shadow-lg', 'font-bold');
+    }
+}
+
+// Reset Advanced Filters
+function resetAdvancedFilters() {
+    advancedFilterState = {
+        contentType: 'shorts',
+        growthMetric: 'total_views',
+        subscriberMin: 0,
+        subscriberMax: 10000000,
+        videoCountMin: 0,
+        videoCountMax: 1000,
+        country: 'KR'
+    };
+
+    selectContentType('shorts', false);
+    selectGrowthMetric('total_views', false);
+    selectFilterCountry('KR', false);
+
+    document.getElementById('filterSubMin').value = '';
+    document.getElementById('filterSubMax').value = '';
+    document.getElementById('filterVideoMin').value = '';
+    document.getElementById('filterVideoMax').value = '';
+}
+
+// Apply Advanced Filters
+function applyAdvancedFilters() {
+    // Update state from inputs
+    advancedFilterState.subscriberMin = parseInt(document.getElementById('filterSubMin').value) || 0;
+    advancedFilterState.subscriberMax = parseInt(document.getElementById('filterSubMax').value) || 10000000;
+    advancedFilterState.videoCountMin = parseInt(document.getElementById('filterVideoMin').value) || 0;
+    advancedFilterState.videoCountMax = parseInt(document.getElementById('filterVideoMax').value) || 1000;
+
+    // Close modal
+    closeAdvancedFilterModal();
+
+    // Execute search
+    searchHotChannels();
+}
+
+// Open Category Filter Modal
+async function openCategoryFilterModal() {
+    const modal = document.getElementById('categoryFilterModal');
+    if (!modal) {
+        console.error('[Category Filter] Modal not found');
+        return;
+    }
+
+    modal.classList.remove('hidden');
+
+    // Load discovered channels
+    try {
+        const response = await fetch('/discovered_channels.json');
+        const discoveredChannels = await response.json();
+
+        // Group channels by category
+        const categoryCounts = {};
+        Object.values(discoveredChannels).forEach(channel => {
+            const category = channel.category || '일반';
+            if (!categoryCounts[category]) {
+                categoryCounts[category] = [];
+            }
+            categoryCounts[category].push(channel);
+        });
+
+        // Update total count
+        const totalCount = Object.keys(discoveredChannels).length;
+        document.getElementById('categoryTotalCount').textContent = totalCount.toLocaleString();
+
+        // Render category grid
+        renderCategoryGrid(categoryCounts);
+
+    } catch (error) {
+        console.error('[Category Filter] Error loading channels:', error);
+        alert('채널 데이터를 불러올 수 없습니다.');
+    }
+}
+
+// Close Category Filter Modal
+function closeCategoryFilterModal() {
+    const modal = document.getElementById('categoryFilterModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Render Category Grid
+function renderCategoryGrid(categoryCounts) {
+    const categoryGrid = document.getElementById('categoryGrid');
+    if (!categoryGrid) return;
+
+    const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1].length - a[1].length);
+
+    categoryGrid.innerHTML = sortedCategories.map(([category, channels]) => `
+        <button onclick="selectCategory('${escapeHtml(category)}')" 
+            class="category-btn bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-yellow-500 rounded-xl p-4 text-left transition-all group">
+            <div class="text-2xl mb-2">📁</div>
+            <div class="text-white font-bold mb-1">${escapeHtml(category)}</div>
+            <div class="text-slate-400 text-sm">${channels.length}개 채널</div>
+        </button>
+    `).join('');
+}
+
+// Select Category
+async function selectCategory(category) {
+    const selectedSection = document.getElementById('selectedCategorySection');
+    const selectedTitle = document.getElementById('selectedCategoryTitle');
+    const selectedChannels = document.getElementById('selectedCategoryChannels');
+
+    if (!selectedSection || !selectedTitle || !selectedChannels) return;
+
+    // Load discovered channels again
+    try {
+        const response = await fetch('/discovered_channels.json');
+        const discoveredChannels = await response.json();
+
+        // Filter by category
+        const channelsInCategory = Object.values(discoveredChannels).filter(
+            channel => (channel.category || '일반') === category
+        );
+
+        // Update UI
+        selectedTitle.textContent = `${category} (${channelsInCategory.length}개)`;
+        selectedSection.classList.remove('hidden');
+
+        selectedChannels.innerHTML = channelsInCategory.map(channel => `
+            <div class="flex items-center gap-4 bg-slate-800/50 rounded-xl p-4 hover:bg-slate-800 transition-all">
+                <div class="flex-1">
+                    <h5 class="text-white font-bold mb-1">${escapeHtml(channel.name)}</h5>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-slate-400">${escapeHtml(channel.channelId)}</span>
+                        <span class="px-2 py-0.5 bg-slate-700/80 text-slate-300 rounded text-xs">
+                            ${new Date(channel.discoveredAt).toLocaleDateString('ko-KR')}
+                        </span>
+                    </div>
+                </div>
+                <a href="https://www.youtube.com/channel/${channel.channelId}" target="_blank"
+                    class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all text-sm">
+                    채널 보기
+                </a>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('[Category Filter] Error loading category channels:', error);
+    }
+}
+
+
+// ========================================
+// HOT Channel Search
+// ========================================
+
+async function searchHotChannels() {
+    const resultsGrid = document.getElementById('channelResultsGrid');
+    if (!resultsGrid) return;
+
+    // Show loading state
+    resultsGrid.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-20">
+            <div class="loader w-16 h-16 border-4 border-t-red-500 mb-4"></div>
+            <p class="text-slate-300 animate-pulse font-bold text-xl">🔥 HOT 채널 발굴 중...</p>
+            <p class="text-slate-500 text-sm mt-2">구독자 대비 조회수를 분석하고 있습니다.</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('http://localhost:4000/api/hot-channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(advancedFilterState)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || '채널 검색 실패');
+        }
+
+        // Update total count
+        const totalCountEl = document.getElementById('hotChannelTotalCount');
+        if (totalCountEl) {
+            totalCountEl.textContent = (data.totalCount || 0).toLocaleString();
+        }
+
+        // Render channel cards
+        renderHotChannelCards(data.channels || []);
+
+    } catch (error) {
+        console.error('[HOT Channel Search Error]', error);
+        resultsGrid.innerHTML = `
+            <div class="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
+                <div class="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-4xl text-red-500">⚠️</span>
+                </div>
+                <p class="text-red-400 font-bold text-xl mb-2">채널 검색 실패</p>
+                <p class="text-slate-500">${error.message}</p>
+                <button onclick="searchHotChannels()" class="mt-6 px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all">
+                    다시 시도하기
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Render HOT Channel Cards
+function renderHotChannelCards(channels) {
+    const resultsGrid = document.getElementById('channelResultsGrid');
+    if (!resultsGrid) return;
+
+    if (!channels || channels.length === 0) {
+        resultsGrid.innerHTML = `
+            <div class="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
+                <div class="bg-slate-700/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-4xl">🔍</span>
+                </div>
+                <p class="text-slate-300 font-bold text-xl mb-2">검색 결과가 없습니다</p>
+                <p class="text-slate-500">필터 조건을 변경해보세요.</p>
+            </div>
+        `;
+        return;
+    }
+
+    resultsGrid.innerHTML = channels.map(channel => `
+        <div class="channel-card glass-panel rounded-2xl p-6 hover:border-red-500/50 transition-all group">
+            <!-- Channel Header -->
+            <div class="flex items-center gap-4 mb-4">
+                <img src="${channel.thumbnail}" alt="${escapeHtml(channel.name)}" 
+                    class="w-16 h-16 rounded-full border-2 border-slate-700 group-hover:border-red-500 transition-all">
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-white mb-1">${escapeHtml(channel.name)}</h3>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-slate-400">${formatCompactNumber(channel.subscribers)} 구독자</span>
+                        <span class="px-2 py-0.5 bg-slate-700/80 text-slate-300 rounded text-xs">${escapeHtml(channel.category)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Videos Thumbnails -->
+            <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+                ${(channel.recentVideos || []).map(video => `
+                    <div class="flex-shrink-0 w-32">
+                        <div class="relative aspect-video bg-slate-800 rounded-lg overflow-hidden group/thumb">
+                            <img src="${video.thumbnail}" alt="${escapeHtml(video.title)}" 
+                                class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div class="text-slate-400 text-xs mb-1">총 조회수</div>
+                    <div class="text-white font-bold">${formatCompactNumber(channel.totalViews)}</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div class="text-slate-400 text-xs mb-1">일일 증감</div>
+                    <div class="text-red-400 font-bold">+${formatCompactNumber(channel.dailyGrowth)}↗</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div class="text-slate-400 text-xs mb-1">추정 수익</div>
+                    <div class="text-green-400 font-bold">${formatCompactNumber(channel.estimatedRevenue)}원</div>
+                </div>
+            </div>
+            
+            <!-- Action Button -->
+            <button onclick="openChannelDetailModal('${channel.channelId}')" 
+                class="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold py-2.5 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                채널 상세 보기
+            </button>
+        </div>
+    `).join('');
+}
+
+// Open Channel Detail Modal (placeholder для Phase 4)
+function openChannelDetailModal(channelId) {
+    alert(`채널 상세 모달: ${channelId}\n\n이 기능은 Phase 4에서 구현됩니다.`);
+}
+
+// ========================================
+// Multilingual Keyword Finder Functions
+// ========================================
+
+const MULTILANG_CATEGORIES = {
+    '영화/애니메이션': '🎬',
+    '자동차': '🚗',
+    '음악': '🎵',
+    '반려동물/동물': '🐾',
+    '스포츠': '⚽',
+    '여행/이벤트': '✈️',
+    '게임': '🎮',
+    '인물/블로그': '👤',
+    '코미디': '😂',
+    '엔터테인먼트': '🎭',
+    '뉴스/정치': '📰',
+    '노하우/스타일': '💄',
+    '교육': '📚',
+    '과학기술': '🔬',
+    '비영리/사회운동': '🤝'
+};
+
+let selectedMultilangCategory = '';
+let currentMultilangKeywords = [];
+
+// Switch between Channel Finder subtabs
+
+
+// Initialize multilang category buttons
+function initMultilangCategories() {
+    console.log('[Multilang] initMultilangCategories called');
+    const grid = document.getElementById('multilangCategoryGrid');
+    console.log('[Multilang] Grid element:', grid);
+
+    if (!grid) {
+        console.error('[Multilang] Grid element not found!');
+        return;
+    }
+
+    // Always populate (remove the check for already populated)
+
+    grid.innerHTML = Object.entries(MULTILANG_CATEGORIES).map(([category, emoji]) => `
+        <button onclick="selectMultilangCategory('${category}')" 
+            id="multilang-cat-${category.replace(/\//g, '-')}"
+            class="multilang-category-btn flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 rounded-xl text-slate-300 font-medium transition-all">
+            <span class="text-2xl">${emoji}</span>
+            <span>${category}</span>
+        </button>
+    `).join('');
+}
+
+// Select multilang category
+function selectMultilangCategory(category) {
+    selectedMultilangCategory = category;
+
+    document.querySelectorAll('.multilang-category-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
+        btn.classList.add('bg-slate-700', 'border-slate-600', 'text-slate-300');
+    });
+
+    const btn = document.getElementById(`multilang-cat-${category.replace(/\//g, '-')}`);
+    if (btn) {
+        btn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
+        btn.classList.add('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
+    }
+}
+
+// Search multilang keywords
+async function searchMultilangKeywords() {
+    if (!selectedMultilangCategory) {
+        alert('카테고리를 먼저 선택해주세요!');
+        return;
+    }
+
+    const loadingSection = document.getElementById('multilangLoadingSection');
+    const keywordSection = document.getElementById('multilangKeywordSection');
+    const viralVideosSection = document.getElementById('multilangViralVideosSection');
+
+    if (loadingSection) loadingSection.classList.remove('hidden');
+    if (keywordSection) keywordSection.classList.add('hidden');
+    if (viralVideosSection) viralVideosSection.classList.add('hidden');
+
+    try {
+        const response = await fetch('http://localhost:4000/api/multilang-keywords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: selectedMultilangCategory,
+                languages: ['ko', 'en', 'ja'],
+                limit: 50
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || '키워드 검색 실패');
+        }
+
+        currentMultilangKeywords = data.keywords || [];
+
+        const categoryTitle = document.getElementById('multilangCategoryTitle');
+        if (categoryTitle) categoryTitle.textContent = `(${selectedMultilangCategory})`;
+
+        const cachedBadge = document.getElementById('multilangCachedBadge');
+        if (cachedBadge) cachedBadge.classList.toggle('hidden', !data.cached);
+
+        renderMultilangKeywordTable(currentMultilangKeywords);
+
+        if (loadingSection) loadingSection.classList.add('hidden');
+        if (keywordSection) keywordSection.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('[Keyword Search Error]', error);
+        alert(`에러: ${error.message}`);
+        if (loadingSection) loadingSection.classList.add('hidden');
+    }
+}
+
+// Render keyword table
+function renderMultilangKeywordTable(keywords) {
+    const tbody = document.getElementById('multilangKeywordTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = keywords.map(kw => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition">
+            <td class="py-4 text-slate-500 font-bold">${kw.rank}</td>
+            <td class="py-4 font-medium">
+                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(kw.ko)}" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline">
+                    ${escapeHtml(kw.ko)}
+                </a>
+            </td>
+            <td class="py-4 text-slate-300">
+                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(kw.en)}" target="_blank" class="text-slate-300 hover:text-white hover:underline">
+                    ${escapeHtml(kw.en)}
+                </a>
+            </td>
+            <td class="py-4 text-slate-300">
+                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(kw.ja)}" target="_blank" class="text-slate-300 hover:text-white hover:underline">
+                    ${escapeHtml(kw.ja)}
+                </a>
+            </td>
+            <td class="py-4 text-center">
+                <span class="px-3 py-1 bg-slate-700/50 text-slate-300 rounded-lg text-sm font-bold">
+                    ${formatCompactNumber(kw.totalViews)}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Search viral videos by keyword
+function searchMultilangViralVideos(keyword) {
+    const viralVideosSection = document.getElementById('multilangViralVideosSection');
+    const viralVideosGrid = document.getElementById('multilangViralVideosGrid');
+    const selectedKeywordSpan = document.getElementById('multilangSelectedKeyword');
+
+    if (selectedKeywordSpan) selectedKeywordSpan.textContent = `"${keyword}"`;
+    if (viralVideosSection) viralVideosSection.classList.remove('hidden');
+
+    if (viralVideosGrid) {
+        viralVideosGrid.innerHTML = `
+            <div class="col-span-full text-center py-12 bg-slate-800/50 rounded-xl">
+                <p class="text-slate-400 mb-4 text-lg">💡 이 키워드로 YouTube에서 바이럴 영상을 검색합니다</p>
+                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(keyword)}&sp=EgIYAQ%253D%253D" 
+                    target="_blank"
+                    class="inline-block mt-4 px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-xl hover:scale-105">
+                    🔴 YouTube에서 "${keyword}" Shorts 검색하기
+                </a>
+            </div>
+        `;
+    }
+}
+
+
+// ========================================
+// Channel Sub-Tab Switching Function
+// ========================================
+function switchChannelSubTab(subTab) {
+    console.log('Switching to sub-tab:', subTab);
+
+    // Get all content sections
+    const hotChannels = document.getElementById('channel-finder-main-content');
+    const trendingVideos = document.getElementById('trending-videos-main-content');
+    const multilangKeywords = document.getElementById('multilang-keywords-content');
+
+    // Get all tab buttons
+    const hotTabBtn = document.querySelector('[onclick="switchChannelSubTab(\'hot-channels\')"]');
+    const trendingTabBtn = document.querySelector('[onclick="switchChannelSubTab(\'trending-videos\')"]');
+    const multilangTabBtn = document.querySelector('[onclick="switchChannelSubTab(\'multilang-keywords\')"]');
+
+    // Hide all content sections
+    if (hotChannels) hotChannels.classList.add('hidden');
+    if (trendingVideos) trendingVideos.classList.add('hidden');
+    if (multilangKeywords) multilangKeywords.classList.add('hidden');
+
+    // Remove active styles from all tabs
+    [hotTabBtn, trendingTabBtn, multilangTabBtn].forEach(btn => {
+        if (btn) {
+            btn.classList.remove('border-brand-500', 'text-brand-400');
+            btn.classList.add('border-transparent', 'text-slate-400');
+        }
+    });
+
+    // Show selected content and activate tab
+    if (subTab === 'hot-channels') {
+        if (hotChannels) hotChannels.classList.remove('hidden');
+        if (hotTabBtn) {
+            hotTabBtn.classList.add('border-brand-500', 'text-brand-400');
+            hotTabBtn.classList.remove('border-transparent', 'text-slate-400');
+        }
+    } else if (subTab === 'trending-videos') {
+        if (trendingVideos) trendingVideos.classList.remove('hidden');
+        if (trendingTabBtn) {
+            trendingTabBtn.classList.add('border-brand-500', 'text-brand-400');
+            trendingTabBtn.classList.remove('border-transparent', 'text-slate-400');
+        }
+
+        // Initial load if empty
+        const tableBody = document.getElementById('trendingVideosTableBody');
+        if (tableBody && (tableBody.children.length === 0 || tableBody.innerText.includes('클릭하여'))) {
+            if (typeof loadTrendingVideos === 'function') {
+                loadTrendingVideos('all', 'KR');
+            }
+        }
+    } else if (subTab === 'multilang-keywords') {
+        if (multilangKeywords) multilangKeywords.classList.remove('hidden');
+        if (multilangTabBtn) {
+            multilangTabBtn.classList.add('border-brand-500', 'text-brand-400');
+            multilangTabBtn.classList.remove('border-transparent', 'text-slate-400');
+        }
+
+        // Initialize categories if needed
+        if (typeof initMultilangCategories === 'function') {
+            initMultilangCategories();
+        }
+    }
+}

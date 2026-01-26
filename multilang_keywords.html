@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>다국어 키워드 검색기 | YouTube Viral Shorts Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .keyword-table {
+            overflow-x: auto;
+        }
+
+        .loader {
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-black text-white mb-4">
+                🌍 다국어 키워드 검색기
+            </h1>
+            <p class="text-slate-400 text-lg">
+                카테고리별 급상승 키워드를 한국어/영어/일본어로 확인하고 바이럴 영상을 분석하세요
+            </p>
+        </div>
+
+        <!-- Category Selection -->
+        <div class="glass-panel rounded-2xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <span class="text-3xl">📂</span>
+                카테고리 선택
+            </h2>
+
+            <div id="categoryGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <!-- Categories will be populated here -->
+            </div>
+        </div>
+
+        <!-- Language Filter -->
+        <div class="glass-panel rounded-2xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <span class="text-3xl">🌐</span>
+                언어 선택
+            </h2>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-ko" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇰🇷 한국어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-en" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇺🇸 영어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-ja" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇯🇵 일본어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-zh" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇨🇳 중국어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-es" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇪🇸 스페인어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-hi" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇮🇳 힌디어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-ru" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇷🇺 러시아어</span>
+                </label>
+            </div>
+
+            <button onclick="searchKeywords()"
+                class="mt-6 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105">
+                🔍 키워드 검색
+            </button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingSection" class="hidden glass-panel rounded-2xl p-12 text-center">
+            <div class="loader w-16 h-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+            <p class="text-white font-bold text-xl">키워드 분석 중...</p>
+            <p class="text-slate-400 mt-2">YouTube Trending 영상을 분석하고 번역하고 있습니다</p>
+        </div>
+
+        <!-- Keyword Table -->
+        <div id="keywordSection" class="hidden glass-panel rounded-2xl p-8 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <span class="text-3xl">🔥</span>
+                    급상승 키워드
+                    <span id="categoryTitle" class="text-blue-400"></span>
+                </h2>
+                <span id="cachedBadge"
+                    class="hidden px-4 py-2 bg-green-600/20 text-green-400 rounded-lg text-sm font-bold border border-green-500/30">
+                    💾 캐시됨
+                </span>
+            </div>
+
+            <div class="keyword-table">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-slate-700">
+                            <th class="pb-4 text-slate-400 font-bold text-sm">#</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-ko">🇰🇷 한국어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-en">🇺🇸 영어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-ja">🇯🇵 일본어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-zh">🇨🇳 중국어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-es">🇪🇸 스페인어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-hi">🇮🇳 힌디어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-ru">🇷🇺 러시아어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm text-center">검색량</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keywordTableBody">
+                        <!-- Keywords will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        const CATEGORIES = {
+            '영화/애니메이션': '🎬',
+            '자동차': '🚗',
+            '음악': '🎵',
+            '반려동물/동물': '🐾',
+            '스포츠': '⚽',
+            '여행/이벤트': '✈️',
+            '게임': '🎮',
+            '인물/블로그': '👤',
+            '코미디': '😂',
+            '엔터테인먼트': '🎭',
+            '뉴스/정치': '📰',
+            '노하우/스타일': '💄',
+            '교육': '📚',
+            '과학기술': '🔬',
+            '비영리/사회운동': '🤝'
+        };
+
+        let selectedCategory = '';
+        let currentKeywords = [];
+
+        // Initialize category buttons
+        function initCategories() {
+            const grid = document.getElementById('categoryGrid');
+            grid.innerHTML = Object.entries(CATEGORIES).map(([category, emoji]) => `
+                <button onclick="selectCategory('${category}')" 
+                    id="cat-${category}"
+                    class="category-btn flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 rounded-xl text-slate-300 font-medium transition-all">
+                    <span class="text-2xl">${emoji}</span>
+                    <span>${category}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectCategory(category) {
+            selectedCategory = category;
+
+            // Update UI
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
+                btn.classList.add('bg-slate-700', 'border-slate-600', 'text-slate-300');
+            });
+
+            const btn = document.getElementById(`cat-${category}`);
+            if (btn) {
+                btn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
+                btn.classList.add('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
+            }
+        }
+
+        async function searchKeywords() {
+            if (!selectedCategory) {
+                alert('카테고리를 먼저 선택해주세요!');
+                return;
+            }
+
+            const loadingSection = document.getElementById('loadingSection');
+            const keywordSection = document.getElementById('keywordSection');
+            const viralVideosSection = document.getElementById('viralVideosSection');
+
+            // Show loading
+            loadingSection.classList.remove('hidden');
+            keywordSection.classList.add('hidden');
+            viralVideosSection.classList.add('hidden');
+
+            try {
+                const response = await fetch('http://localhost:4000/api/multilang-keywords', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: selectedCategory,
+                        languages: ['ko', 'en', 'ja'],
+                        limit: 50
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '키워드 검색 실패');
+                }
+
+                currentKeywords = data.keywords || [];
+
+                // Update UI
+                document.getElementById('categoryTitle').textContent = `(${selectedCategory})`;
+                document.getElementById('cachedBadge').classList.toggle('hidden', !data.cached);
+
+                renderKeywordTable(currentKeywords);
+
+                loadingSection.classList.add('hidden');
+                keywordSection.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('[Keyword Search Error]', error);
+                alert(`에러: ${error.message}`);
+                loadingSection.classList.add('hidden');
+            }
+        }
+
+        function renderKeywordTable(keywords) {
+            const tbody = document.getElementById('keywordTableBody');
+
+            // Get selected languages
+            const languages = ['ko', 'en', 'ja', 'zh', 'es', 'hi', 'ru'];
+            const selectedLangs = languages.filter(lang =>
+                document.getElementById(`lang-${lang}`)?.checked
+            );
+
+            // Update column visibility
+            languages.forEach(lang => {
+                const headers = document.querySelectorAll(`.lang-${lang}`);
+                headers.forEach(header => {
+                    header.style.display = selectedLangs.includes(lang) ? '' : 'none';
+                });
+            });
+
+            tbody.innerHTML = keywords.map(kw => {
+                const langCells = selectedLangs.map(lang =>
+                    `<td class="py-4 text-slate-300 ${lang === 'ko' ? 'font-medium text-white' : ''} lang-${lang}">${escapeHtml(kw[lang] || kw.ko)}</td>`
+                ).join('');
+
+                return `
+                <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition cursor-pointer"
+                    onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(kw.ko)}', '_blank')">
+                    <td class="py-4 text-slate-500 font-bold">${kw.rank}</td>
+                    ${langCells}
+                    <td class="py-4 text-center">
+                        <span class="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-sm font-bold">
+                            🔥 ${kw.frequency}
+                        </span>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+
+            // Update language filter listeners
+            languages.forEach(lang => {
+                const checkbox = document.getElementById(`lang-${lang}`);
+                if (checkbox) {
+                    checkbox.onchange = () => renderKeywordTable(keywords);
+                }
+            });
+        }
+
+
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize on load
+        initCategories();
+    </script>
+</body>
+
+</html>

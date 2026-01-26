@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 가이드라인 체크 | Viral Shorts Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .loader {
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .upload-zone {
+            border: 2px dashed #475569;
+            transition: all 0.3s;
+        }
+
+        .upload-zone:hover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-zone.dragover {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-black text-white mb-4">
+                📋 YouTube 가이드라인 체크
+            </h1>
+            <p class="text-slate-400 text-lg">
+                업로드 전 가이드라인 위반 여부를 AI로 사전 체크하세요
+            </p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="glass-panel rounded-2xl p-8 mb-8">
+            <h2 class="text-2xl font-bold text-white mb-6">📤 비디오 업로드</h2>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+                <!-- File Upload Zone -->
+                <div class="upload-zone rounded-xl p-12 text-center mb-6" id="uploadZone">
+                    <div id="uploadPlaceholder">
+                        <div class="text-6xl mb-4">🎬</div>
+                        <p class="text-slate-300 font-bold text-lg mb-2">비디오 파일을 드래그하거나 클릭하세요</p>
+                        <p class="text-slate-500 text-sm">MP4, MOV, AVI (최대 100MB)</p>
+                        <input type="file" id="videoFile" accept="video/*" class="hidden" />
+                    </div>
+                    <div id="uploadInfo" class="hidden">
+                        <div class="text-4xl mb-2">✅</div>
+                        <p class="text-green-400 font-bold" id="fileName"></p>
+                        <p class="text-slate-500 text-sm" id="fileSize"></p>
+                    </div>
+                </div>
+
+                <!-- Title -->
+                <div class="mb-4">
+                    <label class="block text-slate-300 font-bold mb-2">제목 (선택사항)</label>
+                    <input type="text" id="videoTitle"
+                        class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none"
+                        placeholder="영상 제목을 입력하세요 (생략 가능)">
+                </div>
+
+                <!-- Description -->
+                <div class="mb-6">
+                    <label class="block text-slate-300 font-bold mb-2">설명</label>
+                    <textarea id="videoDescription" rows="3"
+                        class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none"
+                        placeholder="영상 설명을 입력하세요 (선택사항)"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="analyzeBtn"
+                    class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
+                    🔍 가이드라인 분석 시작
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading Section -->
+        <div id="loadingSection" class="glass-panel rounded-2xl p-12 text-center hidden">
+            <div class="loader w-16 h-16 border-4 border-t-blue-500 mx-auto mb-4"></div>
+            <p class="text-white font-bold text-xl mb-2">AI로 가이드라인 분석 중...</p>
+            <p class="text-slate-400">영상 내용, 음성, 텍스트를 검토하고 있습니다</p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="hidden">
+            <div class="glass-panel rounded-2xl p-8 mb-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-white">분석 결과</h2>
+                    <div id="statusBadge"></div>
+                </div>
+
+                <!-- Score -->
+                <div class="bg-slate-800/50 rounded-xl p-6 mb-6 text-center">
+                    <p class="text-slate-400 text-sm mb-2">안전 점수</p>
+                    <p class="text-5xl font-black text-white" id="score">--</p>
+                    <p class="text-slate-500 text-sm mt-2">100점 만점</p>
+                </div>
+
+                <!-- Summary -->
+                <div class="bg-slate-800/50 rounded-xl p-6 mb-6">
+                    <p class="text-slate-400 text-sm mb-2">종합 평가</p>
+                    <p class="text-white" id="summary">--</p>
+                </div>
+
+                <!-- BGM Analysis -->
+                <div class="bg-slate-800/50 rounded-xl p-6 mb-6" id="bgmSection"></div>
+
+                <!-- Violations -->
+                <div id="violationsContainer"></div>
+
+                <!-- Action Buttons -->
+                <div class="mt-6">
+                    <button id="generateTitlesBtn"
+                        class="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
+                        ✨ Shorts 제목 생성 (한/일/발음)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Titles Section -->
+            <div id="titlesSection" class="glass-panel rounded-2xl p-8 hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">📝 생성된 Shorts 제목</h2>
+                <div id="titlesContent"></div>
+            </div>
+
+            <!-- VOICEVOX TTS Section -->
+            <div id="voicevoxSection" class="glass-panel rounded-2xl p-8 hidden mt-6">
+                <h2 class="text-2xl font-bold text-white mb-6">🎙️ 일본어 TTS 생성 (VOICEVOX)</h2>
+
+                <!-- VOICEVOX Connection Status -->
+                <div id="voicevoxStatus" class="mb-6 p-4 rounded-lg border">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full" id="voicevoxStatusDot"></div>
+                        <span id="voicevoxStatusText" class="text-white font-medium"></span>
+                    </div>
+                </div>
+
+                <!-- Character Selection -->
+                <div class="mb-8">
+                    <div class="flex items-baseline justify-between mb-4">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2">👤 캐릭터 선택</h3>
+                        <a href="https://hub.aivis-project.com/" target="_blank"
+                            class="text-[10px] bg-slate-800/80 hover:bg-brand-600/20 text-brand-400 px-3 py-1.5 rounded-full border border-brand-500/30 transition-all flex items-center gap-1.5 group">
+                            🌐 AIVISS Hub에서 더 많은 캐릭터 발견하기
+                            <span class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                        </a>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-6">
+                        <button id="loadCharactersBtn"
+                            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-4">
+                            캐릭터 목록 불러오기
+                        </button>
+
+                        <!-- Category Tabs -->
+                        <div id="categoryTabs" class="hidden mb-4">
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <button
+                                    class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm active"
+                                    data-category="all">
+                                    전체
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="여성 - 밝고 귀여운">
+                                    👧 밝고 귀여운
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="여성 - 차분하고 성숙">
+                                    👩 차분하고 성숙
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="남성 - 청년">
+                                    👨 남성 청년
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="남성 - 중년/특이">
+                                    👴 남성 중년
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="특수 - 로봇/기계">
+                                    🤖 로봇/기계
+                                </button>
+                                <button class="category-tab px-3 py-2 rounded-lg font-medium transition-all text-sm"
+                                    data-category="특수 - 판타지">
+                                    ✨ 판타지
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="charactersGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 hidden">
+                            <!-- Characters will be loaded here -->
+                        </div>
+                        <div id="selectedCharacterInfo" class="mt-4 hidden">
+                            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                                <p class="text-blue-400 font-bold mb-2">선택한 캐릭터:</p>
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <div class="flex items-baseline gap-2">
+                                            <p class="text-white font-medium text-lg" id="selectedCharacterName">캐릭터를
+                                                선택해주세요</p>
+                                            <span id="selectedCharacterEngine" class="hidden"></span>
+                                        </div>
+                                        <p class="text-brand-400 text-sm font-bold" id="selectedCharacterStyle"></p>
+                                        <p class="text-slate-500 text-xs mt-1" id="selectedCharacterUseCase"></p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button id="previewCharacterBtn"
+                                            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-2">
+                                            🔊 미리듣기
+                                        </button>
+                                        <button id="stopPreviewBtn"
+                                            class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg hidden transition-colors flex items-center gap-2">
+                                            ⏹️ 정지
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Script Generation -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-white mb-4">📝 일본어 대본</h3>
+                    <div class="bg-slate-800/50 rounded-xl p-6">
+                        <div class="flex gap-3 mb-4">
+                            <button id="autoGenerateScriptBtn"
+                                class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-lg">
+                                🤖 자동 생성 (Gemini)
+                            </button>
+                            <button id="manualScriptBtn"
+                                class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg">
+                                ✏️ 직접 입력
+                            </button>
+                        </div>
+
+                        <!-- Timeline Editor -->
+                        <div id="timelineEditor" class="space-y-4 hidden">
+                            <div class="bg-slate-900/50 rounded-lg p-4">
+                                <label class="text-slate-300 font-bold mb-2 block">타임라인 대본</label>
+                                <textarea id="scriptTextarea" rows="10"
+                                    class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-purple-500 focus:outline-none font-mono"
+                                    placeholder="예시:
+[0-3초] 皆さん、こんにちは！
+[3-10초] 今日は面白い動画を紹介します
+[10-15초] チャンネル登録お願いします！"></textarea>
+                                <p class="text-slate-500 text-sm mt-2">
+                                    💡 타임라인 형식으로 입력하거나, 일반 텍스트로 입력하세요
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Generated Script Display -->
+                        <div id="generatedScriptDisplay" class="hidden">
+                            <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                                <p class="text-green-400 font-bold mb-2">✅ 대본 생성 완료</p>
+                                <div id="generatedScriptContent"
+                                    class="text-white whitespace-pre-wrap font-mono text-sm">
+                                </div>
+                            </div>
+                            <button id="editGeneratedScriptBtn"
+                                class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg">
+                                ✏️ 수정하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TTS Generation -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-white mb-4">🎵 음성 생성</h3>
+                    <div class="bg-slate-800/50 rounded-xl p-6">
+                        <button id="generateTTSBtn"
+                            class="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]"
+                            disabled>
+                            🎙️ TTS 음성 파일 생성
+                        </button>
+                        <p class="text-slate-500 text-sm mt-2 text-center">
+                            캐릭터와 대본을 선택하면 생성할 수 있습니다
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Generated Audio -->
+                <div id="generatedAudioSection" class="hidden">
+                    <div
+                        class="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20 rounded-xl p-6">
+                        <h3 class="text-xl font-bold text-white mb-4">🎉 음성 생성 완료!</h3>
+                        <audio id="generatedAudio" controls class="w-full mb-4"></audio>
+                        <button id="downloadAudioBtn"
+                            class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg">
+                            ⬇️ WAV 파일 다운로드
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Enhanced VOICEVOX UI Script -->
+        <script src="voicevox-ui-enhanced.js"></script>
+
+        <script>
+            const uploadZone = document.getElementById('uploadZone');
+            const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+            const uploadInfo = document.getElementById('uploadInfo');
+            const videoFileInput = document.getElementById('videoFile');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const uploadForm = document.getElementById('uploadForm');
+            const loadingSection = document.getElementById('loadingSection');
+            const resultSection = document.getElementById('resultSection');
+
+            window.selectedFile = null;
+            window.selectedSpeakerId = null;
+            window.selectedCharacterName = '';
+            window.currentVideoAnalysis = null;
+
+            // Click to upload
+            uploadZone.addEventListener('click', () => {
+                videoFileInput.click();
+            });
+
+            // File selected
+            videoFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            });
+
+            // Drag and drop
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('video/')) {
+                    handleFile(file);
+                } else {
+                    alert('비디오 파일만 업로드 가능합니다.');
+                }
+            });
+
+            function handleFile(file) {
+                selectedFile = file;
+                fileName.textContent = file.name;
+                fileSize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+                uploadPlaceholder.classList.add('hidden');
+                uploadInfo.classList.remove('hidden');
+            }
+
+            // Form submit
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                if (!selectedFile) {
+                    alert('비디오 파일을 선택해주세요.');
+                    return;
+                }
+
+                const title = document.getElementById('videoTitle').value;
+                const description = document.getElementById('videoDescription').value;
+
+                // Show loading
+                loadingSection.classList.remove('hidden');
+                resultSection.classList.add('hidden');
+
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('video', selectedFile);
+                formData.append('title', title);
+                formData.append('description', description);
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/guidelines/check-video', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || '분석 실패');
+                    }
+
+                    // Hide loading, show result
+                    loadingSection.classList.add('hidden');
+                    displayResult(data.analysis);
+
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    loadingSection.classList.add('hidden');
+                    alert('분석 중 오류가 발생했습니다: ' + error.message);
+                }
+            });
+
+            function displayResult(analysis) {
+                // Update global state
+                window.currentVideoAnalysis = analysis;
+
+                const { overallStatus, score, violations, summary, bgmAnalysis } = analysis;
+
+                // Status badge
+                const statusBadge = document.getElementById('statusBadge');
+                if (overallStatus === 'safe') {
+                    statusBadge.innerHTML = '<span class="px-4 py-2 bg-green-500 text-white rounded-full font-bold">✅ 안전</span>';
+                } else if (overallStatus === 'warning') {
+                    statusBadge.innerHTML = '<span class="px-4 py-2 bg-yellow-500 text-white rounded-full font-bold">⚠️ 주의</span>';
+                } else {
+                    statusBadge.innerHTML = '<span class="px-4 py-2 bg-red-500 text-white rounded-full font-bold">❌ 위험</span>';
+                }
+
+                // Score
+                document.getElementById('score').textContent = score;
+
+                // Summary
+                document.getElementById('summary').textContent = summary || '분석 완료';
+
+                // BGM Analysis
+                if (bgmAnalysis) {
+                    displayBgmAnalysis(bgmAnalysis);
+                }
+
+                // Violations
+                const violationsContainer = document.getElementById('violationsContainer');
+                if (violations && violations.length > 0) {
+                    violationsContainer.innerHTML = `
+                    <h3 class="text-xl font-bold text-white mb-4">발견된 문제점</h3>
+                    ${violations.map(v => `
+                        <div class="bg-slate-800/50 rounded-xl p-6 mb-4">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    ${v.severity === 'critical' ? '🔴' : v.severity === 'high' ? '🟠' : v.severity === 'medium' ? '🟡' : '🟢'}
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">${v.timestamp || '전체'}</span>
+                                        <span class="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs">${v.category}</span>
+                                    </div>
+                                    <p class="text-white font-bold mb-2">${v.issue}</p>
+                                    <p class="text-green-400 text-sm">💡 개선 방법: ${v.recommendation}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+                } else {
+                    violationsContainer.innerHTML = `
+                    <div class="bg-green-500/10 rounded-xl p-6 text-center">
+                        <div class="text-4xl mb-2">🎉</div>
+                        <p class="text-green-400 font-bold">문제점이 발견되지 않았습니다!</p>
+                    </div>
+                `;
+                }
+
+                resultSection.classList.remove('hidden');
+
+                // Show VOICEVOX section and check connection
+                document.getElementById('voicevoxSection').classList.remove('hidden');
+                checkVoicevoxConnection();
+            }
+
+            function displayBgmAnalysis(bgm) {
+                const bgmSection = document.getElementById('bgmSection');
+
+                // Risk level colors
+                const riskColors = {
+                    'low': 'text-green-400',
+                    'medium': 'text-yellow-400',
+                    'high': 'text-red-400'
+                };
+
+                const riskIcons = {
+                    'low': '🟢',
+                    'medium': '🟡',
+                    'high': '🔴'
+                };
+
+                bgmSection.innerHTML = `
+                <p class="text-slate-400 text-sm mb-4">🎵 배경음악(BGM) 분석</p>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">저작권 위험도</span>
+                        <span class="${riskColors[bgm.copyrightRiskLevel] || 'text-gray-400'} font-bold">
+                            ${riskIcons[bgm.copyrightRiskLevel] || '⚪'} ${bgm.copyrightRiskLevel?.toUpperCase() || 'UNKNOWN'}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">분위기 적합성</span>
+                        <span class="text-blue-400 font-bold">${bgm.atmosphereMatch || '-'}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">음량/품질</span>
+                        <span class="text-purple-400 font-bold">${bgm.volumeQuality || '-'}</span>
+                    </div>
+                    ${bgm.recommendation ? `
+                        <div class="mt-4 pt-4 border-t border-slate-700">
+                            <p class="text-emerald-400 text-sm">💡 ${bgm.recommendation}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            }
+
+            // Title generation handler
+            document.getElementById('generateTitlesBtn').addEventListener('click', async () => {
+                if (!selectedFile) {
+                    alert('먼저 비디오 파일을 선택해주세요.');
+                    return;
+                }
+
+                const title = document.getElementById('videoTitle').value;
+                const description = document.getElementById('videoDescription').value;
+
+                // Show loading
+                const btn = document.getElementById('generateTitlesBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ 제목 생성 중...';
+                btn.disabled = true;
+
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('video', selectedFile);
+                formData.append('title', title);
+                formData.append('description', description);
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/guidelines/generate-titles', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || '제목 생성 실패');
+                    }
+
+                    displayTitles(data.titles);
+
+                } catch (error) {
+                    console.error('Title generation error:', error);
+                    alert('제목 생성 중 오류가 발생했습니다: ' + error.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+
+            function displayTitles(titles) {
+                const titlesSection = document.getElementById('titlesSection');
+                const titlesContent = document.getElementById('titlesContent');
+
+                titlesContent.innerHTML = `
+                <!-- Video Interpretation -->
+                ${titles.videoInterpretation ? `
+                    <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-3">
+                            <div class="text-2xl">🎬</div>
+                            <div>
+                                <h3 class="text-blue-400 font-bold mb-2">영상 해석</h3>
+                                <p class="text-slate-300 leading-relaxed">${titles.videoInterpretation}</p>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Korean Titles -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        🇰🇷 한국어 제목
+                    </h3>
+                    <div class="space-y-2">
+                        ${titles.korean?.map((t, i) => `
+                            <div class="bg-slate-800/50 rounded-lg p-4 hover:bg-slate-700/50 cursor-pointer transition-colors"
+                                 onclick="copyToClipboard('${t.replace(/'/g, "\\'")}', '한국어 제목 ${i + 1}')">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-white font-medium">${i + 1}. ${t}</span>
+                                    <span class="text-slate-500 text-sm">📋 복사</span>
+                                </div>
+                            </div>
+                        `).join('') || '<p class="text-slate-500">생성된 제목이 없습니다</p>'}
+                    </div>
+                </div>
+
+                <!-- Japanese Titles -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        🇯🇵 일본어 제목
+                    </h3>
+                    <div class="space-y-2">
+                        ${titles.japanese?.map((t, i) => `
+                            <div class="bg-slate-800/50 rounded-lg p-4 hover:bg-slate-700/50 cursor-pointer transition-colors"
+                                 onclick="copyToClipboard('${t.replace(/'/g, "\\'")}', '일본어 제목 ${i + 1}')">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-white font-medium">${i + 1}. ${t}</span>
+                                    <span class="text-slate-500 text-sm">📋 복사</span>
+                                </div>
+                            </div>
+                        `).join('') || '<p class="text-slate-500">생성된 제목이 없습니다</p>'}
+                    </div>
+                </div>
+
+                <!-- Japanese Pronunciation -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        🗣️ 일본어 발음 (한글)
+                    </h3>
+                    <div class="space-y-2">
+                        ${titles.japanesePronunciation?.map((t, i) => `
+                            <div class="bg-slate-800/50 rounded-lg p-4 hover:bg-slate-700/50 cursor-pointer transition-colors"
+                                 onclick="copyToClipboard('${t.replace(/'/g, "\\'")}', '일본어 발음 ${i + 1}')">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-white font-medium">${i + 1}. ${t}</span>
+                                    <span class="text-slate-500 text-sm">📋 복사</span>
+                                </div>
+                            </div>
+                        `).join('') || '<p class="text-slate-500">생성된 제목이 없습니다</p>'}
+                    </div>
+                </div>
+            `;
+
+                titlesSection.classList.remove('hidden');
+                titlesSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function copyToClipboard(text, label) {
+                navigator.clipboard.writeText(text).then(() => {
+                    // Show toast notification
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                    toast.textContent = `✅ ${label} 복사됨!`;
+                    document.body.appendChild(toast);
+
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Copy failed:', err);
+                    alert('복사 실패: ' + err.message);
+                });
+            }
+
+            // ========================================
+            // VOICEVOX TTS Functions
+            // ========================================
+
+            // Check VOICEVOX connection status
+            async function checkVoicevoxConnection() {
+                try {
+                    const response = await fetch('http://localhost:4000/api/voicevox/speakers');
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        updateVoicevoxStatus(true, `연결됨 (${data.count}개 캐릭터)`);
+                        return true;
+                    } else {
+                        updateVoicevoxStatus(false, 'VOICEVOX 서버에 연결할 수 없습니다');
+                        return false;
+                    }
+                } catch (error) {
+                    updateVoicevoxStatus(false, 'VOICEVOX가 실행되지 않았습니다');
+                    return false;
+                }
+            }
+
+            function updateVoicevoxStatus(isConnected, message) {
+                const dot = document.getElementById('voicevoxStatusDot');
+                const text = document.getElementById('voicevoxStatusText');
+                const statusDiv = document.getElementById('voicevoxStatus');
+
+                if (isConnected) {
+                    dot.className = 'w-3 h-3 rounded-full bg-green-500 animate-pulse';
+                    text.textContent = message;
+                    statusDiv.className = 'mb-6 p-4 rounded-lg border border-green-500/20 bg-green-500/10';
+                } else {
+                    dot.className = 'w-3 h-3 rounded-full bg-red-500';
+                    text.textContent = message;
+                    statusDiv.className = 'mb-6 p-4 rounded-lg border border-red-500/20 bg-red-500/10';
+                }
+            }
+
+            // Load VOICEVOX characters
+            document.getElementById('loadCharactersBtn').addEventListener('click', async () => {
+                const btn = document.getElementById('loadCharactersBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ 불러오는 중...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/voicevox/speakers');
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || '캐릭터 목록을 불러올 수 없습니다');
+                    }
+
+                    displayCharacters(data.speakers);
+                    document.getElementById('charactersGrid').classList.remove('hidden');
+
+                } catch (error) {
+                    alert('오류: ' + error.message + '\n\nVOICEVOX 앱을 실행해주세요');
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+
+            function displayCharacters(speakers) {
+                const grid = document.getElementById('charactersGrid');
+                grid.innerHTML = '';
+
+                speakers.forEach(speaker => {
+                    speaker.styles.forEach(style => {
+                        const card = document.createElement('div');
+                        card.className = 'bg-slate-700/50 hover:bg-slate-600/50 rounded-lg p-4 cursor-pointer transition-all border-2 border-transparent hover:border-blue-500';
+                        card.onclick = () => selectCharacter(style.id, speaker.nameKr || speaker.name, style.nameKr || style.name, speaker.useCase || '');
+
+                        // Use character image if available, otherwise fallback to emoji
+                        const imageHtml = speaker.imageUrl
+                            ? `<img src="${speaker.imageUrl}" alt="${speaker.name}" class="w-16 h-16 mx-auto mb-2 rounded-full object-cover" onerror="this.onerror=null; this.outerHTML='<div class=\\'text-4xl mb-2\\'>🎤</div>';">`
+                            : '<div class="text-4xl mb-2">🎤</div>';
+
+                        card.innerHTML = `
+                        <div class="text-center">
+                            ${imageHtml}
+                            <p class="text-white font-bold text-sm mb-1">${speaker.nameKr || speaker.name}</p>
+                            <p class="text-slate-400 text-xs">${style.nameKr || style.name}</p>
+                            ${speaker.gender ? `<p class="text-slate-500 text-xs mt-1">${speaker.gender === 'female' ? '👧' : speaker.gender === 'male' ? '👦' : '🤖'}</p>` : ''}
+                        </div>
+                    `;
+
+                        grid.appendChild(card);
+                    });
+                });
+            }
+
+            function selectCharacter(speakerId, characterName, styleName, useCase = '') {
+                window.selectedSpeakerId = speakerId;
+                window.selectedCharacterName = `${characterName} (${styleName})`;
+
+                // Update selected character info
+                document.getElementById('selectedCharacterIcon').textContent = '🎤';
+                document.getElementById('selectedCharacterName').textContent = characterName;
+                document.getElementById('selectedCharacterStyle').textContent = styleName;
+                document.getElementById('selectedCharacterUseCase').textContent = useCase ? `용도: ${useCase}` : '';
+                document.getElementById('selectedCharacterInfo').classList.remove('hidden');
+
+                // Enable TTS generation if script is ready
+                checkTTSButtonState();
+
+                console.log(`Selected character: ${selectedCharacterName}, ID: ${speakerId}`);
+            }
+
+            // Preview character voice
+            document.getElementById('previewCharacterBtn').addEventListener('click', async () => {
+                if (!window.selectedSpeakerId) {
+                    alert('캐릭터를 먼저 선택해주세요');
+                    return;
+                }
+
+                const btn = document.getElementById('previewCharacterBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ 생성 중...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/voicevox/preview', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            speakerId: window.selectedSpeakerId,
+                            sampleText: 'こんにちは、よろしくお願いします。'
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('샘플 음성 생성에 실패했습니다');
+                    }
+
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+
+            // Manual script input (Always allowed)
+            document.getElementById('manualScriptBtn').addEventListener('click', () => {
+                document.getElementById('timelineEditor').classList.remove('hidden');
+                document.getElementById('generatedScriptDisplay').classList.add('hidden');
+                checkTTSButtonState();
+
+                // Ensure section is visible if opened manually (e.g. future standalone mode)
+                // In current layout, buttons are inside the section, so section must be visible first.
+                // But just in case we add a global entry point:
+                document.getElementById('voicevoxSection').classList.remove('hidden');
+                checkVoicevoxConnection();
+            });
+
+            // Auto generate script with Gemini
+            document.getElementById('autoGenerateScriptBtn').addEventListener('click', async () => {
+                if (!window.currentVideoAnalysis) {
+                    alert('⚠️ 자동 대본 생성은 영상 분석 데이터가 필요합니다.\n먼저 상단의 "가이드라인 분석 시작"을 진행해주세요.\n\n(직접 입력은 언제든지 가능합니다!)');
+                    return;
+                }
+
+                const btn = document.getElementById('autoGenerateScriptBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ Gemini로 생성 중...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/voicevox/generate-script', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            videoAnalysis: window.currentVideoAnalysis,
+                            duration: 15
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || '대본 생성에 실패했습니다');
+                    }
+
+                    displayGeneratedScript(data.script);
+
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+
+            function displayGeneratedScript(script) {
+                let scriptSummary = script.scriptSummary || '일본어 쇼츠 대본이 생성되었습니다.';
+                let scriptText = '';
+
+                if (script.timeline) {
+                    script.timeline.forEach(segment => {
+                        // Display Format: [0-3초] JP: ... / KR: ... / 발음: ...
+                        scriptText += `[${segment.start}-${segment.end}초]\n`;
+                        scriptText += `🇯🇵 일본어: ${segment.text_jp}\n`;
+                        scriptText += `🇰🇷 한국어: ${segment.text_kr}\n`;
+                        scriptText += `🗣️ 발음: ${segment.text_pron}\n\n`;
+                    });
+                }
+
+                document.getElementById('generatedScriptContent').innerHTML = `
+                    <div class="mb-4 text-brand-400 font-bold">${scriptSummary}</div>
+                    <div class="whitespace-pre-wrap font-medium">${scriptText}</div>
+                `;
+                document.getElementById('generatedScriptDisplay').classList.remove('hidden');
+                document.getElementById('timelineEditor').classList.add('hidden');
+
+                // Copy to textarea for potential editing
+                document.getElementById('scriptTextarea').value = scriptText;
+
+                checkTTSButtonState();
+            }
+
+            // Edit generated script
+            document.getElementById('editGeneratedScriptBtn').addEventListener('click', () => {
+                document.getElementById('timelineEditor').classList.remove('hidden');
+                document.getElementById('generatedScriptDisplay').classList.add('hidden');
+            });
+
+            // Generate TTS
+            document.getElementById('generateTTSBtn').addEventListener('click', async () => {
+                if (!window.selectedSpeakerId) {
+                    alert('캐릭터를 먼저 선택해주세요');
+                    return;
+                }
+
+                const scriptText = document.getElementById('scriptTextarea').value.trim();
+                if (!scriptText) {
+                    alert('대본을 입력해주세요');
+                    return;
+                }
+
+                // Extract Japanese text for TTS
+                // We need to extract the parts after "🇯🇵 일본어: " and before the next line
+                const lines = scriptText.split('\n');
+                let cleanText = '';
+
+                if (scriptText.includes('🇯🇵 일본어:')) {
+                    // Trilingual format
+                    cleanText = lines
+                        .filter(line => line.includes('🇯🇵 일본어:'))
+                        .map(line => line.replace('🇯🇵 일본어:', '').trim())
+                        .join('\n');
+                } else {
+                    // Legacy or direct format
+                    cleanText = lines
+                        .map(line => line.replace(/^\[.*?\]\s*/, '')) // Remove [0-3초] markers
+                        .filter(line => line.trim())
+                        .join('\n');
+                }
+
+                const btn = document.getElementById('generateTTSBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ 음성 생성 중...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: cleanText,
+                            speakerId: window.selectedSpeakerId,
+                            engineUrl: window.selectedEngineUrl,
+                            filename: `tts_${window.selectedSpeakerId}_${Date.now()}.wav`
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('TTS 생성에 실패했습니다');
+                    }
+
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+
+                    // Display generated audio
+                    const audio = document.getElementById('generatedAudio');
+                    audio.src = audioUrl;
+                    document.getElementById('generatedAudioSection').classList.remove('hidden');
+
+                    // Setup download
+                    document.getElementById('downloadAudioBtn').onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = audioUrl;
+                        a.download = `voicevox_tts_${Date.now()}.wav`;
+                        a.click();
+                    };
+
+                    // Scroll to audio section
+                    document.getElementById('generatedAudioSection').scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
+
+            function checkTTSButtonState() {
+                const scriptText = document.getElementById('scriptTextarea').value.trim();
+                const btn = document.getElementById('generateTTSBtn');
+                const helpText = btn.nextElementSibling;
+
+                if (window.selectedSpeakerId && scriptText) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed', 'grayscale');
+                    btn.classList.add('hover:scale-[1.02]', 'hover:shadow-lg', 'hover:shadow-purple-500/20');
+                    if (helpText) helpText.textContent = '👆 이제 음성 파일을 생성할 수 있습니다!';
+                } else {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed', 'grayscale');
+                    btn.classList.remove('hover:scale-[1.02]');
+                    if (helpText) helpText.textContent = '캐릭터와 대본을 선택하면 생성할 수 있습니다';
+                }
+            }
+
+            // Listen for script changes
+            document.getElementById('scriptTextarea').addEventListener('input', checkTTSButtonState);
+
+
+        </script>
+</body>
+
+</html>
