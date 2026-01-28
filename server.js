@@ -13,8 +13,12 @@ const multer = require('multer');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const { geminiGenerateJSON, geminiGenerateContent } = require('./server/utils/gemini.util');
+const { glmGenerateContent, glmGenerateJSON } = require('./server/utils/glm.util');
+const { generateQwenTTS } = require('./server/utils/qwen_tts.util');
+const { generatePersonaDialogue } = require('./server/utils/persona_plex.util');
+const { extractTranscriptPhi3 } = require('./server/utils/phi3_asr.util');
 
-
+// Trigger restart for .env load
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
@@ -148,6 +152,7 @@ function saveDiscoveredChannels(channels) {
 }
 
 console.log('[DEBUG] OPENAI_API_KEY loaded:', OPENAI_API_KEY ? `${OPENAI_API_KEY.slice(0, 20)}...${OPENAI_API_KEY.slice(-4)}` : 'NOT SET');
+console.log('[DEBUG] HF_API_TOKEN status:', process.env.HF_API_TOKEN ? 'LOADED' : 'MISSING');
 
 if (!APIFY_TOKEN) {
     console.warn('[WARN] APIFY_TOKEN 이 .env 에 설정되지 않았습니다.');
@@ -474,6 +479,13 @@ app.post('/api/transcript-rewrite', async (req, res) => {
                 }]
             });
             scriptMarkdown = message.content[0].text;
+        } else if (aiProvider === 'glm') {
+            // GLM API 호출 (무료/가성비)
+            try {
+                scriptMarkdown = await glmGenerateContent(process.env.ZHIPU_API_KEY, 'glm-4.7-flash', stylePrompt);
+            } catch (e) {
+                throw new Error('GLM API 응답 실패: ' + e.message);
+            }
         } else {
             // Gemini API 호출 (기본)
             try {
@@ -490,6 +502,78 @@ app.post('/api/transcript-rewrite', async (req, res) => {
     } catch (error) {
         console.error('[Transcript Rewrite Error]', error);
         res.status(500).json({ error: error.message || '대본 재작성 실패' });
+    }
+});
+
+// --- Audio AI Lab Routes ---
+
+// Qwen3-TTS Route (Direct proxy to local Flask server)
+app.post('/api/audio/qwen-tts', async (req, res) => {
+    const { text, language, prompt } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: 'No text provided' });
+    }
+
+    try {
+        console.log(`[Qwen-TTS Proxy] Forwarding request for: "${text.substring(0, 30)}..."`);
+
+        // Forward to local TTS server
+        const response = await fetch('http://127.0.0.1:5001/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: text,
+                prompt: prompt || 'Natural speech'
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[Qwen-TTS Proxy] Local server error:', errorText);
+            throw new Error(`TTS Server Error: ${response.status}`);
+        }
+
+        // Stream audio back to client
+        const audioBuffer = await response.arrayBuffer();
+        res.set('Content-Type', 'audio/mpeg');
+        res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+        console.error('[Qwen-TTS Proxy] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PersonaPlex Chat Route
+app.post('/api/audio/persona-chat', async (req, res) => {
+    const { messages, persona, temperature } = req.body;
+    try {
+        const result = await generatePersonaDialogue(messages, { persona, temperature });
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// MS Phi-3-Voice ASR Route
+// Note: Expecting audio data as a base64 string or binary
+app.post('/api/audio/phi3-asr', async (req, res) => {
+    const { audioData, language } = req.body;
+    try {
+        let buffer;
+        if (audioData.startsWith('data:')) {
+            // Handle base64 data URL
+            const base64Data = audioData.split(',')[1];
+            buffer = Buffer.from(base64Data, 'base64');
+        } else {
+            buffer = Buffer.from(audioData, 'base64');
+        }
+
+        const transcript = await extractTranscriptPhi3(buffer, { language });
+        res.json({ success: true, transcript });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

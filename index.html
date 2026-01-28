@@ -7,6 +7,7 @@
     <meta name="referrer" content="no-referrer">
     <title>YouTube Viral Finder & AI Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="qwen_audio.js" defer></script>
     <script src="hot_channels_v3.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/marked@4.0.0/marked.min.js"></script>
@@ -1251,10 +1252,180 @@ ${window.currentKoreanScript}
                     class="tab-btn px-6 py-3 font-medium text-slate-400 border-b-2 border-transparent hover:text-brand-300 transition-all hover:border-brand-400">
                     📋 YouTube 가이드라인
                 </button>
+                <button id="tab-audio-ai-lab" onclick="switchTab('audio-ai-lab')"
+                    class="tab-btn px-6 py-3 font-medium text-slate-400 border-b-2 border-transparent hover:text-brand-300 transition-all hover:border-brand-400">
+                    🎙️ Audio AI Lab
+                </button>
             </nav>
         </div>
 
         <!-- Tab Contents -->
+
+        <!-- Audio AI Lab Tab -->
+        <div id="content-audio-ai-lab" class="tab-content hidden">
+            <div class="max-w-6xl mx-auto">
+                <!-- Audio AI Lab Header -->
+                <div class="text-center mb-10">
+                    <div class="inline-block p-3 bg-brand-500/10 rounded-2xl mb-4">
+                        <span class="text-3xl">🎙️</span>
+                    </div>
+                    <h1 class="text-4xl font-black text-white mb-3 tracking-tighter">Audio AI 실험실</h1>
+                    <p class="text-slate-400 text-lg">최신 무료 오디오 AI 모델로 고품질 사운드를 디자인하세요.</p>
+                </div>
+
+                <!-- Inner Tab Navigation -->
+                <div class="flex justify-center mb-8">
+                    <div class="bg-slate-800/80 p-1.5 rounded-2xl flex gap-1 shadow-2xl border border-slate-700">
+                        <button onclick="switchAudioSubTab('qwen-tts')" id="subtab-qwen-tts"
+                            class="audio-subtab-btn px-8 py-3 rounded-xl bg-brand-600 text-white font-black shadow-lg shadow-brand-900/40 transition-all">Qwen3-TTS</button>
+                        <button onclick="switchAudioSubTab('persona-plex')" id="subtab-persona-plex"
+                            class="audio-subtab-btn px-8 py-3 rounded-xl text-slate-400 hover:text-white font-bold transition-all">PersonaPlex</button>
+                        <button onclick="switchAudioSubTab('phi3-asr')" id="subtab-phi3-asr"
+                            class="audio-subtab-btn px-8 py-3 rounded-xl text-slate-400 hover:text-white font-bold transition-all">Phi-3-Voice
+                            ASR</button>
+                    </div>
+                </div>
+
+                <!-- Sub-tab Contents -->
+                <div id="audio-subtab-content"
+                    class="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-3xl p-8 shadow-2xl min-h-[600px]">
+                    <!-- Contents will be loaded here -->
+                    <div id="qwen-tts-view" class="audio-view">
+                        <!-- Qwen3-TTS UI -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="space-y-6">
+                                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                                    <span>🎨</span> 음성 디자인 스튜디오
+                                </h3>
+
+                                <div class="bg-slate-900/50 rounded-2xl p-6 border border-slate-700">
+                                    <label class="block text-sm font-bold text-slate-400 mb-3">제어 명령 (자연어 설정)</label>
+                                    <input type="text" id="qwenCommand" placeholder="예: 차분하고 신뢰감 있는 아나운서 톤으로"
+                                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 outline-none transition-all">
+                                </div>
+
+                                <div class="bg-slate-900/50 rounded-2xl p-6 border border-slate-700">
+                                    <label class="block text-sm font-bold text-slate-400 mb-3">텍스트 입력</label>
+                                    <textarea id="qwenText" rows="6" placeholder="생성할 내용을 입력하세요..."
+                                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 outline-none transition-all resize-none"></textarea>
+                                </div>
+
+                                <button onclick="generateQwenAudio(event)"
+                                    class="w-full py-4 bg-gradient-to-r from-brand-600 to-accent-600 hover:from-brand-500 hover:to-accent-500 text-white font-black rounded-2xl shadow-xl transition transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2">
+                                    <span>🔊</span> 음질 합성 & 샘플 생성
+                                </button>
+                            </div>
+
+                            <div class="space-y-6">
+                                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                                    <span>🎵</span> 생성된 오디오 샘플
+                                </h3>
+                                <div id="qwenSampleList"
+                                    class="bg-slate-900/30 rounded-2xl border border-slate-700/50 h-[450px] overflow-y-auto p-4 space-y-3">
+                                    <!-- Samples will match the card style -->
+                                    <div class="text-center py-20 text-slate-500">
+                                        <p>아직 생성된 샘플이 없습니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="persona-plex-view" class="audio-view hidden">
+                        <!-- PersonaPlex UI -->
+                        <div class="flex flex-col h-[600px]">
+                            <div id="personaChatWindow"
+                                class="flex-1 overflow-y-auto mb-6 p-4 space-y-4 bg-slate-900/50 rounded-2xl border border-slate-700">
+                                <div class="flex justify-start">
+                                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 max-w-[80%]">
+                                        <p class="text-slate-300">안녕하세요! 어떤 성격의 대화를 구성해볼까요? 남녀 간의 티키타카나 특정 상황을 말씀해주세요.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4">
+                                <div class="flex-1 relative">
+                                    <input type="text" id="personaChatInput"
+                                        placeholder="메시지를 입력하세요 (예: 연인 간의 가벼운 말싸움 장면을 그려줘)"
+                                        class="w-full bg-slate-900 border border-slate-700 rounded-2xl px-6 py-4 text-white focus:ring-2 focus:ring-brand-500 outline-none transition-all pr-16 shadow-inner">
+                                    <button onclick="sendPersonaChatMessage()"
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-brand-600 hover:bg-brand-500 rounded-xl text-white transition-all">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <select id="personaType"
+                                    class="bg-slate-800 border border-slate-700 rounded-2xl px-4 text-white outline-none focus:ring-2 focus:ring-brand-500">
+                                    <option value="couple">연인 (남녀)</option>
+                                    <option value="friends">친구 (동성)</option>
+                                    <option value="expert">전문가 & 초보자</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="phi3-asr-view" class="audio-view hidden">
+                        <!-- Phi-3-Voice ASR UI -->
+                        <div class="space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div
+                                    class="bg-slate-900/50 rounded-3xl p-8 border-2 border-dashed border-slate-700 hover:border-brand-500 transition-all text-center cursor-pointer group">
+                                    <div
+                                        class="w-16 h-16 bg-brand-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                        <span class="text-3xl text-brand-500">📁</span>
+                                    </div>
+                                    <h4 class="text-xl font-bold text-white mb-2">오디오/동영상 업로드</h4>
+                                    <p class="text-slate-500 mb-4">MP4, MP3, WAV 파일을 여기에 드래그하세요.</p>
+                                    <input type="file" id="asrFileInput" class="hidden" accept="audio/*,video/*">
+                                    <button onclick="document.getElementById('asrFileInput').click()"
+                                        class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold transition-all border border-slate-700">파일
+                                        선택</button>
+                                </div>
+
+                                <div
+                                    class="bg-slate-900/50 rounded-3xl p-8 border border-slate-700 flex flex-col justify-center">
+                                    <h4 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                        <span>🔗</span> 유튜브 URL로 추출
+                                    </h4>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="asrUrlInput"
+                                            placeholder="https://youtube.com/watch?v=..."
+                                            class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 outline-none transition-all">
+                                        <button onclick="extractAsrFromUrl()"
+                                            class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl shadow-lg transition-all">추출</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/50 rounded-2xl border border-slate-700 overflow-hidden">
+                                <div
+                                    class="flex items-center justify-between p-4 bg-slate-800/50 border-b border-slate-700">
+                                    <h4 class="font-bold text-white flex items-center gap-2">
+                                        <span>📝</span> 실시간 자막 교정 에디터
+                                    </h4>
+                                    <div class="flex gap-2">
+                                        <button onclick="copyToClipboard('asrResultText')"
+                                            class="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all"
+                                            title="복사">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea id="asrResultText" rows="12"
+                                    class="w-full bg-transparent p-6 text-slate-300 outline-none resize-none font-sans leading-relaxed"
+                                    placeholder="추출된 자막이 여기에 표시됩니다."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- HOT Channel Finder Tab -->
         <div id="content-channel-finder" class="tab-content">
@@ -1633,7 +1804,7 @@ ${window.currentKoreanScript}
         <script>
             const DEFAULT_YOUTUBE_KEY = 'AIzaSyBNyle0lxe-LUCEtRW3mI2WOfWvkQRmdKk';
             const DEFAULT_GEMINI_KEY = 'AIzaSyATQ84LNLhs7snbzrcE2IRX6ig54BZsSB8';
-            const DEFAULT_APIFY_TOKEN = 'apify_api_VhYHi230U8JbqA9Cf8erX1KvVDtIIC3RW0gh';
+            const DEFAULT_APIFY_TOKEN = ''; // Enter your Apify token in the API settings modal
             const APIFY_ACTOR_ID = 'pintostudio~youtube-transcript-scraper';
 
             let YOUTUBE_API_KEY = '';
@@ -2306,6 +2477,7 @@ ${window.currentKoreanScript}
                                     <select id="aiProvider" class="bg-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent-500">
                                         <option value="gemini">Gemini 2.5 Flash</option>
                                         <option value="claude">Claude Sonnet 4.5</option>
+                                        <option value="glm">GLM-4.7-Flash (Free)</option>
                                     </select>
                                     <select id="rewriteStyle" class="bg-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
                                         <optgroup label="📱 숏폼 (5000자 미만)">
@@ -6416,8 +6588,7 @@ ${window.currentKoreanScript}
     if (!warningEl) {
     warningEl = document.createElement('div');
     warningEl.id = 'quota-warning-banner';
-    warningEl.className = 'bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6 flex items-center gap-4
-    animate-in fade-in slide-in-from-top duration-500';
+                warningEl.className = 'bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6 flex items-center gap-4 animate-in fade-in slide-in-from-top duration-500';
     const grid = document.getElementById('channelResultsGrid');
     grid.parentNode.insertBefore(warningEl, grid);
     }
@@ -6506,7 +6677,303 @@ ${window.currentKoreanScript}
     if (loadingOverlay) loadingOverlay.classList.add('hidden');
     }
     }
-    </script>
-    <script src="hot_channels_v3.js"></script>
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Audio AI Lab Logic
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    let audioSamples = [];
+
+    function switchAudioSubTab(subTabId) {
+        // Hide all views
+        document.querySelectorAll('.audio-view').forEach(view => view.classList.add('hidden'));
+        
+        // Remove active class from buttons
+        document.querySelectorAll('.audio-subtab-btn').forEach(btn => {
+            btn.classList.remove('bg-brand-600', 'text-white', 'font-black', 'shadow-lg', 'shadow-brand-900/40');
+            btn.classList.add('text-slate-400', 'font-bold');
+        });
+
+        // Show selected view
+        const targetView = document.getElementById(`${subTabId}-view`);
+        if (targetView) targetView.classList.remove('hidden');
+
+        // Highlight button
+        const targetBtn = document.getElementById(`subtab-${subTabId}`);
+        if (targetBtn) {
+            targetBtn.classList.remove('text-slate-400', 'font-bold');
+            targetBtn.classList.add('bg-brand-600', 'text-white', 'font-black', 'shadow-lg', 'shadow-brand-900/40');
+        }
+    }
+
+    // --- Qwen3-TTS Logic ---
+    async function generateQwenAudio(event) {
+        const text = document.getElementById('qwenText').value.trim();
+        const command = document.getElementById('qwenCommand').value.trim();
+        
+        if (!text) {
+            alert('합성할 텍스트를 입력해주세요.');
+            return;
+        }
+
+        const btn = event.currentTarget;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<div class="loader w-5 h-5 border-2 border-white border-t-transparent animate-spin mr-2"></div> 합성 중...`;
+
+        try {
+            const response = await fetch('/api/audio/qwen-tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    text: text,
+                    language: 'ko', // Default
+                    command: command
+                })
+            });
+
+            if (!response.ok) throw new Error('TTS 생성 실패');
+
+            const blob = await response.blob();
+            const audioUrl = URL.createObjectURL(blob);
+            
+            // Add to samples
+            const sample = {
+                id: Date.now(),
+                text: text.substring(0, 30) + '...',
+                url: audioUrl,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            audioSamples.unshift(sample);
+            renderQwenSamples();
+        } catch (error) {
+            console.error(error);
+            alert('오류: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    function renderQwenSamples() {
+        const list = document.getElementById('qwenSampleList');
+        if (audioSamples.length === 0) {
+            list.innerHTML = `<div class="text-center py-20 text-slate-500"><p>아직 생성된 샘플이 없습니다.</p></div>`;
+            return;
+        }
+
+        list.innerHTML = audioSamples.map(sample => `
+            <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between group hover:border-brand-500/50 transition-all">
+                <div class="flex-1 min-w-0 mr-4">
+                    <p class="text-slate-200 text-sm font-bold truncate">${sample.text}</p>
+                    <p class="text-slate-500 text-xs">${sample.timestamp}</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="playAudio('${sample.url}')" class="p-2 bg-brand-500/20 text-brand-400 hover:bg-brand-500 hover:text-white rounded-lg transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </button>
+                    <a href="${sample.url}" download="qwen_tts_${sample.id}.mp3" class="p-2 bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white rounded-lg transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    </a>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function playAudio(url) {
+        const audio = new Audio(url);
+        audio.play();
+    }
+
+    // --- PersonaPlex Logic ---
+    async function sendPersonaChatMessage() {
+        const input = document.getElementById('personaChatInput');
+        const text = input.value.trim();
+        const personaType = document.getElementById('personaType').value;
+        const chatWindow = document.getElementById('personaChatWindow');
+
+        if (!text) return;
+
+        // User message
+        appendChatMessage('user', text);
+        input.value = '';
+
+        // AI message (Loading)
+        const loadingId = 'ai-loading-' + Date.now();
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = loadingId;
+        loadingDiv.className = 'flex justify-start';
+        loadingDiv.innerHTML = `<div class="bg-slate-800 border border-slate-700 rounded-2xl p-4"><div class="loader w-4 h-4 border-2 border-brand-500 border-t-transparent animate-spin"></div></div>`;
+        chatWindow.appendChild(loadingDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        try {
+            const response = await fetch('/api/audio/persona-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    messages: [{ role: 'user', content: text }],
+                    persona: personaType 
+                })
+            });
+
+            const data = await response.json();
+            loadingDiv.remove();
+            appendChatMessage('assistant', data.text);
+        } catch (error) {
+            loadingDiv.remove();
+            appendChatMessage('assistant', '죄송합니다. 오류가 발생했습니다: ' + error.message);
+        }
+    }
+
+    async function generateQwenAudio(event) {
+        window.generateQwenAudio = generateQwenAudio; // Ensure global access
+        event.preventDefault();
+        
+        const qwenText = document.getElementById('qwenText').value;
+        const qwenCommand = document.getElementById('qwenCommand').value; // Prompt/Style
+        
+        if (!qwenText) {
+            alert('텍스트를 입력해주세요.');
+            return;
+        }
+
+        const button = event.currentTarget;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<div class="loader w-5 h-5 border-2 border-white border-t-transparent animate-spin"></div> 처리 중...';
+
+        try {
+            // Using a simpler prompt structure for the demo if command is empty
+            const prompt = qwenCommand ? qwenCommand : "Natural speech";
+
+            const response = await fetch('/api/audio/qwen-tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    text: qwenText,
+                    language: 'ko', // Defaulting to Korean as per UI
+                    prompt: prompt
+                })
+            });
+
+            if (!response.ok) throw new Error('Audio generation failed');
+
+            const blob = await response.blob();
+            const audioUrl = URL.createObjectURL(blob);
+            
+            addAudioSample('Qwen3-TTS', qwenText, audioUrl);
+
+        } catch (error) {
+            console.error('TTS Error:', error);
+            alert('오류가 발생했습니다: ' + error.message);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+
+    function addAudioSample(modelName, text, audioUrl) {
+        const list = document.getElementById('qwenSampleList');
+        
+        // Remove empty state if present
+        if (list.querySelector('.text-center')) {
+            list.innerHTML = '';
+        }
+
+        const div = document.createElement('div');
+        div.className = 'bg-slate-800/50 rounded-xl p-4 border border-slate-700 hover:border-brand-500 transition-colors group animate-fade-in-up';
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-brand-400 bg-brand-400/10 px-2 py-1 rounded">${modelName}</span>
+                <span class="text-xs text-slate-500">${new Date().toLocaleTimeString()}</span>
+            </div>
+            <p class="text-sm text-slate-300 mb-4 line-clamp-2" title="${text}">${text}</p>
+            <audio controls class="w-full h-8">
+                <source src="${audioUrl}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+        `;
+        
+        list.insertBefore(div, list.firstChild);
+    }
+
+    function appendChatMessage(role, text) {
+        const chatWindow = document.getElementById('personaChatWindow');
+        const div = document.createElement('div');
+        div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+        div.innerHTML = `
+            <div class="${role === 'user' ? 'bg-brand-600 text-white shadow-lg' : 'bg-slate-800 border border-slate-700 text-slate-300'} rounded-2xl p-4 max-w-[80%]">
+                <p>${text}</p>
+            </div>
+        `;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // --- Phi-3-Voice ASR Logic ---
+    async function extractAsrFromUrl() {
+        const url = document.getElementById('asrUrlInput').value.trim();
+        if (!url) {
+            alert('유튜브 URL을 입력해주세요.');
+            return;
+        }
+
+        const area = document.getElementById('asrResultText');
+        area.placeholder = '분석 중...';
+        area.value = '';
+
+        try {
+            // Re-using existing get-transcript API for simplicity, 
+            // but in a more advanced setup, this would use Phi-3-Voice specifically
+            const response = await fetch('/api/get-transcript', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoUrl: url })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                area.value = data.transcript;
+            } else {
+                throw new Error(data.error || '자막 추출 실패');
+            }
+        } catch (error) {
+            alert('오류: ' + error.message);
+            area.placeholder = '추출된 자막이 여기에 표시됩니다.';
+        }
+    }
+
+    // Handle File Upload for ASR
+    document.addEventListener('DOMContentLoaded', () => {
+        const asrFileInput = document.getElementById('asrFileInput');
+        if (asrFileInput) {
+            asrFileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const area = document.getElementById('asrResultText');
+                area.placeholder = `${file.name} 분석 중...`;
+                
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const base64 = reader.result.split(',')[1];
+                    try {
+                        const response = await fetch('/api/audio/phi3-asr', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ audioData: base64 })
+                        });
+                        const data = await response.json();
+                        area.value = data.transcript;
+                    } catch (error) {
+                        alert('파일 분석 오류: ' + error.message);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+    });
 </body>
 </html>
