@@ -10,7 +10,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * Unified Gemini Generate Content Function with Exponential Backoff Retry Logic
  * 
  * @param {string} apiKey - Gemini API Key
- * @param {string} modelName - Model name (e.g., 'gemini-2.0-flash-exp')
+ * @param {string} modelName - Model name (e.g., 'gemini-2.0-flash')
  * @param {Array|Object} contents - The contents to generate from (SDK format or raw parts)
  * @param {Object} options - Additional options (maxRetries, initialDelay)
  * @returns {Promise<Object>} - The parsed JSON or text response

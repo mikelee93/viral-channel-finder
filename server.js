@@ -17,6 +17,8 @@ const { glmGenerateContent, glmGenerateJSON } = require('./server/utils/glm.util
 const { generateQwenTTS } = require('./server/utils/qwen_tts.util');
 const { generatePersonaDialogue } = require('./server/utils/persona_plex.util');
 const { extractTranscriptPhi3 } = require('./server/utils/phi3_asr.util');
+const dialogueManager = require('./server/utils/dialogue_manager');
+
 
 // Trigger restart for .env load
 const app = express();
@@ -489,7 +491,7 @@ app.post('/api/transcript-rewrite', async (req, res) => {
         } else {
             // Gemini API 호출 (기본)
             try {
-                scriptMarkdown = await geminiGenerateContent(GEMINI_API_KEY, 'gemini-2.0-flash-exp', [
+                scriptMarkdown = await geminiGenerateContent(GEMINI_API_KEY, 'gemini-2.0-flash', [
                     { text: stylePrompt }
                 ]);
             } catch (e) {
@@ -556,9 +558,48 @@ app.post('/api/audio/persona-chat', async (req, res) => {
     }
 });
 
+// PersonaPlex Dialogue (Tiki-Taka) Route
+app.post('/api/audio/dialogue', async (req, res) => {
+    const { topic, personaA, personaB, turns } = req.body;
+
+    if (!topic || !personaA || !personaB) {
+        return res.status(400).json({ error: 'Missing required parameters: topic, personaA, personaB' });
+    }
+
+    try {
+        console.log(`[Dialogue API] Starting dialogue on: ${topic}`);
+        const dialogue = await dialogueManager.generateDialogue(topic, personaA, personaB, turns || 3);
+        res.json({ success: true, dialogue });
+    } catch (error) {
+        console.error('[Dialogue API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// Custom Script Parsing Route
+app.post('/api/audio/parse-script', async (req, res) => {
+    const { script, personaA, personaB } = req.body;
+
+    if (!script) {
+        return res.status(400).json({ error: 'No script text provided' });
+    }
+
+    try {
+        console.log(`[Parse Script API] Parsing script...`);
+        // Use DialogueManager to parse
+        const dialogue = await dialogueManager.parseScriptToDialogue(script, personaA, personaB);
+        res.json({ success: true, dialogue });
+    } catch (error) {
+        console.error('[Parse Script API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 // MS Phi-3-Voice ASR Route
-// Note: Expecting audio data as a base64 string or binary
 app.post('/api/audio/phi3-asr', async (req, res) => {
+
     const { audioData, language } = req.body;
     try {
         let buffer;

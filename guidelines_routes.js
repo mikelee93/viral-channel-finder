@@ -237,7 +237,7 @@ JSON 형식으로만 응답:
 }`;
 
     try {
-        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash-exp', [
+        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [
             file,
             { text: prompt }
         ]);
@@ -288,7 +288,7 @@ ${metadata.description ? `참고 설명: ${metadata.description}` : ''}
 }`;
 
     try {
-        const titles = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash-exp', [
+        const titles = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [
             file,
             { text: prompt }
         ]);
