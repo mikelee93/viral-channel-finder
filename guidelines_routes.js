@@ -76,13 +76,19 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
 
             console.log('[Guidelines] Analysis complete');
 
-            // Save to database
-            const check = await ViolationCheck.create({
-                videoFile: req.file.filename,
-                title: title || 'Uploaded Video',
-                description,
-                analysis
-            });
+            // Save to database (Optional - don't fail properly if DB is down)
+            let checkId = null;
+            try {
+                const check = await ViolationCheck.create({
+                    videoFile: req.file.filename,
+                    title: title || 'Uploaded Video',
+                    description,
+                    analysis
+                });
+                checkId = check._id;
+            } catch (dbError) {
+                console.warn('[Guidelines] Warning: Failed to save to DB (Not Primary/Error), but returning analysis.', dbError.message);
+            }
 
             // Clean up local file
             if (fs.existsSync(videoPath)) {
@@ -91,7 +97,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
             }
 
             res.json({
-                checkId: check._id,
+                checkId: checkId, // Might be null
                 title,
                 analysis
             });
@@ -237,7 +243,7 @@ JSON 형식으로만 응답:
 }`;
 
     try {
-        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [
+        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
             file,
             { text: prompt }
         ]);
@@ -288,7 +294,7 @@ ${metadata.description ? `참고 설명: ${metadata.description}` : ''}
 }`;
 
     try {
-        const titles = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [
+        const titles = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
             file,
             { text: prompt }
         ]);

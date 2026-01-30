@@ -18,6 +18,7 @@ const { generateQwenTTS } = require('./server/utils/qwen_tts.util');
 const { generatePersonaDialogue } = require('./server/utils/persona_plex.util');
 const { extractTranscriptPhi3 } = require('./server/utils/phi3_asr.util');
 const dialogueManager = require('./server/utils/dialogue_manager');
+const { analyzeChannelStrategy } = require('./server/utils/channel_analyzer.util');
 
 
 // Trigger restart for .env load
@@ -428,18 +429,27 @@ app.post('/api/analyze-viral-video', async (req, res) => {
 });
 
 
-// ═══════════════════════════════════════════════════════════════════════════
 // API: Transcript Rewrite with Viral Pattern Learning
 // ═══════════════════════════════════════════════════════════════════════════
 app.post('/api/transcript-rewrite', async (req, res) => {
     try {
-        const { videoId, videoTitle, comments, transcript, style, aiProvider, useViralPatterns } = req.body;
+        const {
+            videoId,
+            videoTitle,
+            comments,
+            transcript,
+            targetCountry,      // 🆕 국가 선택 (KR/JP/US)
+            scriptCategory,     // 🆕 카테고리 (info/money/love/study/humor/challenge)
+            targetAge,          // 🆕 연령대 (teen/20s/30s)
+            aiProvider,
+            useViralPatterns
+        } = req.body;
 
-        console.log(`[Transcript Rewrite] Style: ${style}, AI: ${aiProvider}, UsePatterns: ${useViralPatterns}`);
+        console.log(`[Transcript Rewrite] Country: ${targetCountry}, Category: ${scriptCategory}, Age: ${targetAge}, AI: ${aiProvider}`);
 
         // 입력 검증
-        if (!transcript || !style) {
-            return res.status(400).json({ error: '자막과 스타일이 필요합니다' });
+        if (!transcript || !targetCountry || !scriptCategory || !targetAge) {
+            return res.status(400).json({ error: '자막, 국가, 카테고리, 연령대가 필요합니다' });
         }
 
         // 바이럴 패턴 데이터 가져오기 (체크박스 ON일 때만)
@@ -463,8 +473,17 @@ app.post('/api/transcript-rewrite', async (req, res) => {
             }
         }
 
-        // AI 프롬프트 생성 (스타일별)
-        const stylePrompt = getStylePrompt(style, videoTitle, comments, transcript, viralPatternsContext);
+        // 🆕 로컬라이징 프롬프트 생성 (국가 × 카테고리 × 연령)
+        const { getLocalizedPrompt } = require('./server/utils/localized-prompts.util');
+        const stylePrompt = getLocalizedPrompt(
+            targetCountry,
+            scriptCategory,
+            targetAge,
+            videoTitle,
+            comments,
+            transcript,
+            viralPatternsContext
+        );
 
         // AI 호출 (Gemini 또는 Claude)
         let scriptMarkdown = '';
@@ -5926,6 +5945,7 @@ JSON만 출력하고 다른 설명은 추가하지 마세요.`;
 
 // API Endpoint: /api/multilang-keywords
 // API Endpoint: /api/multilang-keywords
+// API Endpoint: /api/multilang-keywords
 app.post('/api/multilang-keywords', async (req, res) => {
     try {
         const { category, languages = ['ko', 'en', 'ja'], limit = 50 } = req.body;
@@ -5943,21 +5963,68 @@ app.post('/api/multilang-keywords', async (req, res) => {
             return res.status(400).json({ error: 'Invalid category' });
         }
 
-        console.log(`[Multilang Keywords] Fetching keywords for ${category} (ID: ${categoryId}) via Search API`);
+        // 0. Check Cache (Daily Update based on US EST)
+        // EST is UTC-5. Start of "today" in EST.
+        const now = new Date();
+        const estOffset = -5 * 60 * 60 * 1000; // EST offset in ms (simplified)
+        const estNow = new Date(now.getTime() + estOffset);
+        estNow.setUTCHours(0, 0, 0, 0); // Start of day in EST (UTC based timestamp)
+        // Convert back to UTC for DB query
+        const startOfTodayEST_inUTC = new Date(estNow.getTime() - estOffset);
 
-        // 1. YouTube Search API로 키워드 수집 (7일 이내, Shorts, 조회수순)
-        const keywords = await fetchKeywordsBySearch(category, categoryId);
-        console.log(`[Multilang Keywords] Extracted ${keywords.length} unique keywords with category-based smart extraction`);
+        if (mongoose.connection.readyState === 1) {
+            try {
+                const KeywordSnapshot = require('./models/KeywordSnapshot');
+                const cachedSnapshot = await KeywordSnapshot.findOne({
+                    categoryId,
+                    createdAt: { $gte: startOfTodayEST_inUTC }
+                }).sort({ createdAt: -1 });
 
-        // 2. Gemini로 번역
-        const topKeywords = keywords.slice(0, Math.min(50, limit));
-        const translatedKeywords = await translateKeywords(topKeywords, languages);
+                if (cachedSnapshot) {
+                    console.log(`[Multilang Keywords] Serving cached data for ${category} (from ${cachedSnapshot.createdAt})`);
 
-        // Add rank
-        const rankedKeywords = translatedKeywords.map((kw, index) => ({
-            rank: index + 1,
-            ...kw
-        }));
+                    // Format for response
+                    const keywords = cachedSnapshot.keywords.map((k, index) => ({
+                        rank: index + 1,
+                        ko: k.text || k.translations.ko,
+                        en: k.translations.en,
+                        ja: k.translations.ja,
+                        zh: k.translations.zh,
+                        tw: k.translations.tw,
+                        es: k.translations.es,
+                        hi: k.translations.hi,
+                        ru: k.translations.ru,
+                        frequency: k.frequency
+                    }));
+
+                    return res.json({
+                        success: true,
+                        category,
+                        keywords: keywords.slice(0, limit),
+                        cached: true,
+                        timestamp: cachedSnapshot.createdAt
+                    });
+                }
+            } catch (cacheErr) {
+                console.warn('[Multilang Keywords] Cache check failed:', cacheErr.message);
+            }
+        }
+
+        console.log(`[Multilang Keywords] Fetching fresh data for ${category} (ID: ${categoryId}) via Search API`);
+
+        // 1. YouTube Search API로 비디오 수집 (키워드 추출용)
+        // We need raw videos to analyze titles, not just word counts.
+        const videos = await fetchVideosForKeywordAnalysis(category, categoryId);
+        console.log(`[Multilang Keywords] Analyzed ${videos.length} videos for topic extraction`);
+
+        // 2. Gemini로 분석 및 번역 (중복 제거, 핵심 이슈 선별)
+        const rankedKeywords = await analyzeAndTranslateKeywordsWithGemini(videos, category);
+        console.log(`[Multilang Keywords] Gemini returned ${rankedKeywords.length} keywords`);
+        if (rankedKeywords.length > 0) {
+            console.log('[Multilang Keywords] Top keyword:', rankedKeywords[0]);
+        } else {
+            console.warn('[Multilang Keywords] Gemini returned empty array. Check API quota or prompt.');
+        }
 
         // 3. MongoDB 저장 시도 (실패해도 계속 진행)
         try {
@@ -5975,12 +6042,13 @@ app.post('/api/multilang-keywords', async (req, res) => {
                             en: k.en,
                             ja: k.ja,
                             zh: k.zh,
+                            tw: k.tw, // Add TW
                             es: k.es,
                             hi: k.hi,
                             ru: k.ru
                         }
                     })),
-                    collectionMethod: 'search_api',
+                    collectionMethod: 'gemini_analysis',
                     apiQuotaUsed: 100 // Estimate
                 });
 
@@ -6005,6 +6073,200 @@ app.post('/api/multilang-keywords', async (req, res) => {
         res.status(500).json({ error: error.message || '다국어 키워드 검색 실패' });
     }
 });
+
+// Helper: Fetch raw videos for analysis (Modified version of fetchKeywordsBySearch)
+async function fetchVideosForKeywordAnalysis(categoryName, categoryId) {
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const searchQueries = {
+        '스포츠': {
+            ko: ['스포츠', '경기', '하이라이트', '골', '선수'],
+            en: ['sports', 'game', 'highlights', 'goal', 'athlete'],
+            ja: ['スポーツ', '試合', 'ハイライト', 'ゴール', '選手']
+        },
+        '영화/애니메이션': {
+            ko: ['영화', '애니', '명장면', '트레일러', '리뷰'],
+            en: ['movie', 'anime', 'scene', 'trailer', 'review'],
+            ja: ['映画', 'アニメ', '名シーン', 'トレーラー', 'レビュー']
+        },
+        '자동차': {
+            ko: ['자동차', '시승기', '슈퍼카'],
+            en: ['car', 'test drive', 'supercar', 'review'],
+            ja: ['車', '試乗', 'スーパーカー']
+        },
+        '음악': {
+            ko: ['노래', '라이브', '직캠', 'MV'],
+            en: ['song', 'live', 'fancam', 'MV', 'music'],
+            ja: ['歌', 'ライブ', 'ファンカム', 'MV', '音楽']
+        },
+        '반려동물/동물': {
+            ko: ['강아지', '고양이', '반려동물', '귀여운'],
+            en: ['dog', 'cat', 'pet', 'cute', 'animals'],
+            ja: ['犬', '猫', 'ペット', 'かわいい', '動物']
+        },
+        '게임': {
+            ko: ['게임', '플레이', '하이라이트', '공략'],
+            en: ['game', 'gameplay', 'highlights', 'walkthrough'],
+            ja: ['ゲーム', 'プレイ', 'ハイライト', '攻略']
+        },
+        '인물/블로그': {
+            ko: ['브이로그', '일상', '먹방'],
+            en: ['vlog', 'daily', 'mukbang'],
+            ja: ['Vlog', '日常', 'モッパン']
+        },
+        '코미디': {
+            ko: ['웃긴', '몰카', '개그', '상황극'],
+            en: ['funny', 'prank', 'comedy', 'skit'],
+            ja: ['面白い', 'ドッキリ', 'お笑い', 'コント']
+        },
+        '엔터테인먼트': {
+            ko: ['예능', '이슈', '연예인', '아이돌'],
+            en: ['entertainment', 'issue', 'celebrity', 'idol'],
+            ja: ['芸能', '話題', '有名人', 'アイドル']
+        },
+        '뉴스/정치': {
+            ko: ['뉴스', '속보', '이슈'],
+            en: ['news', 'breaking', 'issue'],
+            ja: ['ニュース', '速報', '話題']
+        },
+        '노하우/스타일': {
+            ko: ['메이크업', '패션', '코디', '꿀팁'],
+            en: ['makeup', 'fashion', 'outfit', 'tips'],
+            ja: ['メイク', 'ファッション', 'コーデ', 'コツ']
+        },
+        '교육': {
+            ko: ['강의', '공부', '영어'],
+            en: ['lecture', 'study', 'english', 'tutorial'],
+            ja: ['講義', '勉強', '英語', 'チュートリアル']
+        },
+        '과학기술': {
+            ko: ['과학', '실험', '기술', '신기한'],
+            en: ['science', 'experiment', 'technology', 'amazing'],
+            ja: ['科学', '実験', '技術', '不思議']
+        },
+        '비영리/사회운동': {
+            ko: ['봉사', '기부', '캠페인'],
+            en: ['volunteer', 'donation', 'campaign'],
+            ja: ['ボランティア', '寄付', 'キャンペーン']
+        }
+    };
+
+    const categoryQueries = searchQueries[categoryName];
+    const allVideos = [];
+    const apiKey = getYouTubeApiKey();
+
+    if (!apiKey) throw new Error('No YouTube API Key available');
+
+    // Define search targets: 1 KR, 1 US, 1 JP to ensure global coverage
+    const searchTargets = [
+        { region: 'KR', lang: 'ko', queryList: categoryQueries?.ko || [categoryName] },
+        { region: 'US', lang: 'en', queryList: categoryQueries?.en || [categoryName] },
+        { region: 'JP', lang: 'ja', queryList: categoryQueries?.ja || [categoryName] }
+    ];
+
+    for (const target of searchTargets) {
+        // Pick one random query from the list for this region
+        const query = target.queryList[Math.floor(Math.random() * target.queryList.length)];
+
+        try {
+            console.log(`[Search API] Searching in ${target.region} for: ${query}`);
+            const searchUrl = `https://www.googleapis.com/youtube/v3/search?` + new URLSearchParams({
+                part: 'snippet',
+                maxResults: '20', // Reduce per-region count to stay within quota but get diversity
+                order: 'viewCount',
+                publishedAfter: oneWeekAgo,
+                regionCode: target.region,
+                relevanceLanguage: target.lang,
+                type: 'video',
+                q: query,
+                videoCategoryId: categoryId,
+                key: apiKey
+            });
+
+            const { data } = await fetchWithKeyRotation(searchUrl);
+            if (data.items) {
+                allVideos.push(...data.items);
+            }
+        } catch (e) {
+            console.error(`[Search API] Error searching for ${query} in ${target.region}:`, e.message);
+        }
+    }
+
+    // Deduplicate by ID
+    const uniqueVideos = Array.from(new Map(allVideos.map(v => [v.id.videoId, v])).values());
+    console.log(`[Search API] Collected ${uniqueVideos.length} unique videos for analysis`);
+    return uniqueVideos;
+}
+
+// Helper: Analyze titles with Gemini to extract topics and translate
+async function analyzeAndTranslateKeywordsWithGemini(videos, category) {
+    if (!GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is required for smart analysis');
+    }
+
+    // Extract titles and view counts (implied high view count since we sorted by viewCount)
+    const titles = videos.map(v => v.snippet.title).slice(0, 50).join('\n');
+
+    const prompt = `
+    다음은 유튜브 '${category}' 카테고리의 인기 동영상 제목들입니다.
+    이 제목들을 분석하여 현재 가장 화제가 되고 있는 **핵심 주제(Topic) 20개**를 추출해주세요.
+
+    [요구사항]
+    1. **중복 제거**: 비슷한 주제는 하나로 통합하세요. (예: '손흥민 골', '손흥민 득점', 'Sonny' -> '손흥민 (Son Heung-min)')
+    2. **구체적인 콘텐츠 주제(Specific Topics)**: 단순한 명사나 인물명(예: '축구', '아이유', '젤다')은 제외하세요. 대신 사람들이 유튜브창에 검색할법한 **구체적인 행동, 공략, 모음, 강좌, 핵심 장면** 등을 문장형 명사나 복합 키워드로 추출하세요.
+       - Bad: '축구', '야구', '먹방', '여행'
+       - Good: '축구 프리킥 잘 차는 법', '야구 경기 명장면 모음', '매운 라면 먹방 챌린지', '일본 오사카 여행 코스 추천', '아이폰 15 배터리 절약 꿀팁'
+    3. **다국어 번역**: 추출된 키워드를 한국어(ko), 영어(en), 일본어(ja), 중국어 간체(zh), 대만(번체)(tw), 스페인어(es), 힌디어(hi), 러시아어(ru)로 번역하세요.
+    4. **화제성 점수**: 1~100 사이의 점수로 화제성을 평가하세요. (Frequency)
+
+    [입력 데이터]
+    ${titles}
+
+    [출력 형식]
+    다음 JSON 배열 형식으로만 출력하세요 (마크다운 없이 JSON만):
+    [
+        {
+            "rank": 1,
+            "ko": "한국어 키워드",
+            "en": "English Keyword",
+            "ja": "Japanese Keyword",
+            "zh": "Chinese Keyword (Simplified)",
+            "tw": "Taiwanese Keyword (Traditional)",
+            "es": "Spanish Keyword",
+            "hi": "Hindi Keyword",
+            "ru": "Russian Keyword",
+            "frequency": 95
+        },
+        ...
+    ]
+    `;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        const data = await response.json();
+        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+
+        // Clean JSON
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+            console.error('Gemini output not JSON:', responseText);
+            return [];
+        }
+
+        return JSON.parse(jsonMatch[0]);
+
+    } catch (error) {
+        console.error('Gemini Analysis Error:', error);
+        // Fallback to empty
+        return [];
+    }
+}
 
 // ========================================
 // YouTube Search API Helpers
@@ -6320,6 +6582,7 @@ async function discoverHotChannels(contentType = 'shorts', maxChannels = 50, cou
 
         let targetVideos = [];
         const channelCategoryMap = {}; // Map channelId -> categoryName
+        let allVideoIds = [];
 
         // Map country codes to language codes
         const languageMap = {
@@ -6336,40 +6599,75 @@ async function discoverHotChannels(contentType = 'shorts', maxChannels = 50, cou
             if (country === 'KR') localKeyword = '#shorts #쇼츠';
             else if (country === 'JP') localKeyword = '#shorts #ショート';
 
-            let queryKeywords = localKeyword;
             if (categoryName) {
+                // [Specific Category Mode]
                 // Remove special chars for query safety
                 const cleanCat = categoryName.replace(/[^\w\s가-힣\u3000-\u303f\u3040-\u309f\u30a0-\u30ff]/g, '');
-                queryKeywords = `${cleanCat} ${queryKeywords}`;
-            }
+                let queryKeywords = `${cleanCat} ${localKeyword}`;
 
-            const searchQuery = encodeURIComponent(queryKeywords);
-            // Fetch up to 200 videos (4 pages of 50) to increase candidate pool
-            let pageToken = '';
-            const maxPages = 4;
-            const allVideoIds = [];
+                const searchQuery = encodeURIComponent(queryKeywords);
+                // Fetch up to 200 videos (4 pages of 50) to increase candidate pool
+                let pageToken = '';
+                const maxPages = 4;
 
-            for (let i = 0; i < maxPages; i++) {
-                const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${searchQuery}&regionCode=${country}&relevanceLanguage=${relevanceLanguage}&maxResults=50&order=viewCount&pageToken=${pageToken}&key=${getYouTubeApiKey()}`;
+                for (let i = 0; i < maxPages; i++) {
+                    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${searchQuery}&regionCode=${country}&relevanceLanguage=${relevanceLanguage}&maxResults=50&order=viewCount&pageToken=${pageToken}&key=${getYouTubeApiKey()}`;
 
-                console.log(`[HOT Discovery] Fetching page ${i + 1}/${maxPages}...`);
-                const { data: searchData } = await fetchWithKeyRotation(searchUrl);
+                    console.log(`[HOT Discovery] Fetching page ${i + 1}/${maxPages} for category: ${categoryName}...`);
+                    const { data: searchData } = await fetchWithKeyRotation(searchUrl);
 
-                if (searchData.items) {
-                    const ids = searchData.items.map(item => item.id.videoId).filter(Boolean);
-                    allVideoIds.push(...ids);
+                    if (searchData.items) {
+                        const ids = searchData.items.map(item => item.id.videoId).filter(Boolean);
+                        allVideoIds.push(...ids);
+                    }
+
+                    pageToken = searchData.nextPageToken;
+                    if (!pageToken) break;
                 }
+            } else {
+                // [General Diversity Mode]
+                // If no specific category is requested, iterate through ALL 15 categories to ensure diversity
+                console.log('[HOT Discovery] General mode: Iterating through all 15 categories to ensure diversity...');
 
-                pageToken = searchData.nextPageToken;
-                if (!pageToken) break;
+                // Use IDs to be more precise if possible, but search API 'videoCategoryId' filter is often restrictive/buggy with 'q'.
+                // Instead, we will use the category NAME in the query + #shorts.
+
+                const categories = Object.values(YOUTUBE_CATEGORY_MAP);
+
+                // We will fetch fewer per category (e.g., 10) to keep total quota reasonable, 
+                // but cover all 15 categories. 15 * 10 = 150 candidates.
+
+                for (const cat of categories) {
+                    const cleanCat = cat.replace(/[^\w\s가-힣\u3000-\u303f\u3040-\u309f\u30a0-\u30ff]/g, '');
+                    const q = encodeURIComponent(`${cleanCat} ${localKeyword}`);
+
+                    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&regionCode=${country}&relevanceLanguage=${relevanceLanguage}&maxResults=10&order=viewCount&key=${getYouTubeApiKey()}`;
+
+                    // Log less verbosely
+                    // console.log(`[HOT Discovery] Fetching for diversity: ${cat}...`); 
+
+                    try {
+                        const { data: searchData } = await fetchWithKeyRotation(searchUrl);
+                        if (searchData.items) {
+                            const ids = searchData.items.map(item => item.id.videoId).filter(Boolean);
+                            allVideoIds.push(...ids);
+                        }
+                    } catch (e) {
+                        console.warn(`[HOT Discovery] Failed to fetch for category ${cat}: ${e.message}`);
+                    }
+                }
+                console.log(`[HOT Discovery] Diversity search complete. Collected ${allVideoIds.length} candidate videos.`);
             }
 
             // Fetch details for all collected video IDs
             if (allVideoIds.length > 0) {
-                console.log(`[HOT Discovery] Fetching details for ${allVideoIds.length} videos...`);
+                // Remove duplicates
+                const uniqueVideoIds = [...new Set(allVideoIds)];
+                console.log(`[HOT Discovery] Fetching details for ${uniqueVideoIds.length} unique videos...`);
+
                 // Batch requests in 50s
-                for (let i = 0; i < allVideoIds.length; i += 50) {
-                    const batchIds = allVideoIds.slice(i, i + 50);
+                for (let i = 0; i < uniqueVideoIds.length; i += 50) {
+                    const batchIds = uniqueVideoIds.slice(i, i + 50);
                     const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${batchIds.join(',')}&key=${getYouTubeApiKey()}`;
                     const { data: videoData } = await fetchWithKeyRotation(videoUrl);
 
@@ -6454,12 +6752,40 @@ async function discoverHotChannels(contentType = 'shorts', maxChannels = 50, cou
                                 const { data: videosData } = await fetchWithKeyRotation(videosUrl);
 
                                 if (videosData.items) {
-                                    recentVideos = videosData.items.map(v => ({
-                                        videoId: v.contentDetails.videoId,
-                                        title: v.snippet.title,
-                                        thumbnail: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '',
-                                        publishedAt: v.snippet.publishedAt
-                                    }));
+                                    // 2025-01-29 Feature: Fetch durations AND views
+                                    const videoIds = videosData.items.map(item => item.contentDetails.videoId).filter(Boolean);
+                                    let videoDetails = {};
+
+                                    if (videoIds.length > 0) {
+                                        try {
+                                            const durationUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds.join(',')}&key=${getYouTubeApiKey()}`;
+                                            const { data: durationData } = await fetchWithKeyRotation(durationUrl);
+
+                                            if (durationData.items) {
+                                                durationData.items.forEach(item => {
+                                                    videoDetails[item.id] = {
+                                                        duration: item.contentDetails.duration,
+                                                        viewCount: item.statistics.viewCount
+                                                    };
+                                                });
+                                            }
+                                        } catch (durErr) {
+                                            console.warn(`[HOT Discovery] Duration/Stats fetch failed: ${durErr.message}`);
+                                        }
+                                    }
+
+                                    recentVideos = videosData.items.map(v => {
+                                        const vidId = v.contentDetails.videoId;
+                                        const details = videoDetails[vidId] || {};
+                                        return {
+                                            videoId: vidId,
+                                            title: v.snippet.title,
+                                            thumbnail: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '',
+                                            publishedAt: v.contentDetails.videoPublishedAt || v.snippet.publishedAt,
+                                            duration: details.duration || '',
+                                            viewCount: details.viewCount || '0'
+                                        };
+                                    });
                                 }
                             } catch (err) {
                                 console.error(`[HOT Discovery] Failed to fetch videos for ${channel.snippet.title}:`, err.message);
@@ -6523,17 +6849,29 @@ async function discoverHotChannels(contentType = 'shorts', maxChannels = 50, cou
                 updateData.recentVideos = channel.recentVideos;
             }
 
-            await HotChannel.findOneAndUpdate(
-                { channelId: channel.channelId },
-                { $set: updateData },
-                { upsert: true, new: true }
-            );
+            try {
+                await HotChannel.findOneAndUpdate(
+                    { channelId: channel.channelId },
+                    { $set: updateData },
+                    { upsert: true, new: true }
+                );
+            } catch (dbErr) {
+                console.warn(`[HOT Discovery] DB Write failed for ${channel.channelId}: ${dbErr.message}`);
+                // Continue despite DB error to show results to user
+            }
         }
 
-        console.log('[HOT Discovery] Saved to MongoDB');
+        console.log('[HOT Discovery] Saved to MongoDB (partial or complete)');
         return discoveredChannels;
     } catch (error) {
         console.error('[HOT Discovery] Error:', error);
+        // If we have any discovered channels, return them instead of failing completely using a local variable if defined
+        // However, 'discoveredChannels' is defined inside try.
+        // Since we are moving the DB write into the try block, the main catch will only catch critical errors before discovery.
+        // We really want to return what we have.
+        // Wait, 'discoveredChannels' is defined in scope above? No, it's defined inside 'try'.
+        // Let's rely on the inner try-catch for DB writes.
+        // If the error happens BEFORE the DB write loop (e.g. API limit), we throw.
         throw error;
     }
 }
@@ -6590,98 +6928,132 @@ app.post('/api/hot-channels/migrate-countries', async (req, res) => {
 
 app.post('/api/hot-channels', async (req, res) => {
     try {
-        const { contentType, growthMetric, subscriberMin, subscriberMax, videoCountMin, videoCountMax, country, categories } = req.body;
+        const { contentType, growthMetric, subscriberMin, subscriberMax, videoCountMin, videoCountMax, country, categories, localOnly } = req.body;
 
         console.log('[HOT Channels API] Query:', req.body);
 
-        // Build query
-        const query = {};
+        // Define target categories (User selected OR All default)
+        const TARGET_CATEGORIES = (categories && categories.length > 0)
+            ? categories
+            : [
+                '영화/애니메이션', '자동차', '음악', '반려동물/동물', '스포츠',
+                '여행/이벤트', '게임', '인물/블로그', '코미디', '엔터테인먼트',
+                '뉴스/정치', '노하우/스타일', '교육', '과학기술', '비영리/사회운동'
+            ];
 
-        // Subscriber range filter
-        if (subscriberMin || subscriberMax) {
-            query.subscriberCount = {};
-            if (subscriberMin) query.subscriberCount.$gte = subscriberMin;
-            if (subscriberMax) query.subscriberCount.$lte = subscriberMax;
-        }
+        let finalResults = [];
+        const CHANNELS_PER_CATEGORY = 10; // Target count per category
+        const HotChannel = require('./models/HotChannel');
 
-        // Video count range filter
-        if (videoCountMin || videoCountMax) {
-            query.videoCount = {};
-            if (videoCountMin) query.videoCount.$gte = videoCountMin;
-            if (videoCountMax) query.videoCount.$lte = videoCountMax;
-        }
+        // Parallel processing for categories to speed up
+        const categoryPromises = TARGET_CATEGORIES.map(async (catName) => {
+            try {
+                // 1. Build Base Query
+                const query = { categoryName: catName };
+                if (country && country !== 'ALL') query.country = country;
 
-        // Category filter (New)
-        if (categories && categories.length > 0) {
-            query.categoryName = { $in: categories };
-        }
+                // Add user ranges
+                if (subscriberMin || subscriberMax) {
+                    query.subscriberCount = {};
+                    if (subscriberMin) query.subscriberCount.$gte = subscriberMin;
+                    if (subscriberMax) query.subscriberCount.$lte = subscriberMax;
+                }
+                if (videoCountMin || videoCountMax) {
+                    query.videoCount = {};
+                    if (videoCountMin) query.videoCount.$gte = videoCountMin;
+                    if (videoCountMax) query.videoCount.$lte = videoCountMax;
+                }
 
-        // Country filter (New)
-        if (country && country !== 'ALL') {
-            query.country = country;
-        }
+                // 2. Fetch UNDERDOGS (Low Subs, High Potential)
+                // Definition: Subs < 100k, Sorted by Daily Growth (View/Day)
+                const underdogs = await HotChannel.find({
+                    ...query,
+                    subscriberCount: { $lt: 200000 } // Underdog Threshold
+                })
+                    .sort({ avgViewsPerVideo: -1, dailyViewGrowth: -1 }) // High efficiency
+                    .limit(5)
+                    .lean();
 
-        // Fetch from MongoDB
-        let channels = await HotChannel.find(query)
-            .sort({ lastUpdated: -1 })
-            .limit(100)
-            .lean();
+                // 3. Fetch TITANS (High Subs/Views)
+                // Definition: Subs >= 100k (or just top overall), Sorted by Total Views
+                const titans = await HotChannel.find({
+                    ...query
+                })
+                    .sort({ subscriberCount: -1, totalViews: -1 })
+                    .limit(5)
+                    .lean();
 
-        // If insufficient channels (less than 50) AND not in local-only mode
-        // We now attempt to discover channels even if a category is selected, to populate that category.
-        if (!req.body.localOnly && channels.length < 50) {
-            console.log(`[HOT Channels API] Insufficient channels in DB (${channels.length} < 50), discovering more...`);
+                let combined = [...underdogs, ...titans];
 
-            // Use the first filtered category as the target for discovery, or null for general
-            const targetCategory = (categories && categories.length > 0) ? categories[0] : null;
+                // Deduplicate by channelId
+                const seen = new Set();
+                combined = combined.filter(ch => {
+                    if (seen.has(ch.channelId)) return false;
+                    seen.add(ch.channelId);
+                    return true;
+                });
 
-            // Discover new channels
-            await discoverHotChannels(contentType, 50, country, targetCategory);
+                // 4. Discovery Fallback (If insufficient results AND not localOnly)
+                if (!localOnly && combined.length < 5) {
+                    console.log(`[HOT API] Low results for ${catName} (${combined.length}), discovering...`);
+                    const fresh = await discoverHotChannels(contentType, 10, country, catName);
 
-            // Re-fetch from MongoDB to include newly discovered ones
-            channels = await HotChannel.find(query)
-                .sort({ lastUpdated: -1 })
-                .limit(100)
-                .lean();
-        }
+                    // Add fresher ones
+                    fresh.forEach(f => {
+                        if (!seen.has(f.channelId)) {
+                            // Map fresh result to DB format for consistency
+                            combined.push({
+                                channelId: f.channelId,
+                                channelTitle: f.name,
+                                subscriberCount: f.subscribers,
+                                totalViews: f.totalViews,
+                                videoCount: f.videoCount,
+                                categoryName: f.category,
+                                thumbnail: f.thumbnail,
+                                recentVideos: f.recentVideos || [],
+                                avgViewsPerVideo: Math.floor(f.totalViews / Math.max(1, f.videoCount)),
+                                estimatedRevenue: f.estimatedRevenue,
+                                dailyViewGrowth: f.dailyGrowth,
+                                country: country
+                            });
+                            seen.add(f.channelId);
+                        }
+                    });
+                }
 
-        // Apply client-side filters to discovered/existing channels
-        let filteredChannels = channels;
+                return combined;
 
-        // Strict Country Filter (Server-side enforcement for KR)
+            } catch (err) {
+                console.error(`[HOT API] Error processing category ${catName}:`, err.message);
+                return [];
+            }
+        });
+
+        // Wait for all category queries
+        const resultsArray = await Promise.all(categoryPromises);
+        finalResults = resultsArray.flat();
+
+        // 5. Global Clean & Filter
+        // Strict Country Filter
         if (country === 'KR') {
-            filteredChannels = filteredChannels.filter(ch => {
-                const title = ch.channelTitle || ch.name || '';
-                // Check if title matches strict Korean validation (contains Hangul)
-                return /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(title);
-            });
-            console.log(`[HOT Channels API] Strict KR filter applied. ${channels.length} -> ${filteredChannels.length}`);
+            finalResults = finalResults.filter(ch => /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(ch.channelTitle || ch.name || ''));
         }
 
-        // Filter by video count (for discovered channels that might not have been filtered by DB query)
-        if (videoCountMin || videoCountMax) {
-            filteredChannels = filteredChannels.filter(ch => {
-                const count = ch.videoCount || 0;
-                if (videoCountMin && count < videoCountMin) return false;
-                if (videoCountMax && count > videoCountMax) return false;
-                return true;
-            });
-        }
+        // Final Sort: Prioritize Underdogs with High Growth across all categories? 
+        // Or just randomize/interleave? User requested "Underdog prioritized".
+        // Let's sort entire result set by Average Views Per Video (a good proxy for 'Heat') 
+        // penalizing massive channels slightly to give underdogs a chance?
+        // Simple approach: Sort by Daily Growth / Subscriber Count ratio (Viral coefficient)
+        finalResults.sort((a, b) => {
+            const ratioA = (a.avgViewsPerVideo || 0) / Math.max(1, a.subscriberCount || 1);
+            const ratioB = (b.avgViewsPerVideo || 0) / Math.max(1, b.subscriberCount || 1);
+            return ratioB - ratioA; // Descending Viral Ratio
+        });
 
-        // Filter by subscriber range (for discovered channels)
-        if (subscriberMin || subscriberMax) {
-            filteredChannels = filteredChannels.filter(ch => {
-                const subs = ch.subscriberCount || ch.subscribers || 0;
-                if (subscriberMin && subs < subscriberMin) return false;
-                if (subscriberMax && subs > subscriberMax) return false;
-                return true;
-            });
-        }
+        console.log(`[HOT Channels API] Returning ${finalResults.length} channels.`);
 
-        console.log(`[HOT Channels API] Filtered ${filteredChannels.length} channels from ${channels.length} total`);
-
-        // Format response
-        const formattedChannels = filteredChannels.map(ch => ({
+        // Format Response
+        const formattedChannels = finalResults.map(ch => ({
             channelId: ch.channelId,
             name: ch.channelTitle || ch.name,
             thumbnail: ch.thumbnail || `https://via.placeholder.com/88x88?text=${encodeURIComponent(ch.channelTitle || 'Channel')}`,
@@ -6690,8 +7062,8 @@ app.post('/api/hot-channels', async (req, res) => {
             videoCount: ch.videoCount,
             category: ch.categoryName || ch.category || '일반',
             recentVideos: ch.recentVideos || [],
-            dailyGrowth: Math.floor((ch.viewCount || ch.totalViews || 0) / 365), // Adjusted to daily estimate
-            estimatedRevenue: parseInt(ch.estimatedRevenue) || Math.floor(((ch.viewCount || ch.totalViews || 0) / 1000) * 200 / 30),
+            dailyGrowth: ch.dailyViewGrowth || Math.floor((ch.viewCount || ch.totalViews || 0) / 365),
+            estimatedRevenue: ch.estimatedRevenue || '0',
             tags: []
         }));
 
@@ -6993,6 +7365,41 @@ app.post('/api/test-cron', async (req, res) => {
 });
 
 console.log('📅 Cron 스케줄러 활성화 (매일 자정 US EST)');
+
+
+// ========================================
+// AI Channel Analysis Endpoint
+// ========================================
+app.get('/api/channel-analysis/:channelId', async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        const channels = loadDiscoveredChannels();
+        const channel = channels[channelId];
+
+        if (!channel) {
+            return res.status(404).json({ error: 'Channel not found in database' });
+        }
+
+        // Return cached analysis if exists
+        if (channel.aiAnalysis) {
+            return res.json({ success: true, analysis: channel.aiAnalysis });
+        }
+
+        // Generate new analysis
+        console.log(`[Channel Analysis] Generating for: ${channel.channelTitle}`);
+        const analysis = await analyzeChannelStrategy(channel, GEMINI_API_KEY);
+
+        // Save to DB
+        channel.aiAnalysis = analysis;
+        saveDiscoveredChannels(channels);
+
+        res.json({ success: true, analysis });
+
+    } catch (error) {
+        console.error('[Channel Analysis Error]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Start server
 app.listen(PORT, () => {

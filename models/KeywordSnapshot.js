@@ -47,14 +47,19 @@ const KeywordSnapshotSchema = new mongoose.Schema({
         translations: {
             ko: String,
             en: String,
-            ja: String
+            ja: String,
+            zh: String,
+            tw: String,
+            es: String,
+            hi: String,
+            ru: String
         }
     }],
 
     // 메타데이터
     collectionMethod: {
         type: String,
-        enum: ['search_api', 'trending_api', 'manual'],
+        enum: ['search_api', 'trending_api', 'manual', 'gemini_analysis'],
         default: 'search_api'
     },
     apiQuotaUsed: {

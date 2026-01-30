@@ -92,6 +92,11 @@
                     <span class="text-sm text-slate-300 group-hover:text-white transition">🇨🇳 중국어</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer group">
+                    <input type="checkbox" id="lang-tw" checked
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-slate-300 group-hover:text-white transition">🇹🇼 대만어</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
                     <input type="checkbox" id="lang-es" checked
                         class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500">
                     <span class="text-sm text-slate-300 group-hover:text-white transition">🇪🇸 스페인어</span>
@@ -144,6 +149,7 @@
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-en">🇺🇸 영어</th>
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-ja">🇯🇵 일본어</th>
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-zh">🇨🇳 중국어</th>
+                            <th class="pb-4 text-slate-400 font-bold text-sm lang-tw">🇹🇼 대만어</th>
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-es">🇪🇸 스페인어</th>
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-hi">🇮🇳 힌디어</th>
                             <th class="pb-4 text-slate-400 font-bold text-sm lang-ru">🇷🇺 러시아어</th>
@@ -179,7 +185,7 @@
             '비영리/사회운동': '🤝'
         };
 
-        let selectedCategory = '';
+        let selectedCategories = new Set();
         let currentKeywords = [];
 
         // Initialize category buttons
@@ -188,7 +194,7 @@
             grid.innerHTML = Object.entries(CATEGORIES).map(([category, emoji]) => `
                 <button onclick="selectCategory('${category}')" 
                     id="cat-${category}"
-                    class="category-btn flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 rounded-xl text-slate-300 font-medium transition-all">
+                    class="category-btn flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 rounded-xl text-slate-300 font-medium transition-all select-none">
                     <span class="text-2xl">${emoji}</span>
                     <span>${category}</span>
                 </button>
@@ -196,58 +202,106 @@
         }
 
         function selectCategory(category) {
-            selectedCategory = category;
+            const btn = document.getElementById(`cat-${category}`);
 
-            // Update UI
-            document.querySelectorAll('.category-btn').forEach(btn => {
+            if (selectedCategories.has(category)) {
+                // Deselect
+                selectedCategories.delete(category);
                 btn.classList.remove('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
                 btn.classList.add('bg-slate-700', 'border-slate-600', 'text-slate-300');
-            });
-
-            const btn = document.getElementById(`cat-${category}`);
-            if (btn) {
+            } else {
+                // Select
+                selectedCategories.add(category);
                 btn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
                 btn.classList.add('bg-blue-600', 'border-blue-500', 'text-white', 'shadow-lg');
             }
         }
 
         async function searchKeywords() {
-            if (!selectedCategory) {
-                alert('카테고리를 먼저 선택해주세요!');
+            if (selectedCategories.size === 0) {
+                alert('카테고리를 최소 하나 이상 선택해주세요!');
                 return;
             }
 
             const loadingSection = document.getElementById('loadingSection');
             const keywordSection = document.getElementById('keywordSection');
-            const viralVideosSection = document.getElementById('viralVideosSection');
 
             // Show loading
             loadingSection.classList.remove('hidden');
             keywordSection.classList.add('hidden');
-            viralVideosSection.classList.add('hidden');
 
             try {
-                const response = await fetch('http://localhost:4000/api/multilang-keywords', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        category: selectedCategory,
-                        languages: ['ko', 'en', 'ja'],
-                        limit: 50
-                    })
+                // Fetch all selected categories in parallel
+                const fetchPromises = Array.from(selectedCategories).map(async (category) => {
+                    try {
+                        const response = await fetch('http://localhost:4000/api/multilang-keywords', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                category: category,
+                                languages: ['ko', 'en', 'ja'], // others supported by backend default
+                                limit: 50
+                            })
+                        });
+                        if (!response.ok) {
+                            console.warn(`Failed to fetch ${category}:`, response.statusText);
+                            return null;
+                        }
+                        return await response.json();
+                    } catch (e) {
+                        console.error(`Error fetching ${category}:`, e);
+                        return null;
+                    }
                 });
 
-                const data = await response.json();
+                const results = await Promise.all(fetchPromises);
+                const validResults = results.filter(r => r && r.success && r.keywords);
 
-                if (!response.ok) {
-                    throw new Error(data.error || '키워드 검색 실패');
+                if (validResults.length === 0) {
+                    throw new Error('모든 카테고리 검색에 실패했습니다.');
                 }
 
-                currentKeywords = data.keywords || [];
+                // Merge results
+                let allKeywords = [];
+                const seenKeys = new Map(); // Key: 'ko' text, Value: keyword obj
 
-                // Update UI
-                document.getElementById('categoryTitle').textContent = `(${selectedCategory})`;
-                document.getElementById('cachedBadge').classList.toggle('hidden', !data.cached);
+                validResults.forEach(res => {
+                    res.keywords.forEach(kw => {
+                        // Deduplicate based on Korean keyword
+                        const key = kw.ko || kw.text;
+                        if (!seenKeys.has(key)) {
+                            seenKeys.set(key, kw);
+                            allKeywords.push(kw);
+                        } else {
+                            // If exists, keep the one with higher frequency/rank
+                            const existing = seenKeys.get(key);
+                            if (kw.frequency > existing.frequency) {
+                                // Update existing properties
+                                existing.frequency = kw.frequency;
+                                // Can merge other fields if needed
+                            }
+                        }
+                    });
+                });
+
+                // Sort merged list by frequency (descending)
+                allKeywords.sort((a, b) => b.frequency - a.frequency);
+
+                // Re-assign ranks
+                allKeywords = allKeywords.map((kw, index) => ({
+                    ...kw,
+                    rank: index + 1
+                }));
+
+                currentKeywords = allKeywords;
+
+                // Update UI Display
+                const categoryNames = Array.from(selectedCategories).join(', ');
+                document.getElementById('categoryTitle').textContent = `(${categoryNames})`;
+
+                // Show cached badge if ANY result was cached (simplified)
+                const isAnyCached = validResults.some(r => r.cached);
+                document.getElementById('cachedBadge').classList.toggle('hidden', !isAnyCached);
 
                 renderKeywordTable(currentKeywords);
 
@@ -265,7 +319,7 @@
             const tbody = document.getElementById('keywordTableBody');
 
             // Get selected languages
-            const languages = ['ko', 'en', 'ja', 'zh', 'es', 'hi', 'ru'];
+            const languages = ['ko', 'en', 'ja', 'zh', 'tw', 'es', 'hi', 'ru'];
             const selectedLangs = languages.filter(lang =>
                 document.getElementById(`lang-${lang}`)?.checked
             );
@@ -279,14 +333,18 @@
             });
 
             tbody.innerHTML = keywords.map(kw => {
-                const langCells = selectedLangs.map(lang =>
-                    `<td class="py-4 text-slate-300 ${lang === 'ko' ? 'font-medium text-white' : ''} lang-${lang}">${escapeHtml(kw[lang] || kw.ko)}</td>`
-                ).join('');
+                const langCells = selectedLangs.map(lang => {
+                    const word = kw[lang] || kw.ko;
+                    return `<td class="py-4 text-slate-300 ${lang === 'ko' ? 'font-medium text-white' : ''} lang-${lang} hover:text-blue-400 cursor-pointer"
+                        onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(word)}', '_blank'); event.stopPropagation();"
+                        title="'${word}' 검색">
+                        ${escapeHtml(word)}
+                    </td>`
+                }).join('');
 
                 return `
-                <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition cursor-pointer"
-                    onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(kw.ko)}', '_blank')">
-                    <td class="py-4 text-slate-500 font-bold">${kw.rank}</td>
+                <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition">
+                    <td class="py-4 text-slate-500 font-bold pl-4">${kw.rank}</td>
                     ${langCells}
                     <td class="py-4 text-center">
                         <span class="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-lg text-sm font-bold">

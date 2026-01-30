@@ -118,6 +118,20 @@
 
                     <div class="border-t border-slate-700"></div>
 
+                    <!-- NEW: 0. 카테고리 (Multi-select) -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-sm font-bold text-slate-300">카테고리 (복수 선택 가능)</label>
+                            <span id="selected-category-count" class="text-xs text-brand-400 font-bold">0개 선택됨</span>
+                        </div>
+                        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"
+                            id="advanced-filter-category-grid">
+                            <!-- JS will populate this -->
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-700"></div>
+
                     <!-- 5. 국가 -->
                     <div>
                         <label class="block text-sm font-bold text-slate-300 mb-3">국가</label>

@@ -9,7 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="qwen_audio.js" defer></script>
     <script src="dialogue_mode.js"></script>
-    <script src="hot_channels_v3.js" defer></script>
+    <script src="hot_channels_v3.js?v=3.2" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/marked@4.0.0/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -534,17 +534,23 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
                             ${(data.videos || []).map(video => `
-                                <div class="bg-slate-800/50 rounded-lg p-3 hover:bg-slate-700/50 transition cursor-pointer"
-                                     onclick="reprocessVideo('${video.id.videoId}', '${escapeHtml(video.snippet.title).replace(/'/g, "\\'")}')">
-                                    <img src="${video.snippet.thumbnails.medium.url}" 
-                                         class="w-full rounded mb-2"
-                                         alt="${escapeHtml(video.snippet.title)}">
-                                    <h4 class="text-sm font-bold text-white line-clamp-2 mb-1">
-                                        ${escapeHtml(video.snippet.title)}
-                                    </h4>
-                                    <p class="text-xs text-slate-400">
-                                        ${new Date(video.snippet.publishedAt).toLocaleDateString()}
-                                    </p>
+                                <div class="relative bg-slate-800/50 rounded-lg p-3 hover:bg-slate-700/50 transition group">
+                                    <div class="cursor-pointer" onclick="reprocessVideo('${video.id.videoId}', '${escapeHtml(video.snippet.title).replace(/'/g, "\\'")}')">
+                                        <div class="relative">
+                                            <img src="${video.snippet.thumbnails.medium.url}" 
+                                                 class="w-full rounded mb-2"
+                                                 alt="${escapeHtml(video.snippet.title)}">
+                                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                                                <span class="bg-brand-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg">⚡ 분석하기</span>
+                                            </div>
+                                        </div>
+                                        <h4 class="text-sm font-bold text-white line-clamp-2 mb-1">
+                                            ${escapeHtml(video.snippet.title)}
+                                        </h4>
+                                        <p class="text-xs text-slate-400">
+                                            ${new Date(video.snippet.publishedAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -679,20 +685,35 @@
                         
                         <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
                             <h4 class="text-lg font-bold text-white mb-3">📝 영상 자막 (Transcript)</h4>
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                <!-- 1. Target Country -->
+                                <select id="targetCountry" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-medium">
+                                    <option value="KR">🇰🇷 한국</option>
+                                    <option value="JP">🇯🇵 일본</option>
+                                    <option value="US">🇺🇸 미국</option>
+                                </select>
+
+                                <!-- 2. Script Category -->
+                                <select id="scriptCategory" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-medium">
+                                    <option value="info">📊 정보형</option>
+                                    <option value="money">💰 돈/재테크</option>
+                                    <option value="love">💕 연애/관계</option>
+                                    <option value="study">📚 공부/입시</option>
+                                    <option value="humor">😂 유머/밈</option>
+                                    <option value="challenge">🎯 실험/챌린지</option>
+                                </select>
+
+                                <!-- 3. Target Age -->
+                                <select id="targetAge" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-medium">
+                                    <option value="teen">10대</option>
+                                    <option value="20s">20대</option>
+                                    <option value="30s">30대+</option>
+                                </select>
+                            </div>
                             <div class="flex gap-2 mb-3">
                                 <select id="aiProvider" class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
                                     <option value="gemini">Gemini 2.5 Flash</option>
                                     <option value="claude">Claude Sonnet 4.5</option>
-                                </select>
-                                <select id="scriptStyle" class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
-                                    <option value="viral_shorts">🔥 바이럴 Shorts (500-800자)</option>
-                                    <option value="viral_shorts_reverse">🔄 바이럴 Shorts 역순</option>
-                                    <option value="viral_shorts_loop">🔁 바이럴 Shorts 무한 루프</option>
-                                    <option value="humor">😂 유머 (반전 코미디)</option>
-                                    <option value="senior_shorts_drama">👴 시니어 사연 Shorts</option>
-                                    <option value="senior_shorts_drama_reverse">🔄 시니어 사연 역순</option>
-                                    <option value="senior_shorts_drama_thirdperson">👁️ 시니어 사연 3인칭</option>
-                                    <option value="senior_shorts_drama_detail">✨ 시니어 사연 디테일</option>
                                 </select>
                                 <button onclick="generateScriptFromModal('${videoId}', '${escapeHtml(videoTitle).replace(/'/g, "\\'")}')" 
                                     class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold px-6 py-2 rounded-lg transition">
@@ -747,7 +768,9 @@
         // 모달에서 대본 생성 함수
         async function generateScriptFromModal(videoId, videoTitle) {
             const aiProvider = document.getElementById('aiProvider').value;
-            const style = document.getElementById('scriptStyle').value;
+            const targetCountry = document.getElementById('targetCountry').value;
+            const scriptCategory = document.getElementById('scriptCategory').value;
+            const targetAge = document.getElementById('targetAge').value;
             const useViralPatterns = document.getElementById('useViralPatterns')?.checked || false;
             const transcriptText = document.getElementById('transcriptText').value;
             const commentsText = document.getElementById('commentsText')?.value || ''; // Read from textarea
@@ -771,7 +794,9 @@
                         videoTitle: videoTitle,
                         comments: commentsText, // Use textarea value
                         transcript: transcriptText,
-                        style: style,
+                        targetCountry: targetCountry,
+                        scriptCategory: scriptCategory,
+                        targetAge: targetAge,
                         aiProvider: aiProvider,
                         useViralPatterns: useViralPatterns
                     })
@@ -6095,20 +6120,16 @@ ${window.currentKoreanScript}
 
                         <div class="border-t border-slate-700"></div>
 
-                        <!-- 4. 영상 수 범위 -->
+                        <!-- 카테고리 (Multi-select) -->
                         <div>
-                            <label class="block text-sm font-bold text-slate-300 mb-3">영상 수 범위</label>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-xs text-slate-500 mb-1 block">최소</label>
-                                    <input type="number" id="filterVideoMin" placeholder="0"
-                                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-500 mb-1 block">최대</label>
-                                    <input type="number" id="filterVideoMax" placeholder="1000"
-                                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-red-500 outline-none transition-all">
-                                </div>
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="block text-sm font-bold text-slate-300">카테고리 (복수 선택 가능)</label>
+                                <span id="selected-category-count" class="text-xs text-brand-400 font-bold">0개
+                                    선택됨</span>
+                            </div>
+                            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"
+                                id="advanced-filter-category-grid">
+                                <!-- JS will populate this -->
                             </div>
                         </div>
 

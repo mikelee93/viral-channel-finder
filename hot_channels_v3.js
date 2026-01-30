@@ -14,8 +14,50 @@ let advancedFilterState = {
     videoCountMin: 0,
     videoCountMax: 1000,
     country: 'KR',
-    growthPeriod: 'none'
+    growthPeriod: 'none',
+    categories: [] // New: Multi-select categories
 };
+
+// Render Category Grid in Advanced Filter Modal
+function renderAdvancedFilterCategories() {
+    const grid = document.getElementById('advanced-filter-category-grid');
+    if (!grid) return;
+
+    const CATEGORIES = [
+        '영화/애니메이션', '자동차', '음악', '반려동물/동물', '스포츠',
+        '여행/이벤트', '게임', '인물/블로그', '코미디', '엔터테인먼트',
+        '뉴스/정치', '노하우/스타일', '교육', '과학기술', '비영리/사회운동'
+    ];
+
+    grid.innerHTML = CATEGORIES.map(cat => {
+        const isSelected = advancedFilterState.categories.includes(cat);
+        const icon = getCategoryIcon(cat);
+        return `
+            <button onclick="toggleAdvancedFilterCategory('${cat}')" 
+                class="flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${isSelected
+                ? 'bg-brand-600 border-brand-500 text-white shadow-md'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200'}">
+                <span class="text-xl mb-1">${icon}</span>
+                <span class="text-[10px] font-medium text-center leading-tight">${cat}</span>
+            </button>
+        `;
+    }).join('');
+
+    // Update count
+    const countEl = document.getElementById('selected-category-count');
+    if (countEl) countEl.textContent = `${advancedFilterState.categories.length}개 선택됨`;
+}
+
+// Toggle Category in Advanced Filter
+function toggleAdvancedFilterCategory(category) {
+    const index = advancedFilterState.categories.indexOf(category);
+    if (index === -1) {
+        advancedFilterState.categories.push(category);
+    } else {
+        advancedFilterState.categories.splice(index, 1);
+    }
+    renderAdvancedFilterCategories();
+}
 
 // Open Advanced Filter Modal
 function openAdvancedFilterModal() {
@@ -43,6 +85,11 @@ function openAdvancedFilterModal() {
     if (subMax) subMax.value = advancedFilterState.subscriberMax || '';
     if (vidMin) vidMin.value = advancedFilterState.videoCountMin || '';
     if (vidMax) vidMax.value = advancedFilterState.videoCountMax || '';
+    if (vidMin) vidMin.value = advancedFilterState.videoCountMin || '';
+    if (vidMax) vidMax.value = advancedFilterState.videoCountMax || '';
+
+    // Render Categories
+    renderAdvancedFilterCategories();
 }
 
 // Close Advanced Filter Modal
@@ -141,13 +188,18 @@ function resetAdvancedFilters() {
         videoCountMin: 0,
         videoCountMax: 1000,
         country: 'KR',
-        growthPeriod: 'none'
+        country: 'KR',
+        growthPeriod: 'none',
+        categories: []
     };
 
     selectContentType('shorts', false);
     selectGrowthMetric('total_views', false);
     selectGrowthPeriod('none', false);
     selectFilterCountry('KR', false);
+
+    // Reset categories
+    renderAdvancedFilterCategories();
 
     const subMin = document.getElementById('filterSubMin');
     const subMax = document.getElementById('filterSubMax');
@@ -487,6 +539,36 @@ async function searchHotChannels() {
             </div>
         `;
     }
+
+
+}
+
+// Helper: Format ISO 8601 Duration (e.g., PT1M2S -> 1:02)
+function formatDuration(iso) {
+    if (!iso) return '';
+    const match = iso.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    if (!match) return '';
+    const h = parseInt(match[1]) || 0;
+    const m = parseInt(match[2]) || 0;
+    const s = parseInt(match[3]) || 0;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Helper: Time Ago (e.g., 2일 전)
+function timeAgo(dateString) {
+    if (!dateString) return '';
+    const now = new Date();
+    const date = new Date(dateString);
+    const seconds = Math.floor((now - date) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}일 전`;
+    if (hours > 0) return `${hours}시간 전`;
+    if (minutes > 0) return `${minutes}분 전`;
+    return '방금 전';
 }
 
 // Render HOT Channel Cards
@@ -538,10 +620,26 @@ function renderHotChannelCards(channels) {
                                     alt="${escapeHtml(video.title)}" 
                                     onerror="this.onerror=null; this.src='https://placehold.co/320x180?text=No+Img';"
                                     class="w-full h-full object-cover">
-                                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
-                                    <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
-                                    </svg>
+                                
+                                <!-- Duration Badge -->
+                                <!-- Duration: Moved to bottom bar -->
+                                
+                                <!-- Date Badge -->
+                                ${video.publishedAt ? `<div class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/60 text-slate-200 text-xs rounded shadow-sm backdrop-blur-sm">${timeAgo(video.publishedAt)}</div>` : ''}
+
+                                <!-- Always visible Overlay at the bottom -->
+                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-end justify-between z-20">
+                                    <span class="text-[10px] text-white font-bold bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                        ${video.duration ? formatDuration(video.duration) : ''}
+                                    </span>
+                                    <span class="text-[10px] text-white font-bold bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                        ${video.viewCount ? formatCompactNumber(video.viewCount) : ''}
+                                        ${video.viewCount ? '' : ''}
+                                    </span>
+                                </div>
+                                
+                                <div class="absolute inset-0 z-10 hidden group-hover/thumb:flex items-center justify-center bg-black/20 pointer-events-none">
+                                    <!-- Optional: Play icon on hover -->
                                 </div>
                             </div>
                         </div>
@@ -573,18 +671,134 @@ function renderHotChannelCards(channels) {
             </div>
 
             <!-- Action Button -->
-            <button onclick="openChannelDetailModal('${channel.channelId}')" 
-                class="mt-4 w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold py-2.5 rounded-lg transition-all">
-                채널 상세 보기
+            <!-- Action Button: Open Channel in New Tab -->
+            <button onclick="window.open('https://www.youtube.com/channel/${channel.channelId}', '_blank')" 
+                class="mt-4 w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2">
+                <span>📺</span> 채널 바로가기
             </button>
         </div>
     `).join('');
 }
 
 // Open Channel Detail Modal (placeholder for Phase 4)
-function openChannelDetailModal(channelId) {
-    alert(`채널 상세 모달: ${channelId}\n\n이 기능은 Phase 4에서 구현됩니다.`);
+
+// Open Channel Detail Modal with AI Analysis
+async function openChannelDetailModal(channelId) {
+    // 1. Create Modal if checks fail
+    let modal = document.getElementById('channelDetailModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'channelDetailModal';
+        modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4';
+        modal.innerHTML = `
+            <div class="bg-slate-900 border border-slate-700 w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span class="text-2xl">📊</span> 채널 심층 분석
+                    </h3>
+                    <button onclick="document.getElementById('channelDetailModal').classList.add('hidden')" class="text-slate-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div id="channelDetailContent" class="flex-1 overflow-y-auto p-6 space-y-6">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // 2. Show Modal & Loading
+    modal.classList.remove('hidden');
+    const contentDiv = document.getElementById('channelDetailContent');
+    contentDiv.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-20">
+            <div class="loader w-12 h-12 border-4 border-t-brand-500 mb-4"></div>
+            <p class="text-brand-400 animate-pulse font-bold text-lg">AI가 채널을 분석 중입니다...</p>
+            <p class="text-slate-500 text-sm mt-2">최근 영상 5개와 성장 지표를 기반으로 전략을 도출합니다.</p>
+        </div>
+    `;
+
+    try {
+        // 3. Fetch Data
+        console.log(`[Channel Detail] Fetching analysis for ${channelId}`);
+        const response = await fetch(`http://localhost:4000/api/channel-analysis/${channelId}`);
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error || '분석 실패');
+
+        const { analysis } = data;
+
+        // Find channel basic info from local list to avoid re-fetching
+        const channel = (window.currentChannels || []).find(c => c.channelId === channelId) || {
+            name: 'Unknown Channel',
+            subscribers: 0,
+            thumbnail: '',
+            totalViews: 0
+        };
+
+        // 4. Render Content
+        contentDiv.innerHTML = `
+            <!-- Header -->
+            <div class="flex items-start gap-6 mb-8">
+                <img src="${channel.thumbnail}" class="w-24 h-24 rounded-full border-4 border-slate-700 shadow-xl" onerror="this.src='https://placehold.co/100?text=Ch'">
+                <div>
+                    <h2 class="text-3xl font-bold text-white mb-2">${channel.name}</h2>
+                    <div class="flex flex-wrap gap-3 text-sm">
+                        <span class="px-3 py-1 bg-slate-700 rounded-full text-slate-300">구독자 ${formatCompactNumber(channel.subscribers)}</span>
+                        <span class="px-3 py-1 bg-slate-700 rounded-full text-slate-300">총 조회수 ${formatCompactNumber(channel.totalViews)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Analysis Grid -->
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-brand-900/30 to-slate-900 border border-brand-500/30 rounded-2xl p-6 relative overflow-hidden group hover:border-brand-500/50 transition-all">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <span class="text-6xl">🎯</span>
+                    </div>
+                    <h4 class="text-brand-400 font-bold mb-3 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        왜 이 채널인가?
+                    </h4>
+                    <p class="text-slate-200 leading-relaxed text-lg">
+                        ${analysis.reason_for_selection || '분석 정보가 없습니다.'}
+                    </p>
+                </div>
+
+                <div class="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden group hover:border-purple-500/50 transition-all">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <span class="text-6xl">🚀</span>
+                    </div>
+                    <h4 class="text-purple-400 font-bold mb-3 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        장기 성장 전략
+                    </h4>
+                    <p class="text-slate-200 leading-relaxed text-lg whitespace-pre-line">
+                        ${analysis.long_term_strategy || '전략 정보가 없습니다.'}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Validation Info -->
+            <div class="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
+                <p class="text-slate-400 text-sm">
+                    🤖 이 분석은 Gemini 2.0 Flash가 채널의 최근 퍼포먼스를 기반으로 실시간 생성했습니다.
+                </p>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error('[Channel Detail] Error:', error);
+        contentDiv.innerHTML = `
+            <div class="text-center py-20 text-red-400">
+                <p class="text-xl font-bold mb-2">분석 정보를 불러오지 못했습니다.</p>
+                <p class="text-sm opacity-80">${error.message}</p>
+            </div>
+        `;
+    }
 }
+
 
 // ========================================
 // Multilingual Keyword Finder Functions
