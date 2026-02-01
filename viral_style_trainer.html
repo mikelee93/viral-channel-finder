@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viral Style Trainer - 바이럴 스타일 연구소</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .category-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .category-card:hover {
+            transform: translateY(-2px);
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+        }
+
+        .category-card.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-color: #60a5fa;
+            color: white;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .loader {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite;
+            /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar (Navigation) -->
+    <aside
+        class="w-20 lg:w-64 flex-shrink-0 border-r border-slate-800 bg-slate-900/50 flex flex-col items-center lg:items-stretch py-6 px-3">
+        <div class="mb-8 lg:px-4 text-center lg:text-left">
+            <h1
+                class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 hidden lg:block">
+                Viral Lab
+            </h1>
+            <span class="text-2xl lg:hidden">🧬</span>
+            <p class="text-xs text-slate-500 mt-1 hidden lg:block">스타일 연구소</p>
+        </div>
+
+        <nav class="space-y-2 flex-1 w-full">
+            <a href="youtube_guidelines.html"
+                class="flex items-center gap-3 p-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                <span class="text-xl">📋</span>
+                <span class="hidden lg:block">가이드라인 체크</span>
+            </a>
+            <a href="#"
+                class="flex items-center gap-3 p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold">
+                <span class="text-xl">🧪</span>
+                <span class="hidden lg:block">스타일 연구소</span>
+            </a>
+        </nav>
+
+        <div class="mt-auto lg:px-4">
+            <div class="glass-panel p-4 rounded-xl hidden lg:block">
+                <p class="text-xs text-slate-400 mb-1">Total Personas</p>
+                <p class="text-2xl font-bold text-white" id="totalPersonasCount">0</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto bg-[#0f172a] relative">
+        <!-- Header Zone -->
+        <header
+            class="sticky top-0 z-30 bg-[#0f172a]/90 backdrop-blur-md border-b border-slate-800 px-8 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-white">채널 스타일 트레이너</h2>
+                <p class="text-sm text-slate-400">유튜브 채널의 'Viral DNA'를 분석하고 학습합니다</p>
+            </div>
+            <button id="addChannelBtn"
+                class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all">
+                <span>➕ 새 채널 분석</span>
+            </button>
+        </header>
+
+        <div class="p-8 max-w-7xl mx-auto">
+
+            <!-- Category Filter (15 items) -->
+            <section class="mb-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-slate-300">📂 카테고리 필터</h3>
+                    <div class="text-xs text-slate-500">15개 카테고리</div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" id="categoryGrid">
+                    <!-- Javascript will populate this -->
+                </div>
+            </section>
+
+            <!-- Channel List -->
+            <section>
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <span id="selectedCategoryTitle">전체</span>
+                        <span class="text-sm font-normal text-slate-500" id="channelCountBadge">(0)</span>
+                    </h3>
+
+                    <!-- Search -->
+                    <div class="relative w-64">
+                        <input type="text" placeholder="채널명 검색..."
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                        <span class="absolute left-3 top-2.5 text-slate-500">🔍</span>
+                    </div>
+                </div>
+
+                <!-- Channel Grid -->
+                <div id="personaGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <!-- Cards will be inserted here -->
+
+                    <!-- Empty State -->
+                    <div
+                        class="col-span-full py-20 text-center glass-panel rounded-2xl border-dashed border-2 border-slate-700">
+                        <div class="text-6xl mb-4 grayscale opacity-50">🧪</div>
+                        <h3 class="text-xl font-bold text-slate-300 mb-2">아직 분석된 채널이 없습니다</h3>
+                        <p class="text-slate-500 mb-6">원하는 유튜버의 스타일을 분석해서 나만의 데이터를 만드세요</p>
+                        <button onclick="window.openModal()" class="text-blue-400 hover:text-blue-300 font-bold">
+                            + 첫 번째 채널 분석하기
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Analyze Modal -->
+    <div id="analyzeModal"
+        class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl transform transition-all scale-95 opacity-0"
+            id="modalContent">
+
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">🧪 새 채널 분석</h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+
+            <div class="p-6">
+                <!-- Input Step -->
+                <div id="stepInput" class="space-y-6">
+                    <div>
+                        <label class="block text-slate-300 font-bold mb-2">유튜브 채널 URL (또는 핸들)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="channelUrlInput" placeholder="예: https://www.youtube.com/@MrBeast"
+                                class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none">
+                            <button id="fetchChannelInfoBtn"
+                                class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 rounded-xl transition-colors">
+                                조회
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">최근 영상 5개를 분석하여 스타일을 학습합니다.</p>
+                    </div>
+
+                    <!-- Channel Info Preview (Hidden initially) -->
+                    <div id="channelPreview" class="hidden glass-panel rounded-xl p-4 flex gap-4 items-center">
+                        <div id="previewThumbnail"
+                            class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl font-bold text-white">
+                            ?</div>
+                        <div>
+                            <h4 id="previewName" class="font-bold text-white text-lg">--</h4>
+                            <p id="previewSubscribers" class="text-sm text-slate-400">구독자 --명</p>
+                        </div>
+                    </div>
+
+                    <!-- Category Selection -->
+                    <div id="categorySelectSection" class="hidden">
+                        <label class="block text-slate-300 font-bold mb-2">카테고리 선택</label>
+                        <select id="categorySelect"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none">
+                            <option value="">카테고리를 선택하세요</option>
+                            <!-- JS populated -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Loading Step -->
+                <div id="stepLoading" class="hidden py-10 text-center">
+                    <div class="loader w-12 h-12 mx-auto mb-4 border-t-purple-500"></div>
+                    <h3 class="text-xl font-bold text-white mb-2" id="loadingStatus">영상 데이터 수집 중...</h3>
+                    <p class="text-slate-400 text-sm" id="loadingDetail">채널의 최근 영상을 불러오고 있습니다</p>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-slate-800 rounded-full h-2 mt-6 overflow-hidden">
+                        <div id="progressBar"
+                            class="bg-gradient-to-r from-blue-500 to-purple-500 h-full w-0 transition-all duration-300">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50 rounded-b-2xl">
+                <button id="cancelBtn" class="px-5 py-2 text-slate-400 hover:text-white font-medium">취소</button>
+                <button id="startAnalysisBtn" disabled
+                    class="px-6 py-2 bg-slate-700 text-slate-400 rounded-xl font-bold cursor-not-allowed transition-all">
+                    분석 시작
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 15 YouTube Categories
+        const CATEGORIES = [
+            { id: 'film', name: '영화/애니메이션', icon: '🎬' },
+            { id: 'autos', name: '자동차', icon: '🚗' },
+            { id: 'music', name: '음악', icon: '🎵' },
+            { id: 'pets', name: '반려동물/동물', icon: '🐾' },
+            { id: 'sports', name: '스포츠', icon: '⚽' },
+            { id: 'travel', name: '여행/이벤트', icon: '✈️' },
+            { id: 'gaming', name: '게임', icon: '🎮' },
+            { id: 'people', name: '인물/블로그', icon: '👤' },
+            { id: 'comedy', name: '코미디', icon: '😂' },
+            { id: 'entertainment', name: '엔터테인먼트', icon: '🎭' },
+            { id: 'news', name: '뉴스/정치', icon: '📰' },
+            { id: 'howto', name: '노하우/스타일', icon: '💄' },
+            { id: 'education', name: '교육', icon: '📚' },
+            { id: 'tech', name: '과학기술', icon: '🔬' },
+            { id: 'nonprofit', name: '비영리/사회운동', icon: '🤝' },
+            { id: 'general', name: '일반', icon: '📁' }
+        ];
+
+        // --- State ---
+        let fetchedChannelInfo = null;
+        let activeFilter = 'all';
+        let allPersonas = [];
+
+        // --- DOM Elements ---
+        const grid = document.getElementById('categoryGrid');
+        const select = document.getElementById('categorySelect');
+        const personaGrid = document.getElementById('personaGrid');
+
+        // --- Init Function ---
+        async function init() {
+            initCategories();
+            await loadPersonas();
+            setupEventListeners();
+        }
+
+        function initCategories() {
+            grid.innerHTML = ''; // Clear
+            select.innerHTML = '<option value="">카테고리를 선택하세요</option>';
+
+            CATEGORIES.forEach(cat => {
+                // Filter Grid Item
+                const card = document.createElement('div');
+                card.className = "category-card glass-panel rounded-xl p-3 flex items-center gap-3 active:scale-95 select-none";
+                card.onclick = () => selectFilterCategory(cat.id);
+                card.dataset.id = cat.id;
+                card.innerHTML = `
+                    <span class="text-xl">${cat.icon}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-sm text-slate-200 truncate">${cat.name}</p>
+                        <p class="text-[10px] text-slate-500" id="count-${cat.id}">0개 채널</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+
+                // Option in Modal
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = `${cat.icon} ${cat.name}`;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadPersonas() {
+            try {
+                const res = await fetch('/api/channels/list');
+                const json = await res.json();
+                if (json.success) {
+                    allPersonas = json.data;
+                    document.getElementById('totalPersonasCount').innerText = allPersonas.length;
+                    renderPersonas();
+                    updateCategoryCounts();
+                }
+            } catch (e) {
+                console.error("Failed to load personas", e);
+            }
+        }
+
+        function updateCategoryCounts() {
+            CATEGORIES.forEach(cat => {
+                const count = allPersonas.filter(p => p.category === cat.id).length;
+                const el = document.getElementById(`count-${cat.id}`);
+                if (el) el.innerText = `${count}개 채널`;
+            });
+        }
+
+        function selectFilterCategory(id) {
+            activeFilter = (activeFilter === id) ? 'all' : id; // Toggle
+
+            // UI Update
+            document.querySelectorAll('.category-card').forEach(c => {
+                if (activeFilter !== 'all' && c.dataset.id === activeFilter) {
+                    c.classList.add('active');
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+
+            const catName = CATEGORIES.find(c => c.id === activeFilter)?.name || '전체';
+            document.getElementById('selectedCategoryTitle').innerText = catName;
+
+            renderPersonas();
+        }
+
+        function renderPersonas() {
+            const filtered = activeFilter === 'all'
+                ? allPersonas
+                : allPersonas.filter(p => p.category === activeFilter);
+
+            document.getElementById('channelCountBadge').innerText = `(${filtered.length})`; // update badge
+
+            personaGrid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                personaGrid.innerHTML = `
+                    <div class="col-span-full py-20 text-center glass-panel rounded-2xl border-dashed border-2 border-slate-700">
+                        <div class="text-6xl mb-4 grayscale opacity-50">🧪</div>
+                        <h3 class="text-xl font-bold text-slate-300 mb-2">
+                            ${activeFilter === 'all' ? '아직 분석된 채널이 없습니다' : '이 카테고리에는 채널이 없습니다'}
+                        </h3>
+                        <p class="text-slate-500 mb-6">원하는 유튜버의 스타일을 분석해서 나만의 데이터를 만드세요</p>
+                        <button onclick="window.openModal()" class="text-blue-400 hover:text-blue-300 font-bold">
+                            + 첫 번째 채널 분석하기
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(p => {
+                // Determine style tags from analysis
+                const tags = [p.analysis.pacing, p.analysis.tone].filter(Boolean).slice(0, 2);
+
+                const card = document.createElement('div');
+                card.className = "glass-panel p-5 rounded-2xl hover:bg-slate-800 transition-colors relative group";
+                card.innerHTML = `
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
+                                ${p.name.charAt(0)}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white leading-tight">${p.name}</h4>
+                                <a href="${p.url}" target="_blank" class="text-xs text-blue-400 hover:underline">YouTube ↗</a>
+                            </div>
+                        </div>
+                        <span class="text-2xl opacity-50">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
+                    </div>
+                    
+                    <div class="mb-4 space-y-2">
+                        <div class="bg-black/30 p-3 rounded-lg text-sm text-slate-300 border border-white/5">
+                            <span class="text-purple-400 font-bold text-xs block mb-1">AI 요약</span>
+                            "${p.analysis.summary || '요약 없음'}"
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${tags.map(t => `<span class="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">${t}</span>`).join('')}
+                    </div>
+                    
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-3 right-3">
+                         <button onclick="deletePersona('${p.id}')" class="bg-red-500/20 text-red-400 p-1.5 rounded hover:bg-red-500/40" title="삭제">🗑️</button>
+                    </div>
+                `;
+                personaGrid.appendChild(card);
+            });
+        }
+
+        // Expose openModal globally
+        window.openModal = () => {
+            const modal = document.getElementById('analyzeModal');
+            const modalContent = document.getElementById('modalContent');
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('opacity-0', 'scale-95');
+                modalContent.classList.add('opacity-100', 'scale-100');
+            }, 10);
+
+            // Reset state
+            document.getElementById('stepInput').classList.remove('hidden');
+            document.getElementById('stepLoading').classList.add('hidden');
+            document.getElementById('startAnalysisBtn').classList.remove('hidden');
+            document.getElementById('cancelBtn').classList.remove('hidden');
+        };
+
+        // Expose delete function global
+        window.deletePersona = async (id) => {
+            if (!confirm('정말 삭제하시겠습니까?')) return;
+            try {
+                await fetch('/api/channels/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                await loadPersonas();
+            } catch (e) {
+                alert('삭제 실패');
+            }
+        };
+
+        function setupEventListeners() {
+            // Header Button
+            document.getElementById('addChannelBtn').onclick = window.openModal;
+
+            // Fetch Info Handler
+            document.getElementById('fetchChannelInfoBtn').onclick = async () => {
+                const url = document.getElementById('channelUrlInput').value.trim();
+                const btn = document.getElementById('fetchChannelInfoBtn');
+
+                if (!url) return alert('URL을 입력해주세요');
+
+                btn.innerText = '조회 중...';
+                btn.disabled = true;
+
+                try {
+                    const res = await fetch('/api/channels/info', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                    const json = await res.json();
+
+                    if (json.success) {
+                        fetchedChannelInfo = json.data;
+
+                        // Show Preview
+                        document.getElementById('channelPreview').classList.remove('hidden');
+                        document.getElementById('previewName').innerText = json.data.name;
+                        document.getElementById('previewSubscribers').innerText = `구독자 ${json.data.subscribers}`;
+                        document.getElementById('previewThumbnail').innerText = json.data.name.charAt(0); // Fallback avatar
+
+                        // Show Category Select
+                        document.getElementById('categorySelectSection').classList.remove('hidden');
+                        document.getElementById('startAnalysisBtn').disabled = false;
+                        document.getElementById('startAnalysisBtn').classList.remove('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
+                        document.getElementById('startAnalysisBtn').classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+
+                        // --- Auto Select Category Logic ---
+                        if (json.data.originalCategory) {
+                            const map = {
+                                'Film & Animation': 'film', 'Autos & Vehicles': 'autos', 'Music': 'music',
+                                'Pets & Animals': 'pets', 'Sports': 'sports', 'Travel & Events': 'travel',
+                                'Gaming': 'gaming', 'People & Blogs': 'people', 'Comedy': 'comedy',
+                                'Entertainment': 'entertainment', 'News & Politics': 'news', 'Howto & Style': 'howto',
+                                'Education': 'education', 'Science & Technology': 'tech', 'Nonprofits & Activism': 'nonprofit'
+                            };
+                            const mappedId = map[json.data.originalCategory];
+                            if (mappedId) {
+                                document.getElementById('categorySelect').value = mappedId;
+                            } else {
+                                // Try lowercase match
+                                const lowerCat = json.data.originalCategory.toLowerCase();
+                                const exists = CATEGORIES.find(c => c.id === lowerCat);
+                                if (exists) {
+                                    document.getElementById('categorySelect').value = exists.id;
+                                } else {
+                                    // Default to general if not found
+                                    document.getElementById('categorySelect').value = 'general';
+                                }
+                            }
+                        }
+
+                    } else {
+                        alert('채널 정보를 가져오는데 실패했습니다: ' + (json.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('서버 오류가 발생했습니다.');
+                } finally {
+                    btn.innerText = '조회';
+                    btn.disabled = false;
+                }
+            };
+
+            // Start Analysis Handler
+            document.getElementById('startAnalysisBtn').onclick = async () => {
+                const category = document.getElementById('categorySelect').value;
+                if (!fetchedChannelInfo) return;
+                if (!category) return alert('카테고리를 선택해주세요');
+
+                // UI Switch to Loading
+                document.getElementById('stepInput').classList.add('hidden');
+                document.getElementById('stepLoading').classList.remove('hidden');
+                document.getElementById('startAnalysisBtn').classList.add('hidden');
+                document.getElementById('cancelBtn').classList.add('hidden'); // Cannot cancel easily mid-request
+
+                // Fake Progress Bar Animation
+                let progress = 10;
+                const progressBar = document.getElementById('progressBar');
+                const interval = setInterval(() => {
+                    progress += (Math.random() * 5);
+                    if (progress > 90) progress = 90;
+                    progressBar.style.width = `${progress}%`;
+                }, 1000);
+
+                try {
+                    const res = await fetch('/api/channels/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url: fetchedChannelInfo.url,
+                            category: category
+                        })
+                    });
+                    const json = await res.json();
+
+                    clearInterval(interval);
+                    progressBar.style.width = '100%';
+
+                    if (json.success) {
+                        // Auto Save (Simplify workflow)
+                        await fetch('/api/channels/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: fetchedChannelInfo.name,
+                                url: fetchedChannelInfo.url,
+                                category: category,
+                                analysis: json.analysis
+                            })
+                        });
+
+                        // Success Feedback
+                        alert(`✅ '${fetchedChannelInfo.name}' 채널의 스타일이 학습되었습니다!`);
+
+                        closeModal(); // Use local close first
+
+                        // Internal close function for consistency
+                        const clsModal = () => {
+                            const modal = document.getElementById('analyzeModal');
+                            const modalContent = document.getElementById('modalContent');
+                            modalContent.classList.remove('opacity-100', 'scale-100');
+                            modalContent.classList.add('opacity-0', 'scale-95');
+                            setTimeout(() => {
+                                modal.classList.add('hidden');
+                            }, 200);
+                        }
+                        clsModal();
+
+                        await loadPersonas(); // Refresh Grid
+
+                    } else {
+                        alert('분석 실패: ' + (json.error || '알 수 없는 오류'));
+                        document.getElementById('stepInput').classList.remove('hidden');
+                        document.getElementById('stepLoading').classList.add('hidden');
+                        document.getElementById('startAnalysisBtn').classList.remove('hidden');
+                        document.getElementById('cancelBtn').classList.remove('hidden');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('서버 통신 오류');
+                    document.getElementById('stepInput').classList.remove('hidden');
+                    document.getElementById('stepLoading').classList.add('hidden');
+                    document.getElementById('startAnalysisBtn').classList.remove('hidden');
+                    document.getElementById('cancelBtn').classList.remove('hidden');
+                }
+            };
+        }
+
+        // Modal Logic Helper (Internal)
+        function closeModal() {
+            const modal = document.getElementById('analyzeModal');
+            const modalContent = document.getElementById('modalContent');
+            modalContent.classList.remove('opacity-100', 'scale-100');
+            modalContent.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        document.getElementById('closeModalBtn').onclick = closeModal;
+        document.getElementById('cancelBtn').onclick = closeModal;
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>

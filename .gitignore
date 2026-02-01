@@ -28,3 +28,5 @@ debug_*.js
 credentials.json
 
 spreadsheet_id.txt
+
+temp_subs/

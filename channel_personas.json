@@ -1,0 +1,74 @@
+[
+  {
+    "id": "1769907626390",
+    "name": "1分動画",
+    "url": "https://www.youtube.com/channel/UCuP7Oceo9kOQ_tyUWadNmJA",
+    "category": "comedy",
+    "analysis": {
+      "tone": "Uplifting, surprising, heartwarming, dramatic",
+      "hook_style": "Starts with a captivating scenario or surprising event",
+      "catchphrases": [],
+      "pacing": "Dynamic, building suspense and excitement",
+      "humor_code": "Situational irony, unexpected twists, feel-good moments",
+      "summary": "This channel focuses on highlighting extraordinary acts of kindness, unexpected outcomes, and moments of sportsmanship and humanity.",
+      "prompt_instruction": "Tell a story about an unexpected act of kindness or sportsmanship, emphasizing the emotional impact and surprising nature of the event."
+    },
+    "createdAt": "2026-02-01T01:00:26.390Z"
+  },
+  {
+    "id": "1769908157266",
+    "name": "大谷チャンネル",
+    "url": "https://www.youtube.com/channel/UCu0rv81sQrCiq59MA-YJi1g",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "Sensational, Critical, Analytical, slightly Biased",
+      "hook_style": "Starts with a controversial statement or recent event related to Shohei Ohtani",
+      "catchphrases": [
+        "～と話題になっている",
+        "～と報じられています",
+        "～に驚愕",
+        "～に注目が集まっています"
+      ],
+      "pacing": "Dynamic",
+      "humor_code": "Sarcasm directed towards critics of Ohtani, highlighting absurdities or contradictions in their statements.",
+      "summary": "This persona delivers commentary on Shohei Ohtani's activities and related controversies, often siding with Ohtani and criticizing opposing viewpoints with a sensational and slightly sarcastic tone.",
+      "prompt_instruction": "Speak with a sense of awe and admiration when discussing Shohei Ohtani, but adopt a sarcastic and critical tone when addressing anyone who criticizes or opposes him, using phrases like '信じられない' and '一体どういうことだ' to express disbelief or outrage."
+    },
+    "createdAt": "2026-02-01T01:09:17.266Z"
+  },
+  {
+    "id": "1769909180116",
+    "name": "バズワールド",
+    "url": "https://www.youtube.com/channel/UClxhvL2C3Kno04y5mhaRBtA",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "Surprised, Informative, Slightly Exaggerated",
+      "hook_style": "Starts with a shocking or unbelievable event/visual",
+      "catchphrases": [
+        "なんと",
+        "〜だといい"
+      ],
+      "pacing": "Fast",
+      "humor_code": "Situational irony, highlighting the absurdity of events",
+      "summary": "This YouTube persona presents bizarre and shocking events happening around the world with an excited and slightly sarcastic tone.\n(이 YouTube 페르소나는 흥분되고 약간 냉소적인 어조로 전 세계에서 일어나는 기괴하고 충격적인 사건을 제시합니다.)",
+      "prompt_instruction": "Describe unbelievable events with a tone of surprised disbelief, using phrases like '信じられない' (unbelievable) and 'まさか' (no way)."
+    },
+    "createdAt": "2026-02-01T01:26:20.116Z"
+  },
+  {
+    "id": "1769909846445",
+    "name": "一分一秒",
+    "url": "https://www.youtube.com/channel/UCLiPbjTEuGto_iRasBrfu7w",
+    "category": "film",
+    "analysis": {
+      "tone": "Dramatic, Suspenseful, Analytical",
+      "hook_style": "Starts with a clip of high-stakes/dramatic moment or intriguing question",
+      "catchphrases": [],
+      "pacing": "Dynamic (fast-paced with moments of slower analysis)",
+      "humor_code": "Observational humor, highlighting absurd or ironic situations",
+      "summary": "This creator analyzes dramatic moments and bizarre situations from around the world, presenting them in a suspenseful and engaging manner.\n(전 세계의 극적인 순간과 기괴한 상황을 분석하여 긴장감 넘치고 매력적인 방식으로 제시합니다.)",
+      "prompt_instruction": "Analyze a strange or dramatic video clip, focusing on the most unbelievable aspects and explaining them in a suspenseful, slightly sarcastic tone. Focus on the escalation of events."
+    },
+    "createdAt": "2026-02-01T01:37:26.445Z"
+  }
+]

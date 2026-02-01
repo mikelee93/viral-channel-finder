@@ -11,6 +11,7 @@
     "@distube/ytdl-core": "^4.16.12",
     "@google/generative-ai": "^0.24.1",
     "apify-client": "^2.21.0",
+    "axios": "^1.13.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
@@ -20,7 +21,8 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "openai": "^6.16.0",
-    "youtube-transcript": "^1.2.1"
+    "youtube-transcript": "^1.2.1",
+    "yt-dlp-exec": "^1.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

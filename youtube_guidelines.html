@@ -15,11 +15,30 @@
         .glass-panel {
             background: rgba(30, 41, 59, 0.5);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        .upload-zone {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+            border: 2px dashed rgba(99, 102, 241, 0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-zone:hover {
+            border-color: rgba(99, 102, 241, 0.8);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Loader animation */
         .loader {
             border-radius: 50%;
+            border-top-color: currentColor;
             animation: spin 1s linear infinite;
         }
 
@@ -33,16 +52,6 @@
             }
         }
 
-        .upload-zone {
-            border: 2px dashed #475569;
-            transition: all 0.3s;
-        }
-
-        .upload-zone:hover {
-            border-color: #3b82f6;
-            background: rgba(59, 130, 246, 0.05);
-        }
-
         .upload-zone.dragover {
             border-color: #10b981;
             background: rgba(16, 185, 129, 0.1);
@@ -52,6 +61,16 @@
 
 <body class="p-8">
     <div class="max-w-6xl mx-auto">
+        <!-- Navigation -->
+        <div class="flex justify-end mb-6">
+            <a href="viral_style_trainer.html"
+                class="flex items-center gap-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg hover:bg-blue-600/30 transition-colors font-bold">
+                <span class="text-xl">🧪</span>
+                <span>스타일 연구소로 이동</span>
+                <span>→</span>
+            </a>
+        </div>
+
         <!-- Header -->
         <div class="text-center mb-12">
             <h1 class="text-5xl font-black text-white mb-4">
@@ -141,10 +160,95 @@
                 <div id="violationsContainer"></div>
 
                 <!-- Action Buttons -->
-                <div class="mt-6">
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button id="generateTitlesBtn"
-                        class="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
+                        class="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
                         ✨ Shorts 제목 생성 (한/일/발음)
+                    </button>
+                    <button id="extractTranscriptBtn"
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
+                        📝 영상 대본 추출
+                    </button>
+                </div>
+            </div>
+
+            <!-- Transcript Extraction Section (Step 1) -->
+            <div id="transcriptStepSection" class="glass-panel rounded-2xl p-8 mb-6 hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">📝 Step 1: 영상 대본 추출 결과</h2>
+
+                <!-- Language Info -->
+                <div class="bg-slate-800/50 rounded-xl p-4 mb-6">
+                    <div class="flex items-center gap-4">
+                        <span id="detectedLanguageFlag" class="text-4xl">🌐</span>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-1">
+                                <p class="text-white font-bold text-xl" id="languageName">-</p>
+                                <span id="translationBadge"
+                                    class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-bold hidden">
+                                    🌐 한국어 번역 포함
+                                </span>
+                            </div>
+                            <div class="flex gap-3 text-sm">
+                                <span class="text-slate-400">
+                                    <span class="text-purple-400 font-bold" id="transcriptDuration">-</span>초
+                                </span>
+                                <span class="text-slate-400">•</span>
+                                <span class="text-slate-400">
+                                    <span class="text-purple-400 font-bold" id="transcriptSegments">-</span>개 세그먼트
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bilingual Transcript -->
+                <div id="bilingualTranscriptContainer" class="mb-6">
+                    <h3 class="text-lg font-bold text-white mb-4">대본 내용</h3>
+                    <div class="space-y-3 max-h-[500px] overflow-y-auto" id="bilingualTranscript">
+                        <!-- Dynamic segments will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="copyTranscriptBtn"
+                        class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors">
+                        📋 대본 복사
+                    </button>
+                    <button id="extractHighlightsBtn"
+                        class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-lg transition-colors">
+                        ✂️ 하이라이트 추출 →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Highlight Selection Section (Step 2) -->
+            <div id="highlightsStepSection" class="glass-panel rounded-2xl p-8 mb-6 hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">✂️ Step 2: 하이라이트 구간 선택</h2>
+
+                <p class="text-slate-300 mb-6">AI가 분석한 가장 바이럴하기 좋은 구간들입니다. 하나를 선택해 보세요.</p>
+
+                <!-- Highlights Grid -->
+                <div id="highlightsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    <!-- Dynamic cards -->
+                </div>
+
+                <!-- Manual Selection (Optional) -->
+                <div class="bg-slate-800/50 rounded-xl p-4 mb-6 hidden">
+                    <h3 class="font-bold text-white mb-2">수동 구간 설정</h3>
+                    <div class="flex items-center gap-4">
+                        <input type="number" id="manualStart" placeholder="0.0"
+                            class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white w-24">
+                        <span class="text-white">~</span>
+                        <input type="number" id="manualEnd" placeholder="10.0"
+                            class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white w-24">
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button id="generateFinalScriptBtn" disabled
+                        class="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed">
+                        🎬 선택한 구간으로 대본 생성 (Step 3)
                     </button>
                 </div>
             </div>
@@ -1020,6 +1124,278 @@
             // Listen for script changes
             document.getElementById('scriptTextarea').addEventListener('input', checkTTSButtonState);
 
+            // ========================================
+            // TRANSCRIPT EXTRACTION (Step 1)
+            // ========================================
+
+            // Extract transcript button handler
+            document.getElementById('extractTranscriptBtn').addEventListener('click', async () => {
+                if (!selectedFile) {
+                    alert('먼저 비디오 파일을 선택해주세요.');
+                    return;
+                }
+
+                const transcriptSection = document.getElementById('transcriptStepSection');
+
+                // Show section & reset
+                transcriptSection.classList.remove('hidden');
+                document.getElementById('bilingualTranscript').innerHTML = `
+                    <div class="flex items-center justify-center p-12">
+                        <div class="text-center">
+                            <div class="loader w-12 h-12 border-4 border-t-purple-500 mx-auto mb-4"></div>
+                            <p class="text-white font-bold text-lg">대본 추출 및 번역 중...</p>
+                            <p class="text-slate-400 text-sm mt-2">Whisper ASR + Gemini Translation</p>
+                        </div>
+                    </div>
+                `;
+
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('video', selectedFile);
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/guidelines/extract-transcript', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || '대본 추출 실패');
+                    }
+
+                    // Store for next step
+                    currentTranscriptData = data.transcript;
+
+                    // Display transcript
+                    displayBilingualTranscript(data.transcript);
+
+                    // Scroll to results
+                    transcriptSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                } catch (error) {
+                    console.error('Transcript extraction error:', error);
+                    document.getElementById('bilingualTranscript').innerHTML = `
+                        <div class="p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+                            <p class="text-red-400 font-bold mb-2">❌ 오류 발생</p>
+                            <p class="text-slate-300 text-sm">${error.message}</p>
+                        </div>
+                    `;
+                }
+            });
+
+            function displayBilingualTranscript(transcript) {
+                // Update language info
+                const languageFlags = {
+                    'English': '🇺🇸',
+                    'english': '🇺🇸',
+                    '한국어': '🇰🇷',
+                    'korean': '🇰🇷',
+                    '日本語': '🇯🇵',
+                    'japanese': '🇯🇵',
+                    '中文': '🇨🇳',
+                    'chinese': '🇨🇳'
+                };
+
+                document.getElementById('detectedLanguageFlag').textContent = languageFlags[transcript.languageName] || '🌐';
+                document.getElementById('languageName').textContent = transcript.languageName;
+                document.getElementById('transcriptDuration').textContent = transcript.duration.toFixed(1);
+                document.getElementById('transcriptSegments').textContent = transcript.segments.length;
+
+                // Show translation badge if has translation
+                if (transcript.hasTranslation) {
+                    document.getElementById('translationBadge').classList.remove('hidden');
+                }
+
+                // Build bilingual segments
+                const segmentsHTML = transcript.segments.map((seg, i) => {
+                    const emotionColor = seg.emotion === 'excitement' ? 'border-yellow-400' :
+                        seg.emotion === 'tension' ? 'border-red-400' :
+                            seg.emotion === 'surprise' ? 'border-orange-400' :
+                                'border-blue-400';
+
+                    const showBilingual = transcript.hasTranslation && seg.text !== seg.textKo;
+
+                    return `
+                        <div class="bg-slate-800/50 rounded-xl p-4 border-l-4 ${emotionColor}">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-xs font-mono text-purple-300">${formatTime(seg.start)} → ${formatTime(seg.end)}</span>
+                                ${seg.emotion ? `<span class="text-xs bg-pink-500/30 px-2 py-0.5 rounded">${seg.emotion}</span>` : ''}
+                            </div>
+                            ${showBilingual ? `
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-xs text-slate-400 mb-1">${languageFlags[transcript.languageName] || '🌐'} Original</p>
+                                        <p class="text-white">${seg.text}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-slate-400 mb-1">🇰🇷 한국어</p>
+                                        <p class="text-white">${seg.textKo}</p>
+                                    </div>
+                                </div>
+                            ` : `
+                                <p class="text-white">${seg.text}</p>
+                            `}
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('bilingualTranscript').innerHTML = segmentsHTML;
+            }
+
+            // Copy transcript button
+            document.getElementById('copyTranscriptBtn').addEventListener('click', () => {
+                const transcriptDiv = document.getElementById('bilingualTranscript');
+                const segments = transcriptDiv.querySelectorAll('.bg-slate-800\\/50');
+
+                let textToCopy = '';
+                segments.forEach((seg) => {
+                    const text = seg.textContent.trim();
+                    textToCopy += text + '\n\n';
+                });
+
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const btn = document.getElementById('copyTranscriptBtn');
+                    const originalText = btn.textContent;
+                    btn.textContent = '✅ 복사 완료!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 2000);
+                }).catch(err => {
+                    alert('복사 실패: ' + err.message);
+                });
+            });
+
+            // Current transcript data buffer
+            let currentTranscriptData = null;
+            let selectedHighlight = null;
+
+            // Extract highlights button
+            document.getElementById('extractHighlightsBtn').addEventListener('click', async () => {
+                if (!currentTranscriptData) {
+                    alert('먼저 대본을 추출해주세요.');
+                    return;
+                }
+
+                const highlightsSection = document.getElementById('highlightsStepSection');
+                const highlightsGrid = document.getElementById('highlightsGrid');
+
+                // Show section & loading
+                highlightsSection.classList.remove('hidden');
+                highlightsGrid.innerHTML = `
+                    <div class="col-span-full flex items-center justify-center p-12">
+                        <div class="text-center">
+                            <div class="loader w-12 h-12 border-4 border-t-pink-500 mx-auto mb-4"></div>
+                            <p class="text-white font-bold text-xl">AI가 바이럴 구간 분석 중...</p>
+                            <p class="text-slate-400 text-sm mt-2">Hook, 감정선, 기승전결 분석</p>
+                        </div>
+                    </div>
+                `;
+
+                highlightsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/guidelines/extract-highlights', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            transcript: currentTranscriptData
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || '하이라이트 추출 실패');
+                    }
+
+                    // Display highlights
+                    displayHighlights(data.highlights);
+
+                } catch (error) {
+                    console.error('Highlight extraction error:', error);
+                    highlightsGrid.innerHTML = `
+                        <div class="col-span-full p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+                            <p class="text-red-400 font-bold mb-2">❌ 오류 발생</p>
+                            <p class="text-slate-300 text-sm">${error.message}</p>
+                        </div>
+                    `;
+                }
+            });
+
+            function displayHighlights(highlights) {
+                const grid = document.getElementById('highlightsGrid');
+                grid.innerHTML = '';
+
+                highlights.forEach((highlight, index) => {
+                    const duration = (highlight.end - highlight.start).toFixed(1);
+
+                    const card = document.createElement('div');
+                    card.className = `bg-slate-800/50 border border-slate-700 hover:border-pink-500 rounded-xl p-5 cursor-pointer transition-all hover:scale-[1.02] group highlight-card`;
+                    card.dataset.index = index;
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="bg-gradient-to-r from-pink-600 to-rose-600 text-white text-xs font-bold px-2 py-1 rounded">
+                                추천 ${index + 1}
+                            </div>
+                            <div class="text-yellow-400 font-black text-xl">
+                                ${highlight.viralScore}점
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-white font-bold mb-2 group-hover:text-pink-400 transition-colors">
+                            ${highlight.title}
+                        </h3>
+                        
+                        <div class="flex items-center gap-2 text-xs font-mono text-slate-400 mb-3">
+                            <span>⏱️ ${formatTime(highlight.start)} - ${formatTime(highlight.end)}</span>
+                            <span>(${duration}초)</span>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-2 mb-3">
+                             <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">${highlight.emotion || 'Exciting'}</span>
+                             <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">Shorts 최적</span>
+                        </div>
+
+                        <p class="text-slate-300 text-sm bg-black/20 p-3 rounded-lg border border-white/5">
+                            💡 ${highlight.reason}
+                        </p>
+                    `;
+
+                    card.addEventListener('click', () => {
+                        // Select this card
+                        document.querySelectorAll('.highlight-card').forEach(c => {
+                            c.classList.remove('border-pink-500', 'bg-pink-900/10', 'ring-2', 'ring-pink-500');
+                            c.classList.add('border-slate-700');
+                        });
+
+                        card.classList.remove('border-slate-700');
+                        card.classList.add('border-pink-500', 'bg-pink-900/10', 'ring-2', 'ring-pink-500');
+
+                        selectedHighlight = highlight;
+
+                        const btn = document.getElementById('generateFinalScriptBtn');
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btn.innerHTML = `🎬 선택한 구간(${duration}초)으로 대본 생성 생성`;
+                    });
+
+                    grid.appendChild(card);
+                });
+            }
+
+            // Also store transcript data when extracted
+            /* In extractTranscriptBtn handler:
+               currentTranscriptData = data.transcript;
+            */
+
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
 
         </script>
 </body>

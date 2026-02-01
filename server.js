@@ -186,6 +186,9 @@ app.use('/api/voicevox', voicevoxRoutes);
 // URL 분석 서비스
 const { analyzeVideoUrl, isValidUrl } = require('./server/services/url-analyzer.service');
 
+// Channel Analysis & Persona Trainer Routes
+app.use('/api/channels', require('./server/routes/channel_analysis.routes'));
+
 
 // Viral Archive Path
 const VIRAL_ARCHIVE_PATH = path.join(__dirname, 'viral_archive.json');

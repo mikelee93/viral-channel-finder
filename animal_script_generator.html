@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐾 일본 동물 채널 대본 생성기 | Japanese Animal Channel Script Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold text-white mb-4">
+                🐾 일본 동물 채널 대본 생성기
+            </h1>
+            <p class="text-xl text-purple-200">
+                페이스북/유튜브 동물 영상을 일본 YouTube Shorts용 대본으로 변환
+            </p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="glass-panel rounded-2xl p-8 mb-6">
+            <h2 class="text-2xl font-bold text-white mb-6">📤 영상 업로드</h2>
+
+            <div class="space-y-4">
+                <!-- Video Upload -->
+                <div>
+                    <label class="block text-white font-bold mb-2">영상 파일</label>
+                    <input type="file" id="videoFile" accept="video/*"
+                        class="w-full px-4 py-3 rounded-lg bg-white/20 text-white border-2 border-white/30 focus:border-white/60 outline-none">
+                    <p class="text-sm text-purple-200 mt-2">
+                        💡 페이스북 릴스를 먼저 다운로드 하세요:
+                        <a href="https://fdown.net/" target="_blank" class="underline">fdown.net</a>
+                    </p>
+                </div>
+
+                <!-- Source Title -->
+                <div>
+                    <label class="block text-white font-bold mb-2">원본 제목 (선택)</label>
+                    <input type="text" id="sourceTitle" placeholder="예: Cheetah vs Baboons on Bridge"
+                        class="w-full px-4 py-3 rounded-lg bg-white/20 text-white border-2 border-white/30 focus:border-white/60 outline-none placeholder-purple-200">
+                </div>
+
+                <!-- Target Channel -->
+                <div>
+                    <label class="block text-white font-bold mb-2">타겟 채널 스타일</label>
+                    <select id="targetChannel"
+                        class="w-full px-4 py-3 rounded-lg bg-white/20 text-white border-2 border-white/30 focus:border-white/60 outline-none">
+                        <option value="japanese-animal-channel">🐾 일본 동물 채널 (일반)</option>
+                        <option value="wildlife-documentary">📚 야생 다큐멘터리 스타일</option>
+                        <option value="cute-animals">🥰 귀여운 동물 채널</option>
+                        <option value="animal-facts">🧠 동물 지식 채널</option>
+                    </select>
+                </div>
+
+                <!-- Narration Style -->
+                <div>
+                    <label class="block text-white font-bold mb-2">나레이션 스타일</label>
+                    <select id="narrationStyle"
+                        class="w-full px-4 py-3 rounded-lg bg-white/20 text-white border-2 border-white/30 focus:border-white/60 outline-none">
+                        <option value="educational-exciting">🎓 교육적 + 흥미진진</option>
+                        <option value="dramatic">🎬 드라마틱</option>
+                        <option value="casual-friendly">😊 친근한 대화체</option>
+                        <option value="mysterious">🔮 신비로운 분위기</option>
+                    </select>
+                </div>
+
+                <!-- Generate Button -->
+                <button onclick="generateScript()"
+                    class="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg">
+                    ✨ 일본어 대본 생성하기
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <!-- Original Transcript (NEW!) -->
+            <div id="transcriptSection" class="glass-panel rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4">
+                    🎙️ 원본 음성 Transcript (Step 1/2)
+                </h2>
+
+                <div id="transcriptStatus" class="mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
+                        <span class="text-white font-bold">Whisper ASR로 추출 완료</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3" id="transcriptSegments"></div>
+
+                <div class="mt-4 p-4 bg-purple-900/30 rounded-lg border border-purple-500/30">
+                    <p class="text-sm text-purple-200">
+                        💡 <strong>왜 중요한가요?</strong><br>
+                        원본에서 말한 타이밍 = 중요한 순간! Gemini가 이 정보를 활용해서
+                        일본어 나레이션의 타이밍과 감정을 더 정확하게 조정합니다.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Title & Description -->
+            <div class="glass-panel rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4">📝 제목 & 설명 (Step 2/2)</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-purple-200 font-bold mb-2">일본어 제목</label>
+                        <p id="titleJapanese" class="text-2xl font-bold text-white"></p>
+                    </div>
+                    <div>
+                        <label class="block text-purple-200 font-bold mb-2">영어 번역</label>
+                        <p id="titleEnglish" class="text-lg text-purple-100"></p>
+                    </div>
+                    <div>
+                        <label class="block text-purple-200 font-bold mb-2">동영상 설명</label>
+                        <p id="descriptionJapanese" class="text-white"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Narration Script -->
+            <div class="glass-panel rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4">🎙️ 나레이션 대본</h2>
+                <div id="narrationScenes" class="space-y-4"></div>
+
+                <div class="mt-6 grid grid-cols-2 gap-4">
+                    <div class="bg-white/10 rounded-lg p-4">
+                        <p class="text-purple-200 text-sm">총 길이</p>
+                        <p id="totalDuration" class="text-2xl font-bold text-white"></p>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4">
+                        <p class="text-purple-200 text-sm">글자 수</p>
+                        <p id="wordCount" class="text-2xl font-bold text-white"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Viral Potential -->
+            <div class="glass-panel rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4">🔥 바이럴 가능성</h2>
+
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-bold">점수</span>
+                        <span id="viralScore" class="text-3xl font-bold text-yellow-300"></span>
+                    </div>
+                    <div class="w-full bg-white/20 rounded-full h-4">
+                        <div id="viralBar"
+                            class="bg-gradient-to-r from-yellow-400 to-pink-500 h-4 rounded-full transition-all"
+                            style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div>
+                        <p class="text-purple-200 font-bold mb-1">이유</p>
+                        <p id="viralReason" class="text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-purple-200 font-bold mb-1">개선 제안</p>
+                        <ul id="improvementTips" class="list-disc list-inside text-white space-y-1"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VOICEVOX Settings -->
+            <div class="glass-panel rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-4">🎤 VOICEVOX 설정</h2>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-purple-200 text-sm">캐릭터</p>
+                        <p id="voiceSpeaker" class="text-white font-bold"></p>
+                    </div>
+                    <div>
+                        <p class="text-purple-200 text-sm">속도</p>
+                        <p id="voiceSpeed" class="text-white font-bold"></p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <p class="text-purple-200 text-sm mb-1">선택 이유</p>
+                    <p id="voiceReason" class="text-white"></p>
+                </div>
+            </div>
+
+            <!-- Hashtags -->
+            <div class="glass-panel rounded-2xl p-8">
+                <h2 class="text-2xl font-bold text-white mb-4">#️⃣ 해시태그</h2>
+                <div id="hashtags" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function generateScript() {
+            const videoFile = document.getElementById('videoFile').files[0];
+            const sourceTitle = document.getElementById('sourceTitle').value;
+            const targetChannel = document.getElementById('targetChannel').value;
+            const narrationStyle = document.getElementById('narrationStyle').value;
+
+            if (!videoFile) {
+                alert('영상 파일을 선택해주세요!');
+                return;
+            }
+
+            // Show loading
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.classList.remove('hidden');
+            resultsSection.innerHTML = `
+                <div class="glass-panel rounded-2xl p-12 text-center">
+                    <div class="loader mx-auto mb-4"></div>
+                    <p class="text-white text-xl">AI가 영상을 분석하고 대본을 생성하는 중...</p>
+                    <p class="text-purple-200 mt-2">1-2분 정도 소요될 수 있습니다</p>
+                </div>
+            `;
+
+            try {
+                const formData = new FormData();
+                formData.append('video', videoFile);
+                formData.append('sourceTitle', sourceTitle);
+                formData.append('targetChannel', targetChannel);
+                formData.append('narrationStyle', narrationStyle);
+
+                const response = await fetch('http://localhost:4000/api/guidelines/generate-animal-script', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error);
+
+                // Display results with transcript
+                displayResults(data.script, data.originalTranscript);
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultsSection.innerHTML = `
+                    <div class="glass-panel rounded-2xl p-12 text-center">
+                        <p class="text-red-300 text-xl">❌ 오류 발생: ${error.message}</p>
+                        <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-white/20 rounded-lg text-white hover:bg-white/30">
+                            다시 시도
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function displayResults(script, originalTranscript) {
+            // Restore results section HTML
+            let html = '';
+
+            // Add transcript section if available
+            if (originalTranscript && originalTranscript.segments) {
+                html += `
+                    <div class="glass-panel rounded-2xl p-8 mb-6">
+                        <h2 class="text-2xl font-bold text-white mb-4">
+                            🎙️ 원본 음성 Transcript (Step 1/2)
+                        </h2>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                                <span class="text-white font-bold">Whisper ASR로 추출 완료</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-sm">
+                                <div class="bg-white/10 rounded px-3 py-1">
+                                    <span class="text-purple-200">언어:</span>
+                                    <span class="text-white font-bold ml-1">${originalTranscript.language}</span>
+                                </div>
+                                <div class="bg-white/10 rounded px-3 py-1">
+                                    <span class="text-purple-200">길이:</span>
+                                    <span class="text-white font-bold ml-1">${originalTranscript.duration}초</span>
+                                </div>
+                                <div class="bg-white/10 rounded px-3 py-1">
+                                    <span class="text-purple-200">세그먼트:</span>
+                                    <span class="text-white font-bold ml-1">${originalTranscript.segments.length}개</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                            ${originalTranscript.segments.map((seg, i) => `
+                                <div class="bg-white/5 rounded-lg p-3 border-l-4 ${seg.emotion === 'excitement' ? 'border-yellow-400' : seg.emotion === 'tension' ? 'border-red-400' : 'border-blue-400'}">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-xs font-mono text-purple-300">${formatTime(seg.start)} → ${formatTime(seg.end)}</span>
+                                        ${seg.emotion ? `<span class="text-xs bg-pink-500/30 px-2 py-0.5 rounded">${seg.emotion}</span>` : ''}
+                                    </div>
+                                    <p class="text-white">${seg.text}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="mt-4 p-4 bg-purple-900/30 rounded-lg border border-purple-500/30">
+                            <p class="text-sm text-purple-200">
+                                💡 <strong>왜 중요한가요?</strong><br>
+                                원본에서 말한 타이밍 = 중요한 순간! Gemini가 이 정보를 활용해서 
+                                일본어 나레이션의 타이밍과 감정을 더 정확하게 조정합니다.
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="glass-panel rounded-2xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-white mb-4">📝 제목 & 설명 (Step 2/2)</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-purple-200 font-bold mb-2">일본어 제목</label>
+                            <p id="titleJapanese" class="text-2xl font-bold text-white"></p>
+                        </div>
+                        <div>
+                            <label class="block text-purple-200 font-bold mb-2">영어 번역</label>
+                            <p id="titleEnglish" class="text-lg text-purple-100"></p>
+                        </div>
+                        <div>
+                            <label class="block text-purple-200 font-bold mb-2">동영상 설명</label>
+                            <p id="descriptionJapanese" class="text-white"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-white mb-4">🎙️ 나레이션 대본</h2>
+                    <div id="narrationScenes" class="space-y-4"></div>
+                    <div class="mt-6 grid grid-cols-2 gap-4">
+                        <div class="bg-white/10 rounded-lg p-4">
+                            <p class="text-purple-200 text-sm">총 길이</p>
+                            <p id="totalDuration" class="text-2xl font-bold text-white"></p>
+                        </div>
+                        <div class="bg-white/10 rounded-lg p-4">
+                            <p class="text-purple-200 text-sm">글자 수</p>
+                            <p id="wordCount" class="text-2xl font-bold text-white"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-white mb-4">🔥 바이럴 가능성</h2>
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-white font-bold">점수</span>
+                            <span id="viralScore" class="text-3xl font-bold text-yellow-300"></span>
+                        </div>
+                        <div class="w-full bg-white/20 rounded-full h-4">
+                            <div id="viralBar" class="bg-gradient-to-r from-yellow-400 to-pink-500 h-4 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <p class="text-purple-200 font-bold mb-1">이유</p>
+                            <p id="viralReason" class="text-white"></p>
+                        </div>
+                        <div>
+                            <p class="text-purple-200 font-bold mb-1">개선 제안</p>
+                            <ul id="improvementTips" class="list-disc list-inside text-white space-y-1"></ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-white mb-4">🎤 VOICEVOX 설정</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-purple-200 text-sm">캐릭터</p>
+                            <p id="voiceSpeaker" class="text-white font-bold"></p>
+                        </div>
+                        <div>
+                            <p class="text-purple-200 text-sm">속도</p>
+                            <p id="voiceSpeed" class="text-white font-bold"></p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-purple-200 text-sm mb-1">선택 이유</p>
+                        <p id="voiceReason" class="text-white"></p>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl p-8">
+                    <h2 class="text-2xl font-bold text-white mb-4">#️⃣ 해시태그</h2>
+                    <div id="hashtags" class="flex flex-wrap gap-2"></div>
+                </div>
+            `;
+
+            // Fill in data
+            document.getElementById('titleJapanese').textContent = script.title.japanese;
+            document.getElementById('titleEnglish').textContent = script.title.english;
+            document.getElementById('descriptionJapanese').textContent = script.description.japanese;
+
+            // Narration scenes
+            const scenesDiv = document.getElementById('narrationScenes');
+            script.narrationScript.scenes.forEach((scene, i) => {
+                const sceneHTML = `
+                    <div class="bg-white/10 rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-yellow-300 font-bold">Scene ${i + 1}</span>
+                            <span class="text-purple-200 text-sm">${scene.timestamp}</span>
+                        </div>
+                        <p class="text-sm text-purple-200 mb-1">📹 ${scene.visual}</p>
+                        <p class="text-white font-bold mb-1">${scene.narration}</p>
+                        <p class="text-sm text-purple-300">${scene.narrationKoreanPronunciation}</p>
+                        <div class="flex gap-4 mt-2 text-xs">
+                            <span class="text-pink-300">😊 ${scene.emotion}</span>
+                            <span class="text-blue-300">⏸️ ${scene.pause}초</span>
+                        </div>
+                    </div>
+                `;
+                scenesDiv.innerHTML += sceneHTML;
+            });
+
+            document.getElementById('totalDuration').textContent = script.narrationScript.totalDuration;
+            document.getElementById('wordCount').textContent = script.narrationScript.wordCount;
+
+            // Viral potential
+            document.getElementById('viralScore').textContent = script.viralPotential.score + ' / 10';
+            document.getElementById('viralBar').style.width = (script.viralPotential.score * 10) + '%';
+            document.getElementById('viralReason').textContent = script.viralPotential.reason;
+
+            const tipsUl = document.getElementById('improvementTips');
+            script.viralPotential.improvementTips.forEach(tip => {
+                tipsUl.innerHTML += `<li>${tip}</li>`;
+            });
+
+            // VOICEVOX
+            document.getElementById('voiceSpeaker').textContent = script.voicevoxSettings.speakerName;
+            document.getElementById('voiceSpeed').textContent = script.voicevoxSettings.speedScale + 'x';
+            document.getElementById('voiceReason').textContent = script.voicevoxSettings.reason;
+
+            // Hashtags
+            const hashtagsDiv = document.getElementById('hashtags');
+            script.hashtags.japanese.forEach(tag => {
+                hashtagsDiv.innerHTML += `<span class="px-3 py-1 bg-blue-500/30 text-white rounded-full text-sm">${tag}</span>`;
+            });
+        }
+
+        // Helper: Format seconds to MM:SS
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+    </script>
+</body>
+
+</html>
