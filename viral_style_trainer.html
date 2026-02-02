@@ -203,7 +203,7 @@
                                 조회
                             </button>
                         </div>
-                        <p class="text-xs text-slate-500 mt-2">최근 영상 5개를 분석하여 스타일을 학습합니다.</p>
+                        <p class="text-xs text-slate-500 mt-2">입력한 채널의 최근 영상을 분석하여 스타일을 학습합니다.</p>
                     </div>
 
                     <!-- Channel Info Preview (Hidden initially) -->
@@ -225,6 +225,20 @@
                             <option value="">카테고리를 선택하세요</option>
                             <!-- JS populated -->
                         </select>
+                    </div>
+
+                    <!-- Limit Selection (New, Hidden initially) -->
+                    <div id="limitSelectSection" class="hidden">
+                        <label class="block text-slate-300 font-bold mb-2">분석할 영상 개수</label>
+                        <div class="flex gap-3 mb-2">
+                            <button type="button" onclick="selectLimit(3)" id="btn-limit-3"
+                                class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">3개</button>
+                            <button type="button" onclick="selectLimit(5)" id="btn-limit-5"
+                                class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">5개</button>
+                            <button type="button" onclick="selectLimit(10)" id="btn-limit-10"
+                                class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">10개</button>
+                        </div>
+                        <p class="text-xs text-slate-500" id="limitHint">최근 영상 5개를 분석합니다.</p>
                     </div>
                 </div>
 
@@ -277,7 +291,27 @@
         // --- State ---
         let fetchedChannelInfo = null;
         let activeFilter = 'all';
-        let allPersonas = [];
+        window.allPersonas = []; // Made global for access by modals
+        let analysisLimit = 5; // Default
+
+        // --- Limit Selection Logic ---
+        window.selectLimit = (n) => {
+            analysisLimit = n;
+            document.querySelectorAll('.limit-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+                b.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-700');
+            });
+            const btn = document.getElementById(`btn-limit-${n}`);
+            if (btn) {
+                btn.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
+                btn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
+            }
+            const hint = document.getElementById('limitHint');
+            if (hint) hint.textContent = `최근 영상 ${n}개를 분석합니다.`;
+        }
+
+        // Init default selection visually
+        setTimeout(() => { if (window.selectLimit) window.selectLimit(5); }, 50);
 
         // --- DOM Elements ---
         const grid = document.getElementById('categoryGrid');
@@ -323,8 +357,8 @@
                 const res = await fetch('/api/channels/list');
                 const json = await res.json();
                 if (json.success) {
-                    allPersonas = json.data;
-                    document.getElementById('totalPersonasCount').innerText = allPersonas.length;
+                    window.allPersonas = json.data;
+                    document.getElementById('totalPersonasCount').innerText = window.allPersonas.length;
                     renderPersonas();
                     updateCategoryCounts();
                 }
@@ -414,6 +448,15 @@
                     <div class="flex flex-wrap gap-2 mb-4">
                         ${tags.map(t => `<span class="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">${t}</span>`).join('')}
                     </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-auto">
+                        <button onclick="window.viewDNA('${p.id}')" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-center text-white transition-colors">
+                            🧬 DNA 분석
+                        </button>
+                        <button onclick="window.openDirectorWrite('${p.id}')" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs text-center text-white font-bold transition-colors">
+                            🎬 Director Write
+                        </button>
+                    </div>
                     
                     <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-3 right-3">
                          <button onclick="deletePersona('${p.id}')" class="bg-red-500/20 text-red-400 p-1.5 rounded hover:bg-red-500/40" title="삭제">🗑️</button>
@@ -439,6 +482,20 @@
             document.getElementById('stepLoading').classList.add('hidden');
             document.getElementById('startAnalysisBtn').classList.remove('hidden');
             document.getElementById('cancelBtn').classList.remove('hidden');
+
+            // Hide result sections
+            document.getElementById('channelPreview').classList.add('hidden');
+            document.getElementById('categorySelectSection').classList.add('hidden');
+            document.getElementById('limitSelectSection').classList.add('hidden');
+
+            // Reset Button State
+            document.getElementById('startAnalysisBtn').disabled = true;
+            document.getElementById('startAnalysisBtn').classList.add('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
+            document.getElementById('startAnalysisBtn').classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+
+            // Reset inputs
+            document.getElementById('channelUrlInput').value = '';
+            fetchedChannelInfo = null;
         };
 
         // Expose delete function global
@@ -489,6 +546,7 @@
 
                         // Show Category Select
                         document.getElementById('categorySelectSection').classList.remove('hidden');
+                        document.getElementById('limitSelectSection').classList.remove('hidden'); // Added
                         document.getElementById('startAnalysisBtn').disabled = false;
                         document.getElementById('startAnalysisBtn').classList.remove('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
                         document.getElementById('startAnalysisBtn').classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
@@ -557,7 +615,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             url: fetchedChannelInfo.url,
-                            category: category
+                            category: category,
+                            limit: analysisLimit // Added limit
                         })
                     });
                     const json = await res.json();
@@ -633,6 +692,411 @@
         init();
 
     </script>
+    <!-- DNA Analysis Modal -->
+    <div id="dnaModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div id="dnaModalContent"
+            class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl p-8 transform scale-95 opacity-0 transition-all duration-300 shadow-2xl relative">
+            <button onclick="closeDnaModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Left: Profile -->
+                <div>
+                    <div class="flex items-center gap-4 mb-6">
+                        <div id="dnaAvatar"
+                            class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white">
+                            A
+                        </div>
+                        <div>
+                            <h2 id="dnaName" class="text-2xl font-bold text-white">Channel Name</h2>
+                            <p id="dnaSummary" class="text-slate-400 text-sm mt-1">Summary...</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5 mb-4">
+                        <h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Director's Rules
+                        </h4>
+                        <ul id="dnaRules" class="text-sm text-slate-300 space-y-2 list-disc list-inside">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Right: Structure Graph -->
+                <div>
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <span>📊</span> Viral Structure DNA
+                    </h3>
+                    <p class="text-xs text-slate-400 mb-4">Timestamps & Narrative Flow</p>
+
+                    <div id="dnaTimeline" class="space-y-3">
+                        <!-- Bars will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-slate-700 flex justify-end">
+                <button onclick="startDirectorWriteFromModal()"
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/20 transition-all">
+                    🎬 이 DNA로 대본 쓰기 (Director Mode)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ensure access to global variable if it exists, or define it for safety (though it should be defined in valid flow)
+        // If 'allPersonas' is defined in the previous script block, it should be accessible.
+        // However, if the previous script block was inside a module or function, it might not be.
+        // Let's assume it's global.
+
+        // DNA Modal Logic
+        let currentDnaId = null;
+
+        window.viewDNA = function (id) {
+            // Check if allPersonas is available
+            if (typeof allPersonas === 'undefined') {
+                console.error("allPersonas is undefined. Loading from server...");
+                // Emergency load
+                fetch('/api/channels/list').then(r => r.json()).then(d => {
+                    if (d.success) {
+                        window.allPersonas = d.data; // Force global
+                        window.viewDNA(id); // Retry
+                    }
+                });
+                return;
+            }
+
+            currentDnaId = id;
+            const persona = allPersonas.find(p => p.id === id);
+            if (!persona) return;
+
+            // Populate Info
+            document.getElementById('dnaName').innerText = persona.name;
+            document.getElementById('dnaAvatar').innerText = persona.name.charAt(0);
+            document.getElementById('dnaSummary').innerText = persona.analysis.summary || '요약 정보 없음';
+
+            // Populate Rules
+            const rulesList = document.getElementById('dnaRules');
+            rulesList.innerHTML = '';
+            if (persona.analysis.director_rules && persona.analysis.director_rules.length > 0) {
+                persona.analysis.director_rules.forEach(r => {
+                    rulesList.innerHTML += `<li>${r}</li>`;
+                });
+            } else {
+                rulesList.innerHTML = `<li class="text-slate-500 italic">No specific rules found.</li>`;
+            }
+
+            // Populate Timeline
+            const timeline = document.getElementById('dnaTimeline');
+            timeline.innerHTML = '';
+
+            if (persona.analysis.structure_template) {
+                persona.analysis.structure_template.forEach(block => {
+                    // Parse "0-5s"
+                    const timeMatch = block.time.match(/(\d+)-(\d+)s/);
+                    let duration = 5;
+                    if (timeMatch) duration = parseInt(timeMatch[2]) - parseInt(timeMatch[1]);
+
+                    // Color mapping
+                    let bgClass = "bg-slate-600";
+                    if (block.type.includes('Hook')) bgClass = "bg-red-500";
+                    if (block.type.includes('Body')) bgClass = "bg-blue-500";
+                    if (block.type.includes('Climax')) bgClass = "bg-purple-500";
+                    if (block.type.includes('CTA')) bgClass = "bg-green-500";
+
+                    timeline.innerHTML += `
+                        <div class="relative pl-16 py-2 border-l-2 border-slate-700 hover:border-blue-500 transition-colors group">
+                            <span class="absolute left-0 top-3 text-xs font-mono text-slate-500 w-12 text-right group-hover:text-blue-400">${block.time}</span>
+                            <div class="bg-slate-800 p-3 rounded-lg border border-white/5 relative overflow-hidden">
+                                <div class="absolute left-0 top-0 bottom-0 w-1 ${bgClass}"></div>
+                                <h5 class="text-sm font-bold text-white mb-1 flex justify-between">
+                                    <span>${block.type}</span>
+                                    <span class="text-xs font-normal opacity-50 text-white gap-2 px-1.5 py-0.5 rounded bg-white/10">⏱ ${duration}s</span>
+                                </h5>
+                                <p class="text-xs text-slate-400">${block.description}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                timeline.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-800 rounded-lg">No DNA structure available.<br>Please re-analyze this channel.</div>`;
+            }
+
+            // Show Modal
+            const modal = document.getElementById('dnaModal');
+            const content = document.getElementById('dnaModalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('opacity-0', 'scale-95');
+                content.classList.add('opacity-100', 'scale-100');
+            }, 10);
+        };
+
+        window.closeDnaModal = function () {
+            const modal = document.getElementById('dnaModal');
+            const content = document.getElementById('dnaModalContent');
+            content.classList.remove('opacity-100', 'scale-100');
+            content.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        };
+
+        window.openDirectorWrite = function (id) {
+            currentDnaId = id;
+            // Close DNA modal if open
+            closeDnaModal();
+
+            // Open Input Modal
+            const modal = document.getElementById('directorInputModal');
+            modal.classList.remove('hidden');
+            document.getElementById('directorTopicInput').value = '';
+            setTimeout(() => document.getElementById('directorTopicInput').focus(), 100);
+        };
+
+        window.closeDirectorInputHelper = function () {
+            document.getElementById('directorInputModal').classList.add('hidden');
+        };
+
+        window.generateDirectorScript = async function () {
+            const topic = document.getElementById('directorTopicInput').value.trim();
+            const tone = document.getElementById('directorToneSelect').value;
+            if (!topic) return alert('주제를 입력해주세요!');
+
+            // Loading State
+            const btn = document.getElementById('generateDirectorBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '🎬 감독이 대본을 쓰는 중... (약 15초)';
+            btn.disabled = true;
+
+            try {
+                const persona = allPersonas.find(p => p.id === currentDnaId);
+                if (!persona) throw new Error('Persona not found');
+
+                const res = await fetch('/api/channels/director/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topic: topic,
+                        tone: tone,
+                        structure_template: persona.analysis.structure_template,
+                        director_rules: persona.analysis.director_rules
+                    })
+                });
+
+                const json = await res.json();
+                if (json.success) {
+                    window.closeDirectorInputHelper();
+                    showDirectorResult(json.script, persona.name);
+                } else {
+                    alert('Error: ' + json.error);
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert('대본 생성 실패');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        function showDirectorResult(script, personaName) {
+            const modal = document.getElementById('directorResultModal');
+            document.getElementById('resultPersonaName').innerText = personaName + " Style";
+
+            const container = document.getElementById('scriptTimelineContainer');
+            container.innerHTML = '';
+
+            script.forEach(block => {
+                // Color mapping
+                let bgClass = "border-slate-600";
+                let textClass = "text-slate-300";
+                if (block.type.includes('Hook')) { bgClass = "border-red-500"; textClass = "text-red-300"; }
+                if (block.type.includes('Body')) { bgClass = "border-blue-500"; textClass = "text-blue-300"; }
+                if (block.type.includes('Climax') || block.type.includes('Twist')) { bgClass = "border-purple-500"; textClass = "text-purple-300"; }
+                if (block.type.includes('CTA')) { bgClass = "border-green-500"; textClass = "text-green-300"; }
+
+                container.innerHTML += `
+                    <div class="flex gap-4 relative">
+                        <div class="w-20 pt-2 text-right text-xs font-mono text-slate-500 shrink-0 select-none">
+                            ${block.time}
+                        </div>
+                        <div class="absolute left-[5.25rem] top-0 bottom-0 w-px bg-slate-700"></div>
+                        <div class="absolute left-[5.10rem] top-3 w-3 h-3 rounded-full bg-slate-800 border-2 ${bgClass} z-10"></div>
+                        
+                        <div class="flex-1 pb-8">
+                             <div class="bg-slate-800/80 p-5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-bold px-2 py-1 rounded bg-white/5 ${textClass}">${block.type}</span>
+                                    <div class="flex gap-2">
+                                        ${block.visual_cue ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-500/20">👁 ${block.visual_cue}</span>` : ''}
+                                        ${block.audio_cue ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-pink-900/30 text-pink-300 border border-pink-500/20">🔊 ${block.audio_cue}</span>` : ''}
+                                    </div>
+                                </div>
+                                <p class="text-lg text-white font-medium leading-relaxed">
+                                    "${block.content}"
+                                </p>
+                             </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        window.closeDirectorResult = function () {
+            document.getElementById('directorResultModal').classList.add('hidden');
+        };
+
+        window.startDirectorWriteFromModal = function () {
+            if (currentDnaId) window.openDirectorWrite(currentDnaId);
+        };
+
+        // --- AI Recommendation Logic ---
+        window.recommendTopics = async function () {
+            const btn = document.getElementById('btnRecommend');
+            const list = document.getElementById('aiRecommendationList');
+
+            if (btn.disabled) return; // Prevent double click
+
+            // UI Loading
+            btn.innerHTML = `<span class="animate-spin">🌀</span> 채널 DNA 분석 중...`;
+            btn.disabled = true;
+            list.classList.remove('hidden');
+            list.innerHTML = `<div class="p-3 text-center text-xs text-slate-500">AI가 이 채널에 딱 맞는 주제를 찾고 있습니다...</div>`;
+
+            try {
+                const persona = allPersonas.find(p => p.id === currentDnaId);
+                if (!persona) throw new Error('Persona not found');
+
+                const res = await fetch('/api/channels/director/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        channelName: persona.name,
+                        summary: persona.analysis.summary,
+                        category: persona.category,
+                        tone: persona.analysis.tone,
+                        rules: persona.analysis.director_rules
+                    })
+                });
+
+                const json = await res.json();
+                if (json.success && json.recommendations) {
+                    list.innerHTML = ''; // Clear loading
+                    json.recommendations.forEach(rec => {
+                        const el = document.createElement('div');
+                        el.className = "bg-slate-800 p-3 rounded-lg border border-slate-700 hover:border-purple-500 cursor-pointer transition-colors group";
+                        el.onclick = () => applyRecommendation(rec.topic, rec.tone);
+                        el.innerHTML = `
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="text-[10px] font-bold text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded">${rec.type}</span>
+                                <span class="text-[10px] text-slate-500 group-hover:text-purple-300">Tone: ${rec.tone}</span>
+                            </div>
+                            <h5 class="text-sm font-bold text-white mb-1 group-hover:text-purple-200">"${rec.topic}"</h5>
+                            <p class="text-xs text-slate-400 leading-tight">${rec.reason}</p>
+                         `;
+                        list.appendChild(el);
+                    });
+                    btn.innerHTML = `<span>🤖</span> 다른 주제 다시 추천받기`;
+                } else {
+                    list.innerHTML = `<div class="text-red-400 text-xs p-2">추천 실패: ${json.error || 'Unknown'}</div>`;
+                    btn.innerHTML = `<span>🤖</span> AI 주제 추천받기 (Retry)`;
+                }
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = `<div class="text-red-400 text-xs p-2">서버 오류</div>`;
+                btn.innerHTML = `<span>🤖</span> AI 주제 추천받기 (Retry)`;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        window.applyRecommendation = function (topic, tone) {
+            document.getElementById('directorTopicInput').value = topic;
+            // Try to match tone if exists in select, else add it or ignore
+            const toneSelect = document.getElementById('directorToneSelect');
+            // Simple check: if tone is somewhat matching standard ones, select it.
+            // For now, let's just keep the tone separate or default.
+            // Actually, let's try to set it if it matches value, or default to Engaging
+            // We won't force the select change unless it matches perfectly.
+
+            // Visual feedback
+            const input = document.getElementById('directorTopicInput');
+            input.classList.add('ring-2', 'ring-purple-500');
+            setTimeout(() => input.classList.remove('ring-2', 'ring-purple-500'), 500);
+        };
+
+    </script>
 </body>
+
+<!-- Director Input Modal -->
+<div id="directorInputModal"
+    class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden z-[60] flex items-center justify-center">
+    <div
+        class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <h3 class="text-xl font-bold text-white mb-4">🎬 Director Mode</h3>
+        <p class="text-sm text-slate-400 mb-6">This persona's pacing & editing rules will be applied to your topic.</p>
+
+        <label class="block text-xs font-bold text-slate-500 mb-1">TOPIC</label>
+        <input id="directorTopicInput" type="text" placeholder="e.g., Why cats sleep so much"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
+
+        <!-- AI Suggestion Area -->
+        <div class="mb-4">
+            <button id="btnRecommend" type="button" onclick="recommendTopics()"
+                class="text-xs flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors font-bold mb-2">
+                <span>🤖</span> AI 주제 추천받기 (Click!)
+            </button>
+            <div id="aiRecommendationList" class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 hidden">
+                <!-- Items injected here -->
+            </div>
+        </div>
+
+        <label class="block text-xs font-bold text-slate-500 mb-1">TONE</label>
+        <select id="directorToneSelect"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-6 outline-none">
+            <option value="Engaging">Engaging (Standard)</option>
+            <option value="High-Tension">High-Tension (Fast)</option>
+            <option value="Scientific">Calm & Scientific</option>
+            <option value="Funny">Humorous</option>
+        </select>
+
+        <div class="flex justify-end gap-2">
+            <button onclick="window.closeDirectorInputHelper()"
+                class="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+            <button id="generateDirectorBtn" onclick="generateDirectorScript()"
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">Action!</button>
+        </div>
+    </div>
+</div>
+
+<!-- Director Result Modal -->
+<div id="directorResultModal" class="fixed inset-0 bg-black/95 hidden z-[70] overflow-y-auto">
+    <div class="min-h-screen p-8 max-w-4xl mx-auto">
+        <div
+            class="flex justify-between items-center mb-10 sticky top-0 bg-black/95 py-4 z-10 border-b border-white/10 backdrop-blur">
+            <div>
+                <h2
+                    class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+                    Director's Cut</h2>
+                <p id="resultPersonaName" class="text-slate-400">Persona Style</p>
+            </div>
+            <button onclick="window.closeDirectorResult()"
+                class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg">Close</button>
+        </div>
+
+        <div id="scriptTimelineContainer" class="pl-4">
+            <!-- Timeline items injected here -->
+        </div>
+    </div>
+</div>
 
 </html>

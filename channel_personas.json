@@ -1,21 +1,5 @@
 [
   {
-    "id": "1769907626390",
-    "name": "1分動画",
-    "url": "https://www.youtube.com/channel/UCuP7Oceo9kOQ_tyUWadNmJA",
-    "category": "comedy",
-    "analysis": {
-      "tone": "Uplifting, surprising, heartwarming, dramatic",
-      "hook_style": "Starts with a captivating scenario or surprising event",
-      "catchphrases": [],
-      "pacing": "Dynamic, building suspense and excitement",
-      "humor_code": "Situational irony, unexpected twists, feel-good moments",
-      "summary": "This channel focuses on highlighting extraordinary acts of kindness, unexpected outcomes, and moments of sportsmanship and humanity.",
-      "prompt_instruction": "Tell a story about an unexpected act of kindness or sportsmanship, emphasizing the emotional impact and surprising nature of the event."
-    },
-    "createdAt": "2026-02-01T01:00:26.390Z"
-  },
-  {
     "id": "1769908157266",
     "name": "大谷チャンネル",
     "url": "https://www.youtube.com/channel/UCu0rv81sQrCiq59MA-YJi1g",
@@ -70,5 +54,115 @@
       "prompt_instruction": "Analyze a strange or dramatic video clip, focusing on the most unbelievable aspects and explaining them in a suspenseful, slightly sarcastic tone. Focus on the escalation of events."
     },
     "createdAt": "2026-02-01T01:37:26.445Z"
+  },
+  {
+    "id": "1769983433879",
+    "name": "カワイイが勝つ",
+    "url": "https://www.youtube.com/channel/UCq-sDS_UoWx_xd77QB2lSaA",
+    "category": "pets",
+    "analysis": {
+      "tone": "Sentimental, Emotional, Dramatic, Compassionate",
+      "hook_style": "Starts with a poignant scene or statement about the animal's situation.",
+      "catchphrases": [
+        "精一杯のさよならを伝えて (Seiippai no sayonara o tsutaete - Giving their best farewell)",
+        "最後の瞬間になるとは誰も思いませんでした (Saigo no shunkan ni naru to wa daremo omoimasen deshita - No one thought it would be the last moment)"
+      ],
+      "pacing": "Slow, Deliberate",
+      "humor_code": "None (Focus is on emotional storytelling)",
+      "audio_style": {
+        "bgm": "Calm, Melancholy (Inferred)",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This creator focuses on emotionally charged stories of pets, often dealing with themes of abandonment, loss, and devotion to their owners.  이 제작자는 감정적으로 고조된 반려동물 이야기를 중심으로, 종종 유기, 상실, 주인에 대한 헌신이라는 주제를 다룹니다.",
+      "prompt_instruction": "Write a short, emotionally impactful story about a pet saying goodbye to its owner, focusing on the pet's perspective and feelings."
+    },
+    "createdAt": "2026-02-01T22:03:53.879Z"
+  },
+  {
+    "id": "1769985925115",
+    "name": "1分動画",
+    "url": "https://www.youtube.com/channel/UCuP7Oceo9kOQ_tyUWadNmJA",
+    "category": "comedy",
+    "analysis": {
+      "tone": "Informative, Slightly Sarcastic (정보 제공, 약간 빈정거림)",
+      "hook_style": "Starts with a surprising or intriguing scenario (놀랍거나 흥미로운 시나리오로 시작)",
+      "catchphrases": [],
+      "pacing": "Fast",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Introduce a bizarre or unusual situation. (기괴하거나 특이한 상황 소개) "
+        },
+        {
+          "time": "5-15s",
+          "type": "Body",
+          "description": "Provide context or background information about the scenario. (시나리오에 대한 배경 정보 또는 맥락 제공)"
+        },
+        {
+          "time": "15-45s",
+          "type": "Body",
+          "description": "Show escalation or unexpected consequences. (상황의 고조 또는 예상치 못한 결과 제시)"
+        },
+        {
+          "time": "45-60s",
+          "type": "End",
+          "description": "End with a slightly negative or questioning tone. (약간 부정적이거나 의문스러운 어조로 마무리)"
+        }
+      ],
+      "director_rules": [
+        "Keep the pace fast and engaging. (빠르고 매력적인 속도를 유지하십시오.)",
+        "Focus on unusual or unexpected events. (특이하거나 예상치 못한 사건에 초점을 맞추십시오.)",
+        "Incorporate a hint of sarcasm or irony. (빈정거림이나 아이러니한 요소를 포함하십시오.)"
+      ],
+      "humor_code": "Situational irony, shock value (상황적 아이러니, 충격적인 가치)",
+      "audio_style": {
+        "bgm": "Energetic (활기찬)",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This persona presents short, informative videos about bizarre or shocking situations with a fast pace and a touch of sarcasm. (이 페르소나는 기괴하거나 충격적인 상황에 대한 짧고 유익한 비디오를 빠른 속도와 약간의 빈정거림으로 제공합니다.)",
+      "prompt_instruction": "Create a short video script describing a bizarre everyday object, presented in a fast-paced, informative style with a slightly sarcastic tone."
+    },
+    "createdAt": "2026-02-01T22:45:25.115Z"
+  },
+  {
+    "id": "1769991136377",
+    "name": "ユーモアニャン",
+    "url": "https://www.youtube.com/channel/UCgfo6AxrFNhDd7weUYwxI6Q",
+    "category": "people",
+    "analysis": {
+      "tone": "Gentle, Empathic (부드러운, 공감적인)",
+      "hook_style": "Intriguing opening related to animals in distress or heartwarming animal stories. (동물의 고통이나 감동적인 동물 이야기에 관련된 흥미로운 오프닝.)",
+      "catchphrases": [],
+      "pacing": "Slow (느린)",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Introduction to animal and the central conflict/situation. (동물 소개와 주요 갈등/상황 제시. (동물 소개와 주요 갈등/상황 제시.))"
+        },
+        {
+          "time": "5-15s",
+          "type": "Body",
+          "description": "Continued development of the situation, often involving emotional narration. (상황의 지속적인 전개, 감정적인 내레이션 포함.)"
+        }
+      ],
+      "director_rules": [
+        "Focus on stories with a strong emotional core, especially those involving animals. (강력한 감정적 핵심이 있는 이야기에 집중, 특히 동물과 관련된 이야기. (강력한 감정적 핵심이 있는 이야기에 집중, 특히 동물과 관련된 이야기.))",
+        "Use gentle and empathetic narration. (부드럽고 공감적인 내레이션을 사용. (부드럽고 공감적인 내레이션을 사용.))",
+        "Maintain a slow and deliberate pace. (느리고 신중한 페이스를 유지. (느리고 신중한 페이스를 유지.))"
+      ],
+      "humor_code": "Humor is likely gentle and heartwarming, if present, emphasizing the innocence or quirkiness of animals. (유머는, 있다면, 동물의 순수함이나 엉뚱함을 강조하는 부드럽고 따뜻한 유머일 가능성이 높습니다.)",
+      "audio_style": {
+        "bgm": "Calm, gentle, and possibly instrumental (Not Analyzed) (조용하고 부드러우며 악기 음악일 가능성이 높음 (분석되지 않음))",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This persona focuses on heartwarming and emotionally resonant animal stories, delivered with a gentle and empathetic tone. (이 페르소나는 따뜻하고 감정적으로 공감되는 동물 이야기에 초점을 맞추고 부드럽고 공감적인 어조로 전달합니다. (이 페르소나는 따뜻하고 감정적으로 공감되는 동물 이야기에 초점을 맞추고 부드럽고 공감적인 어조로 전달합니다.))",
+      "prompt_instruction": "Create a script about a heartwarming animal rescue story, using gentle and empathetic narration."
+    },
+    "createdAt": "2026-02-02T00:12:16.377Z"
   }
 ]

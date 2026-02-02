@@ -6,16 +6,17 @@ const { exec } = require('child_process');
 
 // Helper: Sanitize filename
 function sanitizeFilename(name) {
-    // Allow Korean, Japanese (Hiragana, Katakana, Kanji), English, Numbers, Spaces, -, _
     return name.replace(/[^a-z0-9가-힣ㄱ-ㅎㅏ-ㅣ\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\s\-_]/gi, '').replace(/\s+/g, '_').substring(0, 50);
 }
 
-// Helper: Save Transcript and Sync to Git
-function saveTranscript(category, channelName, videoTitle, content) {
+// Helper: Save Transcript and Sync to Git with Country Separation
+function saveTranscript(category, channelName, videoTitle, content, countryCode = 'KR') {
     try {
-        // 1. Define paths
-        const baseDir = path.join(__dirname, '../../transcripts'); // root/transcripts
-        const catDir = path.join(baseDir, sanitizeFilename(category || 'General'));
+        // 1. Define paths with Country Code
+        // Structure: transcripts/{Country}/{Category}/{ChannelName}/...
+        const baseDir = path.join(__dirname, '../../transcripts');
+        const countryDir = path.join(baseDir, countryCode);
+        const catDir = path.join(countryDir, sanitizeFilename(category || 'General'));
         const chanDir = path.join(catDir, sanitizeFilename(channelName || 'Unknown'));
 
         // 2. Create directories recursively
@@ -28,20 +29,18 @@ function saveTranscript(category, channelName, videoTitle, content) {
         const filePath = path.join(chanDir, filename);
 
         fs.writeFileSync(filePath, content, 'utf8');
-        console.log(`[Archive] Saved: ${filePath}`);
+        console.log(`[Archive] Saved to ${countryCode}: ${filePath}`);
 
         // 4. Git Sync (Async - non-blocking)
-        const relativePath = `transcripts/${sanitizeFilename(category || 'General')}/${sanitizeFilename(channelName || 'Unknown')}/${filename}`;
+        const relativePath = `transcripts/${countryCode}/${sanitizeFilename(category || 'General')}/${sanitizeFilename(channelName || 'Unknown')}/${filename}`;
 
         // Command: git add -> commit -> push
-        // Note: Using relative path from root (cwd is usually root in npm run dev)
-        // Adjust cwd if needed. Assuming process.cwd() is project root.
-        const gitCmd = `git add "${relativePath}" && git commit -m "Add transcript: ${videoTitle}" && git push origin master`;
+        // Updated commit message to include Country/Category info
+        const gitCmd = `git add "${relativePath}" && git commit -m "[${countryCode}/${sanitizeFilename(category || 'General')}] Add transcript: ${videoTitle}" && git push origin master`;
 
         exec(gitCmd, (err, stdout, stderr) => {
             if (err) {
                 console.error('[Git Sync Error]', err.message);
-                // Don't crash server for git error
             } else {
                 console.log('[Git Sync Success]', stdout.trim());
             }
@@ -93,22 +92,19 @@ router.post('/info', async (req, res) => {
     try {
         console.log(`[Channel Info] Fetching: ${url}`);
 
-        // Fix: Use dump-json without flat-playlist to get full metadata (including subs)
         const cmd = `yt-dlp --dump-json --playlist-end 1 "${url}"`;
 
         const { stdout } = await execPromise(cmd);
-        // Take first line if multiple (sometimes playlist dump outputs multiple lines)
         const videoData = JSON.parse(stdout.trim().split('\n')[0]);
 
         res.json({
             success: true,
             data: {
                 name: videoData.uploader || videoData.channel || 'Unknown Channel',
-                // Fallback for subscribers
                 subscribers: videoData.channel_follower_count || videoData.subscriber_count || 0,
                 handle: videoData.uploader_id || '',
                 url: videoData.channel_url || url,
-                originalCategory: videoData.categories?.[0] // Extract first category e.g. "Entertainment"
+                originalCategory: videoData.categories?.[0]
             }
         });
     } catch (error) {
@@ -119,238 +115,235 @@ router.post('/info', async (req, res) => {
 
 // 3. POST /analyze - Deep Analysis (Transcript -> Persona)
 router.post('/analyze', async (req, res) => {
-    const { url, category } = req.body;
+    // Added country parameter for manual override
+    const { url, category, country } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const APIFY_TOKEN = process.env.APIFY_TOKEN;
+    const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
     if (!url) return res.status(400).json({ error: 'URL required' });
     if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY missing' });
+    if (!APIFY_TOKEN) return res.status(500).json({ error: 'APIFY_TOKEN missing' });
 
     try {
         console.log(`[Channel Analyze] Starting deep analysis for: ${url}`);
 
-        // A. Fetch popular 10 videos transcripts
-        // We use --dump-json here too for consistency, but flat-playlist is faster for finding URLs
-        // Step 1: Get URLs
-        // Note: yt-dlp doesn't have a direct "sort by popular" for channel URL without loading all videos.
-        // But for /videos tab, we can try to guess or use specific API.
-        // HOWEVER, yt-dlp supports picking video formats, but not sorting by views easily on the CHANNEL url directly without downloading metadata first.
-        // Wait, for Shorts/Videos tabs, youtube stores them in timeline.
-        // BEST APPROACH: Fetch 50, sort by view_count manually, take top 10.
-        // OR try to access the /videos?view=0&sort=p (Popular) URL.
-
-        // Attempt 1: Append /videos?sort=p (Popular) to URL if it's a channel URL
-        let targetUrl = url;
-        if (!url.includes('/videos') && !url.includes('/shorts')) {
-            targetUrl = url.replace(/\/$/, '') + '/videos?view=0&sort=p';
-            // Note: ?sort=p might work for /videos tab. For /shorts tab it is "p" too?
-            // Let's rely on yt-dlp fetching from the popular tab if we give that URL.
-            // Actually, just fetching metadata for 30 videos and sorting is safer.
-        }
-
-        // Optimization: Fetch 30 latest, sort by views, take top 10.
-        // Why? fetching ALL popular might require browsing "Popular" tab specifically.
-        // Let's try appending /popluar or similar? No.
-
-        // BETTER: Just ask yt-dlp to get 20 items and we sort them.
-        // But user wants "Popular".
-        // If sorting is critical, we should try to navigate to the "Popular" tab via URL.
-        // YouTube Interface: /videos?sort=p, /shorts?sort=p
-
-        // A. Fetch Channel Name Explicitly (Fix for Unknown_Channel with flat-playlist)
-        // flat-playlist returns "NA" for uploader, so we must fetch it separately first.
+        // A. Resolve Channel ID & Name using YouTube API (More Reliable)
+        let channelId = '';
         let channelName = 'Unknown_Channel';
-        try {
-            console.log(`[Channel Info] Fetching channel name directly...`);
-            const nameCmd = `yt-dlp --print "%(channel)s" --playlist-end 1 --skip-download --no-warnings "${url}"`;
-            const { stdout: nameOut } = await execPromise(nameCmd);
-            const fetchedName = nameOut.trim();
-            if (fetchedName && fetchedName !== 'NA') {
-                channelName = fetchedName;
+        let customUrl = '';
+
+        // Extract handle or channel ID from URL
+        if (url.includes('youtube.com/@')) {
+            const handle = url.split('@')[1].split('/')[0];
+            const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=@${handle}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
+            if (searchData.items && searchData.items.length > 0) {
+                channelId = searchData.items[0].id.channelId;
+                channelName = searchData.items[0].snippet.title;
             }
-        } catch (e) {
-            console.warn('[Channel Name Fetch] Failed, falling back to Unknown:', e.message);
+        } else if (url.includes('/channel/')) {
+            channelId = url.split('/channel/')[1].split('/')[0];
         }
 
-        console.log(`[Channel Analyze] Target Channel: ${channelName}`);
-
-        const listCmd = `yt-dlp --dump-json --flat-playlist --playlist-end 30 "${url}"`;
-        const { stdout: listOut } = await execPromise(listCmd);
-
-        let allVideos = listOut.trim().split('\n').map(line => {
-            try {
-                return JSON.parse(line);
-            } catch (e) { return null; }
-        }).filter(v => v);
-
-        // Sort by views descending
-        allVideos.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-
-        // Take top 10
-        const videos = allVideos.slice(0, 10).map(v => ({
-            url: v.url || v.webpage_url,
-            title: v.title
-        }));
-
-        if (allVideos.length > 0) {
-            console.log('[Debug] First Video Object:', JSON.stringify(allVideos[0], null, 2));
+        // If we have an ID, fetch details to confirm name
+        if (channelId) {
+            const chanUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`;
+            const chanRes = await fetch(chanUrl);
+            const chanData = await chanRes.json();
+            if (chanData.items && chanData.items.length > 0) {
+                channelName = chanData.items[0].snippet.title;
+                customUrl = chanData.items[0].snippet.customUrl;
+            }
         }
 
-        // Use the explicitly fetched name
-        const name = channelName;
+        console.log(`[Channel Analyze] Target Channel: ${channelName} (${channelId})`);
 
-        console.log(`[Channel Analyze] Found ${videos.length} videos for channel: ${name}`);
+        // B. Fetch Top Videos using YouTube API (Reliable)
+        // We use 'search' endpoint with order=viewCount to get popular videos
+        // If channelId is found, use it. If not, fallback to yt-dlp (but user asked to remove it if possible, however search needs channelId)
 
-        if (videos.length === 0) throw new Error('No videos found');
+        let videos = [];
+        const limit = req.body.limit || 5;
 
-        // B. Extract Transcripts (Robust yt-dlp method)
-        // Ensure temp dir exists
-        const tempDir = path.join(__dirname, '../../temp_subs');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        if (channelId) {
+            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${limit}&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
+            const videosRes = await fetch(videosUrl);
+            const videosData = await videosRes.json();
+
+            if (videosData.items) {
+                videos = videosData.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    url: `https://www.youtube.com/watch?v=${item.id.videoId}`
+                }));
+            }
+        } else {
+            console.warn('[Channel Analyze] Could not resolve Channel ID via API. Falling back to simple yt-dlp for list (if available)...');
+            // Fallback (User said yt-dlp is bad, but if we can't find channel ID, we have no choice for YouTube API)
+            // But let's assume API works if key is valid.
+            throw new Error('Could not resolve Channel ID from URL. Please ensure the URL is valid.');
+        }
+
+        if (videos.length === 0) throw new Error('No videos found for this channel.');
+        console.log(`[Channel Analyze] Found ${videos.length} videos to analyze.`);
+
+
+        // C. Fetch Transcripts using Apify (pintostudio/youtube-transcript-scraper)
+        // Note: The actor 'pintostudio/youtube-transcript-scraper' seems to require 'videoUrl' (singular) based on error logs.
+        // We will run in parallel for the requested videos.
+        console.log('[Channel Analyze] Fetching transcripts via Apify (Parallel)...');
+
+        const { ApifyClient } = require('apify-client');
+        const client = new ApifyClient({ token: APIFY_TOKEN });
 
         const transcripts = [];
 
-        // Helper delay function
-        const wait = (ms) => new Promise(r => setTimeout(r, ms));
-
-        // Sequential processing to avoid 429/403 errors
-        for (const video of videos) {
-            const videoId = video.url.split('v=')[1] || video.url.split('/').pop();
-            const outputFile = path.join(tempDir, `${videoId}`);
-
+        // Function to fetch a single transcript
+        const fetchTranscript = async (video) => {
             try {
-                // Add random delay (5-10 seconds) for maximum reliability
-                const delay = Math.floor(Math.random() * 5000) + 5000;
-                console.log(`[Transcript] Processing ${videoId} (${videos.indexOf(video) + 1}/${videos.length}) - Waiting ${delay}ms...`);
-                await wait(delay);
+                const runInput = {
+                    videoUrl: video.url, // Correct field name based on error: 'Field input.videoUrl is required'
+                    preferredLanguage: "ko"
+                };
 
-                // Command to download auto-subs or subs, in vtt format, skip video download
-                // Added --sleep-requests 1 for extra safety
-                const subCmd = `yt-dlp --write-auto-sub --write-sub --sub-lang "ko,en" --skip-download --output "${outputFile}" --convert-subs vtt --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" "${video.url}"`;
+                const run = await client.actor("pintostudio/youtube-transcript-scraper").call(runInput);
+                const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-                await execPromise(subCmd);
+                if (items && items.length > 0) {
+                    const item = items[0];
+                    let fullText = "";
+                    let fragments = [];
 
-                // Check for files
-                let targetFile = null;
-                const files = fs.readdirSync(tempDir);
-                const candidates = files.filter(f => f.startsWith(videoId) && f.endsWith('.vtt'));
+                    // Case 1: Direct 'text' field
+                    if (item.text) {
+                        fullText = item.text;
+                    }
+                    // Case 2: 'data' array of captions (start, dur, text)
+                    else if (Array.isArray(item.data)) {
+                        fragments = item.data;
+                        fullText = fragments.map(c => c.text).join(" ");
+                    }
+                    // Case 3: 'captions' array or similar (fallback check)
+                    else if (Array.isArray(item.captions)) {
+                        fragments = item.captions;
+                        fullText = fragments.map(c => c.text).join(" ");
+                    }
 
-                targetFile = candidates.find(f => f.includes('.ko.'));
-                if (!targetFile) targetFile = candidates.find(f => f.includes('.en.'));
-                if (!targetFile && candidates.length > 0) targetFile = candidates[0];
-
-                if (targetFile) {
-                    const vttContent = fs.readFileSync(path.join(tempDir, targetFile), 'utf8');
-                    const lines = vttContent.split('\n');
-                    const textLines = lines.filter(line => {
-                        return !line.includes('-->') && line.trim().length > 0 && !line.match(/^(WEBVTT|Kind:|Language:)/);
-                    });
-                    const uniqueText = [...new Set(textLines)].join(' ');
-
-                    // Cleanup
-                    candidates.forEach(f => fs.unlinkSync(path.join(tempDir, f)));
-
-                    const finalTranscript = `Title: ${video.title}\nTranscript: ${uniqueText.substring(0, 1500)}...`;
-                    transcripts.push(finalTranscript);
-
-                    // Archive to GitHub
-                    saveTranscript(category, name, video.title, uniqueText);
-
-                } else {
-                    transcripts.push(`Title: ${video.title}\n(No Transcript Found)`);
-                }
-
-            } catch (e) {
-                console.error(`[Transcript Error ${video.url}]`, e.message);
-
-                // Fallback: Use Apify if yt-dlp fails (e.g. 429 Rate Limit)
-                if (process.env.APIFY_TOKEN) {
-                    try {
-                        console.log(`[Apify Fallback] Trying Apify for ${videoId}...`);
-                        const { ApifyClient } = require('apify-client');
-                        const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
-
-                        // Use the actor ID from env or default
-                        const actorId = process.env.APIFY_ACTOR_ID || 'pintostudio~youtube-transcript-scraper';
-
-                        // Fix: Error said "input.videoUrl is required".
-                        // Some actors use 'videoUrl', others 'startUrls', others 'videoUrls'.
-                        // We will provide multiple common fields to be safe, or just the specific one requested.
-                        const apifyInput = {
-                            videoUrl: video.url,  // Requested by error
-                            url: video.url,       // Common alias
-                            startUrls: [{ url: video.url }], // Common alias
-                            settings: { preferredLanguage: 'ko' },
-                            preferredLanguage: 'ko'
+                    if (fullText) {
+                        return {
+                            success: true,
+                            video: video,
+                            text: fullText,
+                            fragments: fragments
                         };
-
-                        const run = await client.actor(actorId).call(apifyInput);
-
-                        // Fetch results from dataset
-                        const { items } = await client.dataset(run.defaultDatasetId).listItems();
-
-                        if (items && items.length > 0) {
-                            // Inspecting the screenshot: each item seems to have a "data" property which is an array of objects with "text"
-                            // Or sometimes the root item typically has "text".
-                            // Based on screenshot: object structure is { data: [ { text: "...", ... } ] }
-
-                            const firstItem = items[0];
-                            let apifyText = '';
-
-                            if (firstItem.data && Array.isArray(firstItem.data)) {
-                                // Combined all segments
-                                apifyText = firstItem.data.map(segment => segment.text).join(' ');
-                            } else {
-                                // Fallback to standard schema
-                                apifyText = firstItem.text || firstItem.fullText || firstItem.caption || '';
-                            }
-
-                            if (apifyText) {
-                                const finalTranscript = `Title: ${video.title}\nTranscript (Apify): ${apifyText.substring(0, 1500)}...`;
-                                transcripts.push(finalTranscript);
-
-                                // Archive to GitHub
-                                saveTranscript(category, name, video.title, apifyText);
-                                continue; // Success
-                            }
-                        }
-                    } catch (apifyError) {
-                        console.error(`[Apify Error]`, apifyError.message);
+                    } else {
+                        console.warn(`[Apify Warning] Item found but no text extracted. Keys: ${Object.keys(item).join(', ')}`);
                     }
                 }
-
-                transcripts.push(`Title: ${video.title}\n(Transcript Error: ${e.message.split('\n')[0]})`);
+                return { success: false, video: video };
+            } catch (e) {
+                console.error(`[Apify Error] Failed for ${video.title}:`, e.message);
+                return { success: false, video: video };
             }
+        };
 
-            // Success case for yt-dlp (Wait, I need to hook into the SUCCESS path of yt-dlp too)
-            // The logic above is inside catch(e). 
+        // Run in batches to avoid Apify memory limits (Limit to 1 concurrent request due to heavy actor usage 4GB/run)
+        const BATCH_SIZE = 1;
+        const results = [];
+
+        for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+            const batch = videos.slice(i, i + BATCH_SIZE);
+            console.log(`[Channel Analyze] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(videos.length / BATCH_SIZE)} (${batch.length} videos)...`);
+
+            const batchResults = await Promise.all(batch.map(v => fetchTranscript(v)));
+            results.push(...batchResults);
+        }
+
+        // Process results
+        for (const res of results) {
+            if (res.success) {
+                const transcriptText = res.text;
+
+                // Detect Language/Country from text content if not provided
+                let detectedCountry = 'KR'; // Default
+                const jpRegex = /[\u3040-\u309F\u30A0-\u30FF]/;
+                if (jpRegex.test(transcriptText)) {
+                    detectedCountry = 'JP';
+                }
+
+                const finalCountry = country || detectedCountry;
+
+                saveTranscript(category, channelName, res.video.title, transcriptText, finalCountry);
+
+                // Format Transcript with Timestamps for Analysis (Viral Director Mode)
+                let analyzedText = transcriptText;
+                if (res.fragments && res.fragments.length > 0) {
+                    analyzedText = res.fragments.map(f => `[${parseFloat(f.start).toFixed(1)}s] ${f.text}`).join("\n");
+                }
+
+                transcripts.push(`Title: ${res.video.title}\nTranscript (Timestamped):\n${analyzedText.substring(0, 5000)}...`);
+            } else {
+                console.warn(`[Apify] No transcript found for ${res.video.title}`);
+                transcripts.push(`Title: ${res.video.title}\n(No Transcript Found)`);
+            }
         }
 
         const combinedData = transcripts.join('\n\n---\n\n');
 
-        // Clean prompt a bit
-        const prompt = `
-        Analyze these video transcripts from a YouTube channel to create a "Viral Persona Profile".
+        // Use detected country from first successful transcript if not provided
+        let overallCountry = country || 'KR';
+        const firstSuccess = results.find(r => r.success && r.text);
+        if (!country && firstSuccess) {
+            const jpRegex = /[\u3040-\u309F\u30A0-\u30FF]/;
+            if (jpRegex.test(firstSuccess.text)) {
+                overallCountry = 'JP';
+            }
+        }
+
+        const analysisCountry = overallCountry;
+
+        // D. Generate Viral Persona (Gemini)
+        // Removed Audio Analysis as requested
+        const promptText = `
+        Analyze these video transcripts from the YouTube channel "${channelName}" to create a "Viral Persona Profile".
         
         Target Category: ${category || 'General'}
+        Target Country: ${analysisCountry} 
         
-        Input Data (Recent 5 Videos):
+        Input Data (Top ${videos.length} Popular Videos):
         ${combinedData}
         
-        Task: Extract the creator's specific style, tone, and viral patterns.
+        Task: Extract the creator's specific style, tone, viral patterns.
+        Since we skipped audio analysis, focus heavily on the text content, pacing, and structure inferred from the transcript.
         
         Output JSON Format:
         {
-            "tone": "Keywords like High-Tension, Calm, Sarcastic, etc.",
-            "hook_style": "How they usually start videos (e.g., Starts with a scream, Starts with a question)",
+            "tone": "Keywords like High-Tension, Calm, Sarcastic, etc. (with Korean translation)",
+            "hook_style": "How they usually start videos (e.g., Starts with a scream) (with Korean translation)",
             "catchphrases": ["List", "of", "recurring", "phrases"],
-            "pacing": "Fast/Slow/Dynamic",
+            "pacing": "Fast/Slow/Dynamic (Inferred from text density)",
+            "structure_template": [
+                { "time": "0-5s", "type": "Hook", "description": "Description of content in English (Korean translation)" },
+                { "time": "5-15s", "type": "Body", "description": "..." }
+            ],
+            "director_rules": [
+                "Rule 1 in English (Rule 1 in Korean)",
+                "Rule 2 in English (Rule 2 in Korean)"
+            ],
             "humor_code": "Description of their humor (e.g., Puns, Slapstick, Dry wit)",
-            "summary": "A 1-sentence summary of this persona in English, followed by a Korean translation (e.g. 'English Text...\\n(한국어 번역...')",
-            "prompt_instruction": "A specific instruction to give an AI to mimic this person (e.g., 'Speak like a excited teenager using slang')"
+            "audio_style": {
+               "bgm": "Not Analyzed (Inferred: Energetic/Calm based on text)",
+               "sfx": "Not Analyzed",
+               "density": "Not Analyzed"
+            },
+            "summary": "A 1-sentence summary of this persona in English, followed by a Korean translation.",
+            "prompt_instruction": "A specific instruction to give an AI to mimic this person."
         }
         `;
 
-        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [{ text: prompt }]);
+        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [{ text: promptText }]);
 
         res.json({ success: true, analysis });
 
@@ -393,6 +386,103 @@ router.post('/delete', (req, res) => {
 
     savePersonas(personas);
     res.json({ success: true });
+});
+
+// 6. POST /director/generate - Generate Script using DNA
+router.post('/director/generate', async (req, res) => {
+    try {
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        const { topic, structure_template, director_rules, tone } = req.body;
+
+        if (!topic || !structure_template) {
+            return res.status(400).json({ error: 'Missing topic or structure template' });
+        }
+
+        const promptText = `
+        You are a "Viral Director" AI. Your goal is to write a script for a new video that perfectly mimics the pacing and structure of a specific viral channel.
+        
+        Topic: "${topic}"
+        Tone: ${tone || 'Engaging'}
+        
+        You must follow this EXACT Structural Template (DNA):
+        ${JSON.stringify(structure_template, null, 2)}
+        
+        Apply these Director Rules:
+        ${(Array.isArray(director_rules) && director_rules.length > 0) ? director_rules.join('\n') : 'No specific rules'}
+        
+        Task:
+        1. Write the script content for each time block.
+        2. Ensure the text length fits the time duration (approx 4 chars/sec for fast, 2 for slow).
+        3. Insert [Visual Guide] and [Audio/SFX Guide] for the editor.
+        4. IMPORTANT: Write the 'content' (spoken script) in KOREAN (unless the topic implies English).
+        5. Write 'visual_cue' and 'audio_cue' in KOREAN for the Korean editor.
+        
+        Output JSON Format:
+        {
+            "script": [
+                {
+                    "time": "0-5s",
+                    "type": "Hook",
+                    "content": "Actual spoken text (Korean)...",
+                    "visual_cue": "Description of visuals (Korean) (e.g. 얼굴 줌인)",
+                    "audio_cue": "SFX/BGM (Korean) (e.g. 쾅 소리, 빠른 드럼)"
+                }
+            ]
+        }
+        `;
+
+        const result = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [{ text: promptText }]);
+        res.json({ success: true, script: result.script || result }); // Handle simple array return if Gemini simplifies
+
+    } catch (error) {
+        console.error('[Director Generate Error]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 7. POST /director/recommend - Recommend Topics
+router.post('/director/recommend', async (req, res) => {
+    try {
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        const { channelName, summary, category, tone, rules } = req.body;
+
+        const promptText = `
+        You are a "Viral Strategy Consultant".
+        Based on the DNA of the YouTube channel "${channelName}", suggest 3 "Killer Topics" that would go viral.
+
+        Channel DNA:
+        - Category: ${category}
+        - Summary: ${summary}
+        - Tone: ${tone}
+        - Rules: ${rules ? rules.join(', ') : 'None'}
+
+        Task:
+        Suggest 3 topics that fit this style perfectly.
+        1. "Perfect Fit": A topic safely within their usual niche.
+        2. "Twist / Variant": A common topic but applied with their unique twist.
+        3. "Trend Jacking": A currently trending topic applied to their style.
+
+        Output JSON Format (Korean):
+        {
+            "recommendations": [
+                {
+                    "type": "스타일 맞춤형 (Perfect Fit)",
+                    "topic": "Suggested Topic Title (Korean)",
+                    "reason": "Why this fits (Korean)",
+                    "tone": "Suggested Tone"
+                },
+                ...
+            ]
+        }
+        `;
+
+        const result = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [{ text: promptText }]);
+        res.json({ success: true, recommendations: result.recommendations });
+
+    } catch (error) {
+        console.error('[Director Recommend Error]', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 module.exports = router;
