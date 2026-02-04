@@ -478,9 +478,302 @@ async function searchCategoryFilterDB() {
 }
 
 
+
+// Render Video Grid (for URL Search Results)
+function renderVideoGrid(data) {
+    const resultsGrid = document.getElementById('channelResultsGrid');
+    if (!resultsGrid) return;
+
+    // Store for saving
+    window.currentSearchData = data;
+
+    const { channel, videos } = data;
+
+    resultsGrid.className = 'space-y-6'; // Reset class
+    resultsGrid.innerHTML = `
+        <!-- Channel Header -->
+        <div class="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow-xl backdrop-blur-sm relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-pink-600"></div>
+            
+            <!-- Profile -->
+            <div class="relative group">
+                <img src="${channel.thumbnail}" alt="${channel.name}" class="w-24 h-24 rounded-full border-4 border-slate-700 shadow-xl group-hover:scale-105 transition-transform duration-300">
+                <div class="absolute bottom-0 right-0 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-900">HOT</div>
+            </div>
+
+            <!-- Info -->
+            <div class="flex-1 text-center md:text-left">
+                <h2 class="text-3xl font-black text-white tracking-tight mb-2 flex items-center justify-center md:justify-start gap-2">
+                    ${channel.name} 
+                    <a href="https://youtube.com/channel/${channel.id}" target="_blank" class="text-slate-500 hover:text-red-500 transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    </a>
+                </h2>
+                <div class="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-slate-300">
+                     <span class="bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600">
+                        👥 구독자 <span class="text-white font-bold">${formatCompactNumber(channel.subscriberCount)}</span>
+                    </span>
+                    <span class="bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600">
+                        👁️ 총 조회수 <span class="text-white font-bold">${formatCompactNumber(channel.viewCount)}</span>
+                    </span>
+                    <span class="bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600">
+                        📹 동영상 <span class="text-white font-bold">${formatCompactNumber(channel.videoCount)}</span>
+                    </span>
+                </div>
+                <p class="text-slate-400 mt-3 text-sm line-clamp-2 max-w-2xl">${channel.description || '채널 설명이 없습니다.'}</p>
+                
+                <!-- Quick Channel Stats (vidIQ Style) -->
+                <div class="mt-6 bg-slate-700/30 rounded-xl border border-slate-600/50 p-4 grid grid-cols-2 md:grid-cols-5 gap-4 backdrop-blur-sm">
+                    <!-- 1. Views Gained -->
+                    <div class="text-center border-r border-slate-600/30 last:border-0">
+                        <div class="text-xs text-slate-400 mb-1">Views gained (Roughly)</div>
+                        <div class="text-lg font-black text-white flex items-center justify-center gap-1">
+                            +${formatCompactNumber(videos.reduce((acc, v) => acc + parseInt(v.viewCount || 0), 0))}
+                            <span class="text-xs text-green-400 font-normal bg-green-500/10 px-1 py-0.5 rounded">Recent</span>
+                        </div>
+                    </div>
+                    <!-- 2. Est. Monthly Earnings -->
+                    <div class="text-center border-r border-slate-600/30 last:border-0">
+                        <div class="text-xs text-slate-400 mb-1">Est. Monthly Earnings</div>
+                        <div class="text-lg font-black text-green-400">
+                           ${calculateEstEarnings(videos)}
+                        </div>
+                    </div>
+                    <!-- 3. Avg. Video Length -->
+                    <div class="text-center border-r border-slate-600/30 last:border-0">
+                        <div class="text-xs text-slate-400 mb-1">Avg. video length</div>
+                        <div class="text-lg font-bold text-white">
+                            ${calculateAvgDuration(videos)}
+                        </div>
+                    </div>
+                    <!-- 4. Upload Frequency -->
+                    <div class="text-center border-r border-slate-600/30 last:border-0">
+                        <div class="text-xs text-slate-400 mb-1">Upload frequency</div>
+                        <div class="text-lg font-bold text-white">
+                            ${calculateUploadFrequency(videos)}
+                        </div>
+                    </div>
+                    <!-- 5. Subscribers Rank -->
+                    <div class="text-center">
+                        <div class="text-xs text-slate-400 mb-1">Subscribers rank</div>
+                        <div class="text-lg font-black text-brand-400">
+                             ${calculateSubRank(parseInt(channel.subscriberCount))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col gap-2">
+                <button onclick="saveCurrentChannelToDB()" class="px-8 py-3 bg-slate-700 hover:bg-green-600 hover:text-white text-slate-300 font-bold rounded-xl shadow-lg transform transition hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2 border border-slate-600">
+                    <span>💾</span> DB 저장
+                </button>
+                <button onclick="openChannelDetailModal('${channel.id}')" class="px-8 py-3 bg-gradient-to-br from-brand-600 to-blue-600 hover:from-brand-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg transform transition hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2">
+                    <span>📊</span> AI 심층 분석
+                </button>
+            </div>
+        </div>
+
+        <!-- Video Grid -->
+        <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2 px-2">
+            <span class="text-red-500">🔥</span> 최근 업로드된 Shorts
+        </h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            ${videos.map(video => `
+                <div class="group relative bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-red-500/50 transition-all hover:shadow-xl hover:shadow-red-500/10 hover:-translate-y-1 cursor-pointer" onclick="window.open('https://www.youtube.com/watch?v=${video.videoId}', '_blank')">
+                    <!-- Thumbnail -->
+                    <div class="aspect-[9/16] relative overflow-hidden">
+                        <img src="${video.thumbnail}" alt="${video.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                        
+                        <!-- Overlay Gradients -->
+                        <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+
+                        <!-- Top Left: Exact Time Badge -->
+                        <div class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white/80 text-[9px] font-mono px-1.5 py-0.5 rounded border border-white/5 shadow-sm hidden group-hover:block transition-all">
+                            ${new Date(video.publishedAt).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </div>
+
+                        <!-- Top Right: Relative Time Badge -->
+                        <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white/90 text-[10px] font-bold px-2 py-1 rounded-lg border border-white/10 shadow-sm">
+                            ${timeAgo(video.publishedAt)}
+                        </div>
+
+                        <!-- Bottom Info -->
+                        <div class="absolute bottom-0 left-0 right-0 p-3">
+                            <h4 class="text-white font-bold text-sm leading-tight line-clamp-2 mb-1.5 drop-shadow-md group-hover:text-red-400 transition-colors">${video.title}</h4>
+                            
+                            <div class="flex items-center justify-between text-[11px] text-slate-300 font-medium">
+                                <span class="flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                    👁️ ${formatCompactNumber(video.viewCount)}
+                                </span>
+                                <span class="bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm font-mono text-white/80">
+                                    ${formatDuration(video.duration)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Play Icon (Hover) -->
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-[1px]">
+                            <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg transform scale-50 group-hover:scale-100 transition-all duration-300 border-2 border-white">
+                                <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Save Current Channel to DB
+async function saveCurrentChannelToDB() {
+    if (!window.currentSearchData || !window.currentSearchData.channel) {
+        alert('저장할 채널 정보가 없습니다.');
+        return;
+    }
+
+    const { channel, videos } = window.currentSearchData;
+    const btn = event.target.closest('button');
+    const originalContent = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loader w-4 h-4 border-2 border-white"></span> 저장 중...';
+
+    try {
+        // Calculate extra fields for DB consistency
+        const totalViews = videos.reduce((acc, v) => acc + parseInt(v.viewCount || 0), 0);
+        const estimatedRevenue = calculateEstEarnings(videos);
+        const dailyGrowth = Math.floor(totalViews / 30); // Rough estimate
+
+        const payload = {
+            channelId: channel.id,
+            name: channel.name,
+            thumbnail: channel.thumbnail,
+            subscriberCount: channel.subscriberCount,
+            totalViews: channel.viewCount,
+            videoCount: channel.videoCount,
+            category: '일반', // Could add a selector or inference
+            recentVideos: videos,
+            estimatedRevenue: estimatedRevenue,
+            dailyGrowth: dailyGrowth
+        };
+
+        const response = await fetch('http://localhost:4000/api/hot-channels/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel: payload })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || '저장 실패');
+
+        // Success Feedback
+        btn.className = 'px-8 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 border border-green-500 cursor-default';
+        btn.innerHTML = '<span>✅</span> 저장됨';
+        // Keep disabled
+
+    } catch (error) {
+        console.error('Save Error:', error);
+        alert(`저장 실패: ${error.message}`);
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
 // Open Channel Detail Modal (placeholder for Phase 4)
-function openChannelDetailModal(channelId) {
-    alert(`채널 상세 모달: ${channelId}\n\n이 기능은 Phase 4에서 구현됩니다.`);
+
+
+// Helper Functions for Stats
+
+function calculateEstEarnings(videos) {
+    if (!videos || videos.length === 0) return '$0';
+
+    // 1. Calculate Total Views of fetched videos
+    const totalViews = videos.reduce((acc, v) => acc + parseInt(v.viewCount || 0), 0);
+
+    // 2. Determine Content Type (Shorts vs Long)
+    const avgDurationSec = getAvgDurationInSeconds(videos);
+    const isShorts = avgDurationSec < 65; // ~1 minute threshold
+
+    // 3. Set RPM (Revenue Per Mille)
+    // Shorts: $0.02 - $0.12 (More realistic for mixed geos)
+    // Long-form: $1.50 - $5.00 (Standard AdSense)
+    const minRPM = isShorts ? 0.02 : 1.50;
+    const maxRPM = isShorts ? 0.12 : 5.00;
+
+    const min = (totalViews / 1000) * minRPM;
+    const max = (totalViews / 1000) * maxRPM;
+
+    return `$${Math.round(min).toLocaleString()} - $${Math.round(max).toLocaleString()}`;
+}
+
+function getAvgDurationInSeconds(videos) {
+    if (!videos || videos.length === 0) return 0;
+    let totalSeconds = 0;
+    let count = 0;
+
+    videos.forEach(v => {
+        const dur = v.duration || '';
+        const match = dur.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+        if (match) {
+            const h = parseInt((match[1] || '').replace('H', '')) || 0;
+            const m = parseInt((match[2] || '').replace('M', '')) || 0;
+            const s = parseInt((match[3] || '').replace('S', '')) || 0;
+            totalSeconds += h * 3600 + m * 60 + s;
+            count++;
+        }
+    });
+    return count === 0 ? 0 : totalSeconds / count;
+}
+
+function calculateAvgDuration(videos) {
+    if (!videos || videos.length === 0) return '0s';
+    let totalSeconds = 0;
+    let count = 0;
+
+    videos.forEach(v => {
+        const dur = v.duration || '';
+        const match = dur.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+        if (match) {
+            const h = parseInt((match[1] || '').replace('H', '')) || 0;
+            const m = parseInt((match[2] || '').replace('M', '')) || 0;
+            const s = parseInt((match[3] || '').replace('S', '')) || 0;
+            totalSeconds += h * 3600 + m * 60 + s;
+            count++;
+        }
+    });
+
+    if (count === 0) return '0s';
+    const avg = totalSeconds / count;
+    return avg < 60 ? `${Math.round(avg)} sec` : `${Math.floor(avg / 60)} min ${Math.round(avg % 60)} sec`;
+}
+
+function calculateUploadFrequency(videos) {
+    if (!videos || videos.length < 2) return '~0/week';
+
+    // Sort by date descending just in case
+    const sorted = [...videos].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    const newest = new Date(sorted[0].publishedAt);
+    const oldest = new Date(sorted[sorted.length - 1].publishedAt);
+
+    const diffDays = (newest - oldest) / (1000 * 3600 * 24);
+    if (diffDays <= 0) return 'Daily+';
+
+    const videosPerDay = videos.length / diffDays;
+    const videosPerWeek = videosPerDay * 7;
+
+    if (videosPerDay >= 1) return `~${videosPerDay.toFixed(1)} / day`;
+    return `~${videosPerWeek.toFixed(1)} / week`;
+}
+
+function calculateSubRank(subs) {
+    if (subs > 10000000) return 'Top 0.1%'; // 10M+
+    if (subs > 1000000) return 'Top 1%'; // 1M+
+    if (subs > 500000) return 'Top 5%';
+    if (subs > 100000) return 'Top 10%';
+    if (subs > 10000) return 'Top 20%';
+    return 'Growing';
 }
 
 // Search HOT Channels
@@ -488,6 +781,63 @@ async function searchHotChannels() {
     const resultsGrid = document.getElementById('channelResultsGrid');
     if (!resultsGrid) return;
 
+    // 1. Check for URL Search Input
+    const searchInput = document.getElementById('channelSearchKeyword');
+    const query = searchInput ? searchInput.value.trim() : '';
+
+    // If query exists, perform URL Search
+    if (query) {
+        resultsGrid.innerHTML = `
+            <div class="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
+                <div class="loader w-12 h-12 border-4 border-t-brand-500 mx-auto mb-4"></div>
+                <p class="text-brand-400 font-bold text-xl mb-2 animate-pulse">URL 분석 및 채널 검색 중...</p>
+                <p class="text-slate-500">YouTube API를 통해 정보를 가져오고 있습니다.</p>
+            </div>
+        `;
+
+        try {
+            console.log('[searchHotChannels] URL Search:', query);
+            const response = await fetch('http://localhost:4000/api/hot-channels/search-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: query })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // If 404/500, throw error to catch block
+                throw new Error(data.error || '채널 정보를 찾을 수 없습니다.');
+            }
+
+            if (data.success && data.data) {
+                renderVideoGrid(data.data);
+
+                // Update total count if possible (or just hide it)
+                const totalCountEl = document.getElementById('discovered-channels-total');
+                if (totalCountEl) totalCountEl.textContent = '1';
+            }
+
+        } catch (error) {
+            console.error('[HOT URL Search Error]', error);
+            resultsGrid.innerHTML = `
+                <div class="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
+                    <div class="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-4xl text-red-500">⚠️</span>
+                    </div>
+                    <p class="text-red-400 font-bold text-xl mb-2">검색 실패</p>
+                    <p class="text-slate-500 mb-4">${error.message}</p>
+                    <button onclick="document.getElementById('channelSearchKeyword').value=''; searchHotChannels()" 
+                        class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all">
+                        초기화 후 다시 검색
+                    </button>
+                </div>
+            `;
+        }
+        return; // Stop here, do not run filter search
+    }
+
+    // 2. Default: Advanced Filter Search
     resultsGrid.innerHTML = `
         <div class="col-span-full text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
             <div class="bg-slate-700/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -539,8 +889,6 @@ async function searchHotChannels() {
             </div>
         `;
     }
-
-
 }
 
 // Helper: Format ISO 8601 Duration (e.g., PT1M2S -> 1:02)

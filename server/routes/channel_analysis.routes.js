@@ -31,20 +31,15 @@ function saveTranscript(category, channelName, videoTitle, content, countryCode 
         fs.writeFileSync(filePath, content, 'utf8');
         console.log(`[Archive] Saved to ${countryCode}: ${filePath}`);
 
-        // 4. Git Sync (Async - non-blocking)
+        // 4. Git Sync (Queued)
         const relativePath = `transcripts/${countryCode}/${sanitizeFilename(category || 'General')}/${sanitizeFilename(channelName || 'Unknown')}/${filename}`;
 
         // Command: git add -> commit -> push
         // Updated commit message to include Country/Category info
         const gitCmd = `git add "${relativePath}" && git commit -m "[${countryCode}/${sanitizeFilename(category || 'General')}] Add transcript: ${videoTitle}" && git push origin master`;
 
-        exec(gitCmd, (err, stdout, stderr) => {
-            if (err) {
-                console.error('[Git Sync Error]', err.message);
-            } else {
-                console.log('[Git Sync Success]', stdout.trim());
-            }
-        });
+        // Push to queue
+        queueGitCommand(gitCmd);
 
     } catch (e) {
         console.error('[Archive Error]', e.message);
@@ -57,6 +52,22 @@ const os = require('os');
 
 // Database File Path
 const DB_PATH = path.join(__dirname, '../../channel_personas.json');
+
+// Global Git Queue to prevent lock errors (Sequential Execution)
+let gitQueue = Promise.resolve();
+
+function queueGitCommand(cmd) {
+    // Chain the command to the existing queue
+    gitQueue = gitQueue.then(async () => {
+        try {
+            const { stdout, stderr } = await execPromise(cmd);
+            console.log('[Git Sync Success]', stdout.trim());
+        } catch (err) {
+            // Log but don't stop the queue
+            console.error('[Git Sync Error]', err.message);
+        }
+    });
+}
 
 // Ensure DB file exists
 if (!fs.existsSync(DB_PATH)) {
@@ -87,29 +98,69 @@ router.get('/list', (req, res) => {
 // 2. POST /info - Get Basic Channel Info (Quick Check)
 router.post('/info', async (req, res) => {
     const { url } = req.body;
+    const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+
     if (!url) return res.status(400).json({ error: 'URL required' });
+    if (!YOUTUBE_API_KEY) return res.status(500).json({ error: 'YOUTUBE_API_KEY missing' });
 
     try {
         console.log(`[Channel Info] Fetching: ${url}`);
+        let channelId = '';
 
-        const cmd = `yt-dlp --dump-json --playlist-end 1 "${url}"`;
+        // 1. Resolve Channel ID
+        if (url.includes('youtube.com/@')) {
+            const handlePart = url.split('@')[1];
+            const handle = handlePart.split('/')[0]; // Clean handle
+            // Search for channel by handle
+            const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=@${handle}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
 
-        const { stdout } = await execPromise(cmd);
-        const videoData = JSON.parse(stdout.trim().split('\n')[0]);
+            if (!searchData.items || searchData.items.length === 0) {
+                return res.status(404).json({ error: 'Channel not found via handle search' });
+            }
+            channelId = searchData.items[0].id.channelId;
+        } else if (url.includes('/channel/')) {
+            const parts = url.split('/channel/');
+            channelId = parts[1].split('/')[0];
+        } else {
+            // Try searching directly with the URL query if format is unknown
+            const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(url)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
+
+            if (!searchData.items || searchData.items.length === 0) {
+                return res.status(400).json({ error: 'Could not resolve Channel ID from URL' });
+            }
+            channelId = searchData.items[0].id.channelId;
+        }
+
+        // 2. Fetch Channel Details (Snippet + Statistics)
+        const chanUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${YOUTUBE_API_KEY}`;
+        const chanRes = await fetch(chanUrl);
+        const chanData = await chanRes.json();
+
+        if (!chanData.items || chanData.items.length === 0) {
+            return res.status(404).json({ error: 'Channel details not found' });
+        }
+
+        const info = chanData.items[0];
 
         res.json({
             success: true,
             data: {
-                name: videoData.uploader || videoData.channel || 'Unknown Channel',
-                subscribers: videoData.channel_follower_count || videoData.subscriber_count || 0,
-                handle: videoData.uploader_id || '',
-                url: videoData.channel_url || url,
-                originalCategory: videoData.categories?.[0]
+                name: info.snippet.title,
+                subscribers: info.statistics.subscriberCount,
+                handle: info.snippet.customUrl || '',
+                url: `https://www.youtube.com/channel/${channelId}`,
+                originalCategory: 'Unknown', // API doesn't easily give channel category, usually strictly video based. defaults fine.
+                thumbnail: info.snippet.thumbnails?.default?.url
             }
         });
+
     } catch (error) {
         console.error('[Channel Info Error]', error);
-        res.status(500).json({ error: 'Failed to fetch channel info. Check URL or yt-dlp.' });
+        res.status(500).json({ error: 'Failed to fetch channel info via API: ' + error.message });
     }
 });
 
@@ -165,10 +216,18 @@ router.post('/analyze', async (req, res) => {
         // If channelId is found, use it. If not, fallback to yt-dlp (but user asked to remove it if possible, however search needs channelId)
 
         let videos = [];
-        const limit = req.body.limit || 5;
+        const limitStr = req.body.limit;
+        const limit = parseInt(limitStr) || 5;
+        console.log(`[Channel Analyze] Requested Limit: ${limitStr}, Parsed Limit: ${limit}`);
 
         if (channelId) {
-            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${limit}&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
+            // Hard Cap: Ensure limit never exceeds 15 to prevent accidental credit usage
+            const safeLimit = Math.min(limit, 15);
+            console.log(`[Channel Analyze] Final Safe Limit: ${safeLimit} (Requested: ${limit})`);
+
+            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${safeLimit}&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
+            console.log(`[Channel Analyze] API Call: ${videosUrl.replace(YOUTUBE_API_KEY, 'API_KEY_HIDDEN')}`);
+
             const videosRes = await fetch(videosUrl);
             const videosData = await videosRes.json();
 
@@ -178,6 +237,13 @@ router.post('/analyze', async (req, res) => {
                     title: item.snippet.title,
                     url: `https://www.youtube.com/watch?v=${item.id.videoId}`
                 }));
+            }
+
+            // SUPER SAFETY: Explicitly slice the video list to the safe limit
+            // YouTube API might be ignoring maxResults or returning more items for some reason
+            if (videos.length > safeLimit) {
+                console.warn(`[Channel Analyze] API returned ${videos.length} videos, but safety limit is ${safeLimit}. Truncating...`);
+                videos = videos.slice(0, safeLimit);
             }
         } else {
             console.warn('[Channel Analyze] Could not resolve Channel ID via API. Falling back to simple yt-dlp for list (if available)...');
@@ -353,26 +419,50 @@ router.post('/analyze', async (req, res) => {
     }
 });
 
-// 4. POST /save - Save Persona
+// 4. POST /save - Save Persona (Upsert)
 router.post('/save', (req, res) => {
-    const { name, url, category, analysis } = req.body;
+    const { name, url, category, analysis, sourceCount } = req.body;
 
     if (!name || !analysis) return res.status(400).json({ error: 'Missing data' });
 
-    const newPersona = {
-        id: Date.now().toString(),
-        name,
-        url,
-        category,
-        analysis: Array.isArray(analysis) ? analysis[0] : analysis,
-        createdAt: new Date().toISOString()
-    };
+    let personas = getPersonas();
 
-    const personas = getPersonas();
-    personas.push(newPersona);
+    // Check if exists (by URL)
+    const existingIndex = personas.findIndex(p => p.url === url);
+
+    let savedPersona;
+
+    if (existingIndex !== -1) {
+        // Update existing
+        const existing = personas[existingIndex];
+        savedPersona = {
+            ...existing,
+            name: name, // Update name just in case
+            category: category,
+            analysis: Array.isArray(analysis) ? analysis[0] : analysis,
+            sourceCount: sourceCount || existing.sourceCount || 5, // Default to 5 if missing
+            updatedAt: new Date().toISOString()
+        };
+        personas[existingIndex] = savedPersona;
+        console.log(`[Persona Save] Updated existing persona: ${name}`);
+    } else {
+        // Create new
+        savedPersona = {
+            id: Date.now().toString(),
+            name,
+            url,
+            category,
+            analysis: Array.isArray(analysis) ? analysis[0] : analysis,
+            sourceCount: sourceCount || 5, // Default to 5
+            createdAt: new Date().toISOString()
+        };
+        personas.push(savedPersona);
+        console.log(`[Persona Save] Created new persona: ${name}`);
+    }
+
     savePersonas(personas);
 
-    res.json({ success: true, data: newPersona });
+    res.json({ success: true, data: savedPersona });
 });
 
 // 5. POST /delete - Delete Persona

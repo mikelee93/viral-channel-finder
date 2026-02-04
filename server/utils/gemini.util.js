@@ -95,5 +95,67 @@ async function geminiGenerateJSON(apiKey, modelName, contents, options = {}) {
 
 module.exports = {
     geminiGenerateContent,
-    geminiGenerateJSON
+    geminiGenerateJSON,
+    uploadFileToGemini,
+    deleteFileFromGemini
 };
+
+const { GoogleAIFileManager } = require('@google/generative-ai/server');
+
+/**
+ * Uploads a file to Gemini using the File API (for large files > 20MB)
+ * @param {string} filePath - Local path to the file
+ * @param {string} mimeType - Mime type of the file
+ * @param {string} apiKey - API Key
+ * @returns {Promise<Object>} - The uploaded file object (contains name, uri, etc.)
+ */
+async function uploadFileToGemini(filePath, mimeType, apiKey) {
+    const fileManager = new GoogleAIFileManager(apiKey);
+
+    console.log(`[Gemini File API] Uploading file: ${filePath}`);
+    const uploadResult = await fileManager.uploadFile(filePath, {
+        mimeType: mimeType,
+        displayName: "Uploaded Video for Analysis",
+    });
+
+    const file = uploadResult.file;
+    console.log(`[Gemini File API] Uploaded file: ${file.name} (URI: ${file.uri})`);
+
+    // Wait for the file to be processed
+    let activeFile = await waitForFileActive(fileManager, file.name);
+    return activeFile;
+}
+
+/**
+ * Waits for a file to become active (processed)
+ */
+async function waitForFileActive(fileManager, fileName) {
+    console.log(`[Gemini File API] Waiting for file processing...`);
+    let file = await fileManager.getFile(fileName);
+
+    while (file.state === "PROCESSING") {
+        await sleep(2000); // Wait 2 seconds
+        file = await fileManager.getFile(fileName);
+    }
+
+    if (file.state !== "ACTIVE") {
+        throw new Error(`File ${file.name} failed to process. State: ${file.state}`);
+    }
+
+    console.log(`[Gemini File API] File is ACTIVE and ready.`);
+    return file;
+}
+
+/**
+ * Deletes a file from Gemini storage
+ */
+async function deleteFileFromGemini(apiKey, fileName) {
+    try {
+        const fileManager = new GoogleAIFileManager(apiKey);
+        await fileManager.deleteFile(fileName);
+        console.log(`[Gemini File API] Deleted file: ${fileName}`);
+    } catch (error) {
+        console.warn(`[Gemini File API] Warning: Failed to delete file ${fileName}:`, error.message);
+    }
+}
+

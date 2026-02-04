@@ -1,168 +1,104 @@
 [
   {
-    "id": "1769908157266",
-    "name": "大谷チャンネル",
-    "url": "https://www.youtube.com/channel/UCu0rv81sQrCiq59MA-YJi1g",
-    "category": "entertainment",
-    "analysis": {
-      "tone": "Sensational, Critical, Analytical, slightly Biased",
-      "hook_style": "Starts with a controversial statement or recent event related to Shohei Ohtani",
-      "catchphrases": [
-        "～と話題になっている",
-        "～と報じられています",
-        "～に驚愕",
-        "～に注目が集まっています"
-      ],
-      "pacing": "Dynamic",
-      "humor_code": "Sarcasm directed towards critics of Ohtani, highlighting absurdities or contradictions in their statements.",
-      "summary": "This persona delivers commentary on Shohei Ohtani's activities and related controversies, often siding with Ohtani and criticizing opposing viewpoints with a sensational and slightly sarcastic tone.",
-      "prompt_instruction": "Speak with a sense of awe and admiration when discussing Shohei Ohtani, but adopt a sarcastic and critical tone when addressing anyone who criticizes or opposes him, using phrases like '信じられない' and '一体どういうことだ' to express disbelief or outrage."
-    },
-    "createdAt": "2026-02-01T01:09:17.266Z"
-  },
-  {
-    "id": "1769909180116",
-    "name": "バズワールド",
-    "url": "https://www.youtube.com/channel/UClxhvL2C3Kno04y5mhaRBtA",
-    "category": "entertainment",
-    "analysis": {
-      "tone": "Surprised, Informative, Slightly Exaggerated",
-      "hook_style": "Starts with a shocking or unbelievable event/visual",
-      "catchphrases": [
-        "なんと",
-        "〜だといい"
-      ],
-      "pacing": "Fast",
-      "humor_code": "Situational irony, highlighting the absurdity of events",
-      "summary": "This YouTube persona presents bizarre and shocking events happening around the world with an excited and slightly sarcastic tone.\n(이 YouTube 페르소나는 흥분되고 약간 냉소적인 어조로 전 세계에서 일어나는 기괴하고 충격적인 사건을 제시합니다.)",
-      "prompt_instruction": "Describe unbelievable events with a tone of surprised disbelief, using phrases like '信じられない' (unbelievable) and 'まさか' (no way)."
-    },
-    "createdAt": "2026-02-01T01:26:20.116Z"
-  },
-  {
-    "id": "1769909846445",
-    "name": "一分一秒",
-    "url": "https://www.youtube.com/channel/UCLiPbjTEuGto_iRasBrfu7w",
-    "category": "film",
-    "analysis": {
-      "tone": "Dramatic, Suspenseful, Analytical",
-      "hook_style": "Starts with a clip of high-stakes/dramatic moment or intriguing question",
-      "catchphrases": [],
-      "pacing": "Dynamic (fast-paced with moments of slower analysis)",
-      "humor_code": "Observational humor, highlighting absurd or ironic situations",
-      "summary": "This creator analyzes dramatic moments and bizarre situations from around the world, presenting them in a suspenseful and engaging manner.\n(전 세계의 극적인 순간과 기괴한 상황을 분석하여 긴장감 넘치고 매력적인 방식으로 제시합니다.)",
-      "prompt_instruction": "Analyze a strange or dramatic video clip, focusing on the most unbelievable aspects and explaining them in a suspenseful, slightly sarcastic tone. Focus on the escalation of events."
-    },
-    "createdAt": "2026-02-01T01:37:26.445Z"
-  },
-  {
-    "id": "1769983433879",
-    "name": "カワイイが勝つ",
-    "url": "https://www.youtube.com/channel/UCq-sDS_UoWx_xd77QB2lSaA",
-    "category": "pets",
-    "analysis": {
-      "tone": "Sentimental, Emotional, Dramatic, Compassionate",
-      "hook_style": "Starts with a poignant scene or statement about the animal's situation.",
-      "catchphrases": [
-        "精一杯のさよならを伝えて (Seiippai no sayonara o tsutaete - Giving their best farewell)",
-        "最後の瞬間になるとは誰も思いませんでした (Saigo no shunkan ni naru to wa daremo omoimasen deshita - No one thought it would be the last moment)"
-      ],
-      "pacing": "Slow, Deliberate",
-      "humor_code": "None (Focus is on emotional storytelling)",
-      "audio_style": {
-        "bgm": "Calm, Melancholy (Inferred)",
-        "sfx": "Not Analyzed",
-        "density": "Not Analyzed"
-      },
-      "summary": "This creator focuses on emotionally charged stories of pets, often dealing with themes of abandonment, loss, and devotion to their owners.  이 제작자는 감정적으로 고조된 반려동물 이야기를 중심으로, 종종 유기, 상실, 주인에 대한 헌신이라는 주제를 다룹니다.",
-      "prompt_instruction": "Write a short, emotionally impactful story about a pet saying goodbye to its owner, focusing on the pet's perspective and feelings."
-    },
-    "createdAt": "2026-02-01T22:03:53.879Z"
-  },
-  {
     "id": "1769985925115",
     "name": "1分動画",
     "url": "https://www.youtube.com/channel/UCuP7Oceo9kOQ_tyUWadNmJA",
-    "category": "comedy",
+    "category": "entertainment",
     "analysis": {
-      "tone": "Informative, Slightly Sarcastic (정보 제공, 약간 빈정거림)",
-      "hook_style": "Starts with a surprising or intriguing scenario (놀랍거나 흥미로운 시나리오로 시작)",
+      "tone": "Surprised, Neutral, slightly sensational (놀란, 중립적, 약간 선정적)",
+      "hook_style": "Start with a surprising or intriguing situation (놀랍거나 흥미로운 상황으로 시작)",
       "catchphrases": [],
-      "pacing": "Fast",
+      "pacing": "Dynamic (빠른)",
       "structure_template": [
         {
           "time": "0-5s",
           "type": "Hook",
-          "description": "Introduce a bizarre or unusual situation. (기괴하거나 특이한 상황 소개) "
+          "description": "Introduce an absurd or shocking scenario (예상치 못한 상황 또는 충격적인 내용을 소개)"
         },
         {
-          "time": "5-15s",
-          "type": "Body",
-          "description": "Provide context or background information about the scenario. (시나리오에 대한 배경 정보 또는 맥락 제공)"
+          "time": "5-20s",
+          "type": "Setup",
+          "description": "Provide context and details of the situation (상황에 대한 배경과 세부 정보 제공)"
         },
         {
-          "time": "15-45s",
-          "type": "Body",
-          "description": "Show escalation or unexpected consequences. (상황의 고조 또는 예상치 못한 결과 제시)"
+          "time": "20-40s",
+          "type": "Twist/Climax",
+          "description": "Reveal the unexpected twist or climax of the story (예상치 못한 반전이나 이야기의 절정 공개)"
         },
         {
-          "time": "45-60s",
-          "type": "End",
-          "description": "End with a slightly negative or questioning tone. (약간 부정적이거나 의문스러운 어조로 마무리)"
+          "time": "40-60s",
+          "type": "Resolution/Punchline",
+          "description": "Provide a resolution or punchline, often with a humorous or ironic ending (해결 또는 펀치라인 제공, 종종 유머러스하거나 아이러니한 결말 포함)"
         }
       ],
       "director_rules": [
-        "Keep the pace fast and engaging. (빠르고 매력적인 속도를 유지하십시오.)",
-        "Focus on unusual or unexpected events. (특이하거나 예상치 못한 사건에 초점을 맞추십시오.)",
-        "Incorporate a hint of sarcasm or irony. (빈정거림이나 아이러니한 요소를 포함하십시오.)"
+        "Keep the introduction concise and attention-grabbing (소개를 간결하고 시선을 사로잡게 유지)",
+        "Focus on bizarre, ironic or unexpected scenarios (기괴하거나 아이러니하거나 예상치 못한 시나리오에 집중)",
+        "Maintain a neutral and slightly detached tone throughout the narration (내레이션 전반에 걸쳐 중립적이고 약간 거리를 두는 어조 유지)",
+        "End with a punchline or surprising revelation (펀치라인 또는 놀라운 폭로로 마무리)",
+        "Use visual elements that are as absurd as the stories (이야기만큼 터무니없는 시각적 요소 사용)"
       ],
-      "humor_code": "Situational irony, shock value (상황적 아이러니, 충격적인 가치)",
+      "humor_code": "Ironic situations, unexpected twists, and absurd scenarios (아이러니한 상황, 예상치 못한 반전, 터무니없는 시나리오)",
       "audio_style": {
         "bgm": "Energetic (활기찬)",
         "sfx": "Not Analyzed",
         "density": "Not Analyzed"
       },
-      "summary": "This persona presents short, informative videos about bizarre or shocking situations with a fast pace and a touch of sarcasm. (이 페르소나는 기괴하거나 충격적인 상황에 대한 짧고 유익한 비디오를 빠른 속도와 약간의 빈정거림으로 제공합니다.)",
-      "prompt_instruction": "Create a short video script describing a bizarre everyday object, presented in a fast-paced, informative style with a slightly sarcastic tone."
+      "summary": "This channel presents bizarre, ironic, or unexpected scenarios with a neutral tone, often ending with a humorous or ironic punchline. (이 채널은 기이하고 아이러니하거나 예상치 못한 시나리오를 중립적인 어조로 제시하며 종종 유머러스하거나 아이러니한 펀치라인으로 끝맺습니다.)",
+      "prompt_instruction": "Create a short video script about an unusual or ironic situation, narrated in a neutral and slightly detached tone, ending with an unexpected twist or punchline. (예상치 못한 반전이나 펀치라인으로 끝나는 중립적이고 약간 거리를 둔 어조로 내레이션을 한 특이하거나 아이러니한 상황에 대한 짧은 비디오 스크립트를 만듭니다.)"
     },
-    "createdAt": "2026-02-01T22:45:25.115Z"
+    "createdAt": "2026-02-01T22:45:25.115Z",
+    "sourceCount": 30,
+    "updatedAt": "2026-02-03T18:43:12.159Z"
   },
   {
-    "id": "1769991136377",
-    "name": "ユーモアニャン",
-    "url": "https://www.youtube.com/channel/UCgfo6AxrFNhDd7weUYwxI6Q",
-    "category": "people",
+    "id": "1770139168515",
+    "name": "一分一秒",
+    "url": "https://www.youtube.com/channel/UCLiPbjTEuGto_iRasBrfu7w",
+    "category": "entertainment",
     "analysis": {
-      "tone": "Gentle, Empathic (부드러운, 공감적인)",
-      "hook_style": "Intriguing opening related to animals in distress or heartwarming animal stories. (동물의 고통이나 감동적인 동물 이야기에 관련된 흥미로운 오프닝.)",
+      "tone": "Informative, Engaging, Slightly Dramatic (有益な情報、魅力的、やや劇的)",
+      "hook_style": "Starts with a captivating statement or question (魅力的な声明または質問から始まる) ",
       "catchphrases": [],
-      "pacing": "Slow (느린)",
+      "pacing": "Dynamic (Text indicates a mix of fast-paced explanations and slower, more detailed descriptions) (動的)",
       "structure_template": [
         {
           "time": "0-5s",
           "type": "Hook",
-          "description": "Introduction to animal and the central conflict/situation. (동물 소개와 주요 갈등/상황 제시. (동물 소개와 주요 갈등/상황 제시.))"
+          "description": "Intriguing statement or question to grab attention (注意を引くための興味深い声明または質問) "
         },
         {
-          "time": "5-15s",
-          "type": "Body",
-          "description": "Continued development of the situation, often involving emotional narration. (상황의 지속적인 전개, 감정적인 내레이션 포함.)"
+          "time": "5-20s",
+          "type": "Explanation/Background",
+          "description": "Brief explanation or background information related to the topic (トピックに関連する簡単な説明または背景情報) "
+        },
+        {
+          "time": "20-40s",
+          "type": "Development",
+          "description": "Further development of the topic with examples or details (例または詳細を含むトピックのさらなる開発) "
+        },
+        {
+          "time": "40-60s",
+          "type": "Conclusion/Summary",
+          "description": "Conclusion or summary of the key points (キーポイントの結論または要約) "
         }
       ],
       "director_rules": [
-        "Focus on stories with a strong emotional core, especially those involving animals. (강력한 감정적 핵심이 있는 이야기에 집중, 특히 동물과 관련된 이야기. (강력한 감정적 핵심이 있는 이야기에 집중, 특히 동물과 관련된 이야기.))",
-        "Use gentle and empathetic narration. (부드럽고 공감적인 내레이션을 사용. (부드럽고 공감적인 내레이션을 사용.))",
-        "Maintain a slow and deliberate pace. (느리고 신중한 페이스를 유지. (느리고 신중한 페이스를 유지.))"
+        "Keep explanations concise and to the point (説明は簡潔かつ的を射るようにする)",
+        "Use dramatic or surprising elements to maintain viewer engagement (視聴者のエンゲージメントを維持するために、劇的または驚くべき要素を使用する)",
+        "End with a memorable takeaway or thought-provoking question (記憶に残る持ち帰りまたは示唆に富む質問で終わらせる)"
       ],
-      "humor_code": "Humor is likely gentle and heartwarming, if present, emphasizing the innocence or quirkiness of animals. (유머는, 있다면, 동물의 순수함이나 엉뚱함을 강조하는 부드럽고 따뜻한 유머일 가능성이 높습니다.)",
+      "humor_code": "Situational irony, unexpected twists (状況の皮肉、予想外の展開)",
       "audio_style": {
-        "bgm": "Calm, gentle, and possibly instrumental (Not Analyzed) (조용하고 부드러우며 악기 음악일 가능성이 높음 (분석되지 않음))",
+        "bgm": "Energetic, yet not distracting (エネルギッシュでありながら、気を散らすことのない)",
         "sfx": "Not Analyzed",
         "density": "Not Analyzed"
       },
-      "summary": "This persona focuses on heartwarming and emotionally resonant animal stories, delivered with a gentle and empathetic tone. (이 페르소나는 따뜻하고 감정적으로 공감되는 동물 이야기에 초점을 맞추고 부드럽고 공감적인 어조로 전달합니다. (이 페르소나는 따뜻하고 감정적으로 공감되는 동물 이야기에 초점을 맞추고 부드럽고 공감적인 어조로 전달합니다.))",
-      "prompt_instruction": "Create a script about a heartwarming animal rescue story, using gentle and empathetic narration."
+      "summary": "This persona delivers quick, informative content with a touch of drama and engaging storytelling. (このペルソナは、ドラマと魅力的なストーリーテリングのタッチで、迅速で有益なコンテンツを提供します。)",
+      "prompt_instruction": "Create a short, informative video script on [topic] in Japanese, starting with a shocking fact or question, followed by concise explanations and ending with a memorable conclusion."
     },
-    "createdAt": "2026-02-02T00:12:16.377Z"
+    "sourceCount": 10,
+    "createdAt": "2026-02-03T17:19:28.515Z",
+    "updatedAt": "2026-02-03T17:25:12.457Z"
   }
 ]

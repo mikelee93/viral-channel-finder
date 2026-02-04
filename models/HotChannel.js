@@ -20,7 +20,12 @@ const HotChannelSchema = new mongoose.Schema({
     }],
     avgViewsPerVideo: Number,
     estimatedRevenue: String,
-    lastUpdated: { type: Date, default: Date.now, index: true }
+    lastUpdated: { type: Date, default: Date.now, index: true },
+    aiAnalysis: {
+        strategy: mongoose.Schema.Types.Mixed, // Stores JSON strategy: persona, tone, structure
+        summary: String,
+        analyzedAt: Date
+    }
 });
 
 module.exports = mongoose.model('HotChannel', HotChannelSchema);

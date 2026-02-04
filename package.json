@@ -21,7 +21,7 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
-    "openai": "^6.16.0",
+    "openai": "^6.17.0",
     "youtube-transcript": "^1.2.1",
     "yt-dlp-exec": "^1.0.2"
   },

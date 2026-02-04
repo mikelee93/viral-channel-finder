@@ -1618,13 +1618,18 @@ ${window.currentKoreanScript}
                         </div>
                     </div>
                     <div class="flex-1 min-w-[300px] relative">
-                        <input type="text" id="channelSearchKeyword" placeholder="채널명 검색..."
-                            class="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:border-brand-500 outline-none transition-all shadow-inner text-lg">
+                        <input type="text" id="channelSearchKeyword"
+                            placeholder="YouTube URL, Channel ID, or Handle (@...)"
+                            class="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-700 rounded-xl pl-12 pr-28 py-3 text-white focus:border-brand-500 outline-none transition-all shadow-inner text-lg">
                         <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
+                        <button onclick="searchHotChannels()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg font-bold text-sm transition-all shadow-lg">
+                            검색
+                        </button>
                     </div>
                 </div>
 
@@ -1970,6 +1975,16 @@ ${window.currentKoreanScript}
                     keywordInput.addEventListener('keypress', function (e) {
                         if (e.key === 'Enter') {
                             startSearch();
+                        }
+                    });
+                }
+
+                // HOT Channel URL Search Enter Key
+                const channelUrlInput = document.getElementById('channelSearchKeyword');
+                if (channelUrlInput) {
+                    channelUrlInput.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            searchHotChannels();
                         }
                     });
                 }

@@ -233,177 +233,182 @@
                         <div class="flex gap-3 mb-2">
                             <button type="button" onclick="selectLimit(3)" id="btn-limit-3"
                                 class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">3개</button>
-                            <button type="button" onclick="selectLimit(5)" id="btn-limit-5"
-                                class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">5개</button>
-                            <button type="button" onclick="selectLimit(10)" id="btn-limit-10"
-                                class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">10개</button>
+                            <div class="flex gap-2 mb-2">
+                                <button type="button" onclick="selectLimit(5)" id="btn-limit-5"
+                                    class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">5개</button>
+                                <button type="button" onclick="selectLimit(10)" id="btn-limit-10"
+                                    class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">10개</button>
+                                <button type="button" onclick="selectLimit(15)" id="btn-limit-15"
+                                    class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">15개</button>
+                                <button type="button" onclick="selectLimit(30)" id="btn-limit-30"
+                                    class="limit-btn flex-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 py-2 rounded-lg font-medium transition-all">30개</button>
+                            </div>
+                            <p class="text-xs text-slate-500" id="limitHint">최근 인기 순 영상 5개를 분석합니다.</p>
                         </div>
-                        <p class="text-xs text-slate-500" id="limitHint">최근 영상 5개를 분석합니다.</p>
+                    </div>
+
+                    <!-- Loading Step -->
+                    <div id="stepLoading" class="hidden py-10 text-center">
+                        <div class="loader w-12 h-12 mx-auto mb-4 border-t-purple-500"></div>
+                        <h3 class="text-xl font-bold text-white mb-2" id="loadingStatus">영상 데이터 수집 중...</h3>
+                        <p class="text-slate-400 text-sm" id="loadingDetail">채널의 최근 영상을 불러오고 있습니다</p>
+
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-slate-800 rounded-full h-2 mt-6 overflow-hidden">
+                            <div id="progressBar"
+                                class="bg-gradient-to-r from-blue-500 to-purple-500 h-full w-0 transition-all duration-300">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Loading Step -->
-                <div id="stepLoading" class="hidden py-10 text-center">
-                    <div class="loader w-12 h-12 mx-auto mb-4 border-t-purple-500"></div>
-                    <h3 class="text-xl font-bold text-white mb-2" id="loadingStatus">영상 데이터 수집 중...</h3>
-                    <p class="text-slate-400 text-sm" id="loadingDetail">채널의 최근 영상을 불러오고 있습니다</p>
-
-                    <!-- Progress Bar -->
-                    <div class="w-full bg-slate-800 rounded-full h-2 mt-6 overflow-hidden">
-                        <div id="progressBar"
-                            class="bg-gradient-to-r from-blue-500 to-purple-500 h-full w-0 transition-all duration-300">
-                        </div>
-                    </div>
+                <div class="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50 rounded-b-2xl">
+                    <button id="cancelBtn" class="px-5 py-2 text-slate-400 hover:text-white font-medium">취소</button>
+                    <button id="startAnalysisBtn" disabled
+                        class="px-6 py-2 bg-slate-700 text-slate-400 rounded-xl font-bold cursor-not-allowed transition-all">
+                        분석 시작
+                    </button>
                 </div>
-            </div>
-
-            <div class="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50 rounded-b-2xl">
-                <button id="cancelBtn" class="px-5 py-2 text-slate-400 hover:text-white font-medium">취소</button>
-                <button id="startAnalysisBtn" disabled
-                    class="px-6 py-2 bg-slate-700 text-slate-400 rounded-xl font-bold cursor-not-allowed transition-all">
-                    분석 시작
-                </button>
             </div>
         </div>
-    </div>
 
-    <script type="module">
-        // 15 YouTube Categories
-        const CATEGORIES = [
-            { id: 'film', name: '영화/애니메이션', icon: '🎬' },
-            { id: 'autos', name: '자동차', icon: '🚗' },
-            { id: 'music', name: '음악', icon: '🎵' },
-            { id: 'pets', name: '반려동물/동물', icon: '🐾' },
-            { id: 'sports', name: '스포츠', icon: '⚽' },
-            { id: 'travel', name: '여행/이벤트', icon: '✈️' },
-            { id: 'gaming', name: '게임', icon: '🎮' },
-            { id: 'people', name: '인물/블로그', icon: '👤' },
-            { id: 'comedy', name: '코미디', icon: '😂' },
-            { id: 'entertainment', name: '엔터테인먼트', icon: '🎭' },
-            { id: 'news', name: '뉴스/정치', icon: '📰' },
-            { id: 'howto', name: '노하우/스타일', icon: '💄' },
-            { id: 'education', name: '교육', icon: '📚' },
-            { id: 'tech', name: '과학기술', icon: '🔬' },
-            { id: 'nonprofit', name: '비영리/사회운동', icon: '🤝' },
-            { id: 'general', name: '일반', icon: '📁' }
-        ];
+        <script type="module">
+            // 15 YouTube Categories
+            const CATEGORIES = [
+                { id: 'film', name: '영화/애니메이션', icon: '🎬' },
+                { id: 'autos', name: '자동차', icon: '🚗' },
+                { id: 'music', name: '음악', icon: '🎵' },
+                { id: 'pets', name: '반려동물/동물', icon: '🐾' },
+                { id: 'sports', name: '스포츠', icon: '⚽' },
+                { id: 'travel', name: '여행/이벤트', icon: '✈️' },
+                { id: 'gaming', name: '게임', icon: '🎮' },
+                { id: 'people', name: '인물/블로그', icon: '👤' },
+                { id: 'comedy', name: '코미디', icon: '😂' },
+                { id: 'entertainment', name: '엔터테인먼트', icon: '🎭' },
+                { id: 'news', name: '뉴스/정치', icon: '📰' },
+                { id: 'howto', name: '노하우/스타일', icon: '💄' },
+                { id: 'education', name: '교육', icon: '📚' },
+                { id: 'tech', name: '과학기술', icon: '🔬' },
+                { id: 'nonprofit', name: '비영리/사회운동', icon: '🤝' },
+                { id: 'general', name: '일반', icon: '📁' }
+            ];
 
-        // --- State ---
-        let fetchedChannelInfo = null;
-        let activeFilter = 'all';
-        window.allPersonas = []; // Made global for access by modals
-        let analysisLimit = 5; // Default
+            // --- State ---
+            let fetchedChannelInfo = null;
+            let activeFilter = 'all';
+            window.allPersonas = []; // Made global for access by modals
+            let analysisLimit = 5; // Default
 
-        // --- Limit Selection Logic ---
-        window.selectLimit = (n) => {
-            analysisLimit = n;
-            document.querySelectorAll('.limit-btn').forEach(b => {
-                b.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
-                b.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-700');
-            });
-            const btn = document.getElementById(`btn-limit-${n}`);
-            if (btn) {
-                btn.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
-                btn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
+            // --- Limit Selection Logic ---
+            window.selectLimit = (n) => {
+                analysisLimit = n;
+                document.querySelectorAll('.limit-btn').forEach(b => {
+                    b.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+                    b.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-700');
+                });
+                const btn = document.getElementById(`btn-limit-${n}`);
+                if (btn) {
+                    btn.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
+                    btn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
+                }
+                const hint = document.getElementById('limitHint');
+                if (hint) hint.textContent = `최근 영상 ${n}개를 분석합니다.`;
             }
-            const hint = document.getElementById('limitHint');
-            if (hint) hint.textContent = `최근 영상 ${n}개를 분석합니다.`;
-        }
 
-        // Init default selection visually
-        setTimeout(() => { if (window.selectLimit) window.selectLimit(5); }, 50);
+            // Init default selection visually
+            setTimeout(() => { if (window.selectLimit) window.selectLimit(5); }, 50);
 
-        // --- DOM Elements ---
-        const grid = document.getElementById('categoryGrid');
-        const select = document.getElementById('categorySelect');
-        const personaGrid = document.getElementById('personaGrid');
+            // --- DOM Elements ---
+            const grid = document.getElementById('categoryGrid');
+            const select = document.getElementById('categorySelect');
+            const personaGrid = document.getElementById('personaGrid');
 
-        // --- Init Function ---
-        async function init() {
-            initCategories();
-            await loadPersonas();
-            setupEventListeners();
-        }
+            // --- Init Function ---
+            async function init() {
+                initCategories();
+                await loadPersonas();
+                setupEventListeners();
+            }
 
-        function initCategories() {
-            grid.innerHTML = ''; // Clear
-            select.innerHTML = '<option value="">카테고리를 선택하세요</option>';
+            function initCategories() {
+                grid.innerHTML = ''; // Clear
+                select.innerHTML = '<option value="">카테고리를 선택하세요</option>';
 
-            CATEGORIES.forEach(cat => {
-                // Filter Grid Item
-                const card = document.createElement('div');
-                card.className = "category-card glass-panel rounded-xl p-3 flex items-center gap-3 active:scale-95 select-none";
-                card.onclick = () => selectFilterCategory(cat.id);
-                card.dataset.id = cat.id;
-                card.innerHTML = `
+                CATEGORIES.forEach(cat => {
+                    // Filter Grid Item
+                    const card = document.createElement('div');
+                    card.className = "category-card glass-panel rounded-xl p-3 flex items-center gap-3 active:scale-95 select-none";
+                    card.onclick = () => selectFilterCategory(cat.id);
+                    card.dataset.id = cat.id;
+                    card.innerHTML = `
                     <span class="text-xl">${cat.icon}</span>
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-sm text-slate-200 truncate">${cat.name}</p>
                         <p class="text-[10px] text-slate-500" id="count-${cat.id}">0개 채널</p>
                     </div>
                 `;
-                grid.appendChild(card);
+                    grid.appendChild(card);
 
-                // Option in Modal
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = `${cat.icon} ${cat.name}`;
-                select.appendChild(option);
-            });
-        }
-
-        async function loadPersonas() {
-            try {
-                const res = await fetch('/api/channels/list');
-                const json = await res.json();
-                if (json.success) {
-                    window.allPersonas = json.data;
-                    document.getElementById('totalPersonasCount').innerText = window.allPersonas.length;
-                    renderPersonas();
-                    updateCategoryCounts();
-                }
-            } catch (e) {
-                console.error("Failed to load personas", e);
+                    // Option in Modal
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = `${cat.icon} ${cat.name}`;
+                    select.appendChild(option);
+                });
             }
-        }
 
-        function updateCategoryCounts() {
-            CATEGORIES.forEach(cat => {
-                const count = allPersonas.filter(p => p.category === cat.id).length;
-                const el = document.getElementById(`count-${cat.id}`);
-                if (el) el.innerText = `${count}개 채널`;
-            });
-        }
-
-        function selectFilterCategory(id) {
-            activeFilter = (activeFilter === id) ? 'all' : id; // Toggle
-
-            // UI Update
-            document.querySelectorAll('.category-card').forEach(c => {
-                if (activeFilter !== 'all' && c.dataset.id === activeFilter) {
-                    c.classList.add('active');
-                } else {
-                    c.classList.remove('active');
+            async function loadPersonas() {
+                try {
+                    const res = await fetch('/api/channels/list');
+                    const json = await res.json();
+                    if (json.success) {
+                        window.allPersonas = json.data;
+                        document.getElementById('totalPersonasCount').innerText = window.allPersonas.length;
+                        renderPersonas();
+                        updateCategoryCounts();
+                    }
+                } catch (e) {
+                    console.error("Failed to load personas", e);
                 }
-            });
+            }
 
-            const catName = CATEGORIES.find(c => c.id === activeFilter)?.name || '전체';
-            document.getElementById('selectedCategoryTitle').innerText = catName;
+            function updateCategoryCounts() {
+                CATEGORIES.forEach(cat => {
+                    const count = allPersonas.filter(p => p.category === cat.id).length;
+                    const el = document.getElementById(`count-${cat.id}`);
+                    if (el) el.innerText = `${count}개 채널`;
+                });
+            }
 
-            renderPersonas();
-        }
+            function selectFilterCategory(id) {
+                activeFilter = (activeFilter === id) ? 'all' : id; // Toggle
 
-        function renderPersonas() {
-            const filtered = activeFilter === 'all'
-                ? allPersonas
-                : allPersonas.filter(p => p.category === activeFilter);
+                // UI Update
+                document.querySelectorAll('.category-card').forEach(c => {
+                    if (activeFilter !== 'all' && c.dataset.id === activeFilter) {
+                        c.classList.add('active');
+                    } else {
+                        c.classList.remove('active');
+                    }
+                });
 
-            document.getElementById('channelCountBadge').innerText = `(${filtered.length})`; // update badge
+                const catName = CATEGORIES.find(c => c.id === activeFilter)?.name || '전체';
+                document.getElementById('selectedCategoryTitle').innerText = catName;
 
-            personaGrid.innerHTML = '';
+                renderPersonas();
+            }
 
-            if (filtered.length === 0) {
-                personaGrid.innerHTML = `
+            function renderPersonas() {
+                const filtered = activeFilter === 'all'
+                    ? allPersonas
+                    : allPersonas.filter(p => p.category === activeFilter);
+
+                document.getElementById('channelCountBadge').innerText = `(${filtered.length})`; // update badge
+
+                personaGrid.innerHTML = '';
+
+                if (filtered.length === 0) {
+                    personaGrid.innerHTML = `
                     <div class="col-span-full py-20 text-center glass-panel rounded-2xl border-dashed border-2 border-slate-700">
                         <div class="text-6xl mb-4 grayscale opacity-50">🧪</div>
                         <h3 class="text-xl font-bold text-slate-300 mb-2">
@@ -415,16 +420,16 @@
                         </button>
                     </div>
                 `;
-                return;
-            }
+                    return;
+                }
 
-            filtered.forEach(p => {
-                // Determine style tags from analysis
-                const tags = [p.analysis.pacing, p.analysis.tone].filter(Boolean).slice(0, 2);
+                filtered.forEach(p => {
+                    // Determine style tags from analysis
+                    const tags = [p.analysis.pacing, p.analysis.tone].filter(Boolean).slice(0, 2);
 
-                const card = document.createElement('div');
-                card.className = "glass-panel p-5 rounded-2xl hover:bg-slate-800 transition-colors relative group";
-                card.innerHTML = `
+                    const card = document.createElement('div');
+                    card.className = "glass-panel p-5 rounded-2xl hover:bg-slate-800 transition-colors relative group";
+                    card.innerHTML = `
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3">
                             <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
@@ -435,7 +440,10 @@
                                 <a href="${p.url}" target="_blank" class="text-xs text-blue-400 hover:underline">YouTube ↗</a>
                             </div>
                         </div>
-                        <span class="text-2xl opacity-50">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
+                        <div class="flex items-center gap-2">
+                            ${p.sourceCount ? `<span class="bg-slate-700/50 text-slate-400 text-xs px-2 py-1 rounded-md font-mono border border-slate-600/50" title="학습된 영상 수">${p.sourceCount}</span>` : ''}
+                            <span class="text-2xl opacity-50">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
+                        </div>
                     </div>
                     
                     <div class="mb-4 space-y-2">
@@ -462,353 +470,355 @@
                          <button onclick="deletePersona('${p.id}')" class="bg-red-500/20 text-red-400 p-1.5 rounded hover:bg-red-500/40" title="삭제">🗑️</button>
                     </div>
                 `;
-                personaGrid.appendChild(card);
-            });
-        }
-
-        // Expose openModal globally
-        window.openModal = () => {
-            const modal = document.getElementById('analyzeModal');
-            const modalContent = document.getElementById('modalContent');
-
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modalContent.classList.remove('opacity-0', 'scale-95');
-                modalContent.classList.add('opacity-100', 'scale-100');
-            }, 10);
-
-            // Reset state
-            document.getElementById('stepInput').classList.remove('hidden');
-            document.getElementById('stepLoading').classList.add('hidden');
-            document.getElementById('startAnalysisBtn').classList.remove('hidden');
-            document.getElementById('cancelBtn').classList.remove('hidden');
-
-            // Hide result sections
-            document.getElementById('channelPreview').classList.add('hidden');
-            document.getElementById('categorySelectSection').classList.add('hidden');
-            document.getElementById('limitSelectSection').classList.add('hidden');
-
-            // Reset Button State
-            document.getElementById('startAnalysisBtn').disabled = true;
-            document.getElementById('startAnalysisBtn').classList.add('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
-            document.getElementById('startAnalysisBtn').classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500');
-
-            // Reset inputs
-            document.getElementById('channelUrlInput').value = '';
-            fetchedChannelInfo = null;
-        };
-
-        // Expose delete function global
-        window.deletePersona = async (id) => {
-            if (!confirm('정말 삭제하시겠습니까?')) return;
-            try {
-                await fetch('/api/channels/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
+                    personaGrid.appendChild(card);
                 });
-                await loadPersonas();
-            } catch (e) {
-                alert('삭제 실패');
             }
-        };
 
-        function setupEventListeners() {
-            // Header Button
-            document.getElementById('addChannelBtn').onclick = window.openModal;
+            // Expose openModal globally
+            window.openModal = () => {
+                const modal = document.getElementById('analyzeModal');
+                const modalContent = document.getElementById('modalContent');
 
-            // Fetch Info Handler
-            document.getElementById('fetchChannelInfoBtn').onclick = async () => {
-                const url = document.getElementById('channelUrlInput').value.trim();
-                const btn = document.getElementById('fetchChannelInfoBtn');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modalContent.classList.remove('opacity-0', 'scale-95');
+                    modalContent.classList.add('opacity-100', 'scale-100');
+                }, 10);
 
-                if (!url) return alert('URL을 입력해주세요');
+                // Reset state
+                document.getElementById('stepInput').classList.remove('hidden');
+                document.getElementById('stepLoading').classList.add('hidden');
+                document.getElementById('startAnalysisBtn').classList.remove('hidden');
+                document.getElementById('cancelBtn').classList.remove('hidden');
 
-                btn.innerText = '조회 중...';
-                btn.disabled = true;
+                // Hide result sections
+                document.getElementById('channelPreview').classList.add('hidden');
+                document.getElementById('categorySelectSection').classList.add('hidden');
+                document.getElementById('limitSelectSection').classList.add('hidden');
 
+                // Reset Button State
+                document.getElementById('startAnalysisBtn').disabled = true;
+                document.getElementById('startAnalysisBtn').classList.add('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
+                document.getElementById('startAnalysisBtn').classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+
+                // Reset inputs
+                document.getElementById('channelUrlInput').value = '';
+                fetchedChannelInfo = null;
+            };
+
+            // Expose delete function global
+            window.deletePersona = async (id) => {
+                if (!confirm('정말 삭제하시겠습니까?')) return;
                 try {
-                    const res = await fetch('/api/channels/info', {
+                    await fetch('/api/channels/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url })
+                        body: JSON.stringify({ id })
                     });
-                    const json = await res.json();
-
-                    if (json.success) {
-                        fetchedChannelInfo = json.data;
-
-                        // Show Preview
-                        document.getElementById('channelPreview').classList.remove('hidden');
-                        document.getElementById('previewName').innerText = json.data.name;
-                        document.getElementById('previewSubscribers').innerText = `구독자 ${json.data.subscribers}`;
-                        document.getElementById('previewThumbnail').innerText = json.data.name.charAt(0); // Fallback avatar
-
-                        // Show Category Select
-                        document.getElementById('categorySelectSection').classList.remove('hidden');
-                        document.getElementById('limitSelectSection').classList.remove('hidden'); // Added
-                        document.getElementById('startAnalysisBtn').disabled = false;
-                        document.getElementById('startAnalysisBtn').classList.remove('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
-                        document.getElementById('startAnalysisBtn').classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
-
-                        // --- Auto Select Category Logic ---
-                        if (json.data.originalCategory) {
-                            const map = {
-                                'Film & Animation': 'film', 'Autos & Vehicles': 'autos', 'Music': 'music',
-                                'Pets & Animals': 'pets', 'Sports': 'sports', 'Travel & Events': 'travel',
-                                'Gaming': 'gaming', 'People & Blogs': 'people', 'Comedy': 'comedy',
-                                'Entertainment': 'entertainment', 'News & Politics': 'news', 'Howto & Style': 'howto',
-                                'Education': 'education', 'Science & Technology': 'tech', 'Nonprofits & Activism': 'nonprofit'
-                            };
-                            const mappedId = map[json.data.originalCategory];
-                            if (mappedId) {
-                                document.getElementById('categorySelect').value = mappedId;
-                            } else {
-                                // Try lowercase match
-                                const lowerCat = json.data.originalCategory.toLowerCase();
-                                const exists = CATEGORIES.find(c => c.id === lowerCat);
-                                if (exists) {
-                                    document.getElementById('categorySelect').value = exists.id;
-                                } else {
-                                    // Default to general if not found
-                                    document.getElementById('categorySelect').value = 'general';
-                                }
-                            }
-                        }
-
-                    } else {
-                        alert('채널 정보를 가져오는데 실패했습니다: ' + (json.error || 'Unknown error'));
-                    }
+                    await loadPersonas();
                 } catch (e) {
-                    console.error(e);
-                    alert('서버 오류가 발생했습니다.');
-                } finally {
-                    btn.innerText = '조회';
-                    btn.disabled = false;
+                    alert('삭제 실패');
                 }
             };
 
-            // Start Analysis Handler
-            document.getElementById('startAnalysisBtn').onclick = async () => {
-                const category = document.getElementById('categorySelect').value;
-                if (!fetchedChannelInfo) return;
-                if (!category) return alert('카테고리를 선택해주세요');
+            function setupEventListeners() {
+                // Header Button
+                document.getElementById('addChannelBtn').onclick = window.openModal;
 
-                // UI Switch to Loading
-                document.getElementById('stepInput').classList.add('hidden');
-                document.getElementById('stepLoading').classList.remove('hidden');
-                document.getElementById('startAnalysisBtn').classList.add('hidden');
-                document.getElementById('cancelBtn').classList.add('hidden'); // Cannot cancel easily mid-request
+                // Fetch Info Handler
+                document.getElementById('fetchChannelInfoBtn').onclick = async () => {
+                    const url = document.getElementById('channelUrlInput').value.trim();
+                    const btn = document.getElementById('fetchChannelInfoBtn');
 
-                // Fake Progress Bar Animation
-                let progress = 10;
-                const progressBar = document.getElementById('progressBar');
-                const interval = setInterval(() => {
-                    progress += (Math.random() * 5);
-                    if (progress > 90) progress = 90;
-                    progressBar.style.width = `${progress}%`;
-                }, 1000);
+                    if (!url) return alert('URL을 입력해주세요');
 
-                try {
-                    const res = await fetch('/api/channels/analyze', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            url: fetchedChannelInfo.url,
-                            category: category,
-                            limit: analysisLimit // Added limit
-                        })
-                    });
-                    const json = await res.json();
+                    btn.innerText = '조회 중...';
+                    btn.disabled = true;
 
-                    clearInterval(interval);
-                    progressBar.style.width = '100%';
+                    try {
+                        const res = await fetch('/api/channels/info', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url })
+                        });
+                        const json = await res.json();
 
-                    if (json.success) {
-                        // Auto Save (Simplify workflow)
-                        await fetch('/api/channels/save', {
+                        if (json.success) {
+                            fetchedChannelInfo = json.data;
+
+                            // Show Preview
+                            document.getElementById('channelPreview').classList.remove('hidden');
+                            document.getElementById('previewName').innerText = json.data.name;
+                            document.getElementById('previewSubscribers').innerText = `구독자 ${json.data.subscribers}`;
+                            document.getElementById('previewThumbnail').innerText = json.data.name.charAt(0); // Fallback avatar
+
+                            // Show Category Select
+                            document.getElementById('categorySelectSection').classList.remove('hidden');
+                            document.getElementById('limitSelectSection').classList.remove('hidden'); // Added
+                            document.getElementById('startAnalysisBtn').disabled = false;
+                            document.getElementById('startAnalysisBtn').classList.remove('cursor-not-allowed', 'text-slate-400', 'bg-slate-700');
+                            document.getElementById('startAnalysisBtn').classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+
+                            // --- Auto Select Category Logic ---
+                            if (json.data.originalCategory) {
+                                const map = {
+                                    'Film & Animation': 'film', 'Autos & Vehicles': 'autos', 'Music': 'music',
+                                    'Pets & Animals': 'pets', 'Sports': 'sports', 'Travel & Events': 'travel',
+                                    'Gaming': 'gaming', 'People & Blogs': 'people', 'Comedy': 'comedy',
+                                    'Entertainment': 'entertainment', 'News & Politics': 'news', 'Howto & Style': 'howto',
+                                    'Education': 'education', 'Science & Technology': 'tech', 'Nonprofits & Activism': 'nonprofit'
+                                };
+                                const mappedId = map[json.data.originalCategory];
+                                if (mappedId) {
+                                    document.getElementById('categorySelect').value = mappedId;
+                                } else {
+                                    // Try lowercase match
+                                    const lowerCat = json.data.originalCategory.toLowerCase();
+                                    const exists = CATEGORIES.find(c => c.id === lowerCat);
+                                    if (exists) {
+                                        document.getElementById('categorySelect').value = exists.id;
+                                    } else {
+                                        // Default to general if not found
+                                        document.getElementById('categorySelect').value = 'general';
+                                    }
+                                }
+                            }
+
+                        } else {
+                            alert('채널 정보를 가져오는데 실패했습니다: ' + (json.error || 'Unknown error'));
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        alert('서버 오류가 발생했습니다.');
+                    } finally {
+                        btn.innerText = '조회';
+                        btn.disabled = false;
+                    }
+                };
+
+                // Start Analysis Handler
+                document.getElementById('startAnalysisBtn').onclick = async () => {
+                    const category = document.getElementById('categorySelect').value;
+                    if (!fetchedChannelInfo) return;
+                    if (!category) return alert('카테고리를 선택해주세요');
+
+                    // UI Switch to Loading
+                    document.getElementById('stepInput').classList.add('hidden');
+                    document.getElementById('stepLoading').classList.remove('hidden');
+                    document.getElementById('startAnalysisBtn').classList.add('hidden');
+                    document.getElementById('cancelBtn').classList.add('hidden'); // Cannot cancel easily mid-request
+
+                    // Fake Progress Bar Animation
+                    let progress = 10;
+                    const progressBar = document.getElementById('progressBar');
+                    const interval = setInterval(() => {
+                        progress += (Math.random() * 5);
+                        if (progress > 90) progress = 90;
+                        progressBar.style.width = `${progress}%`;
+                    }, 1000);
+
+                    try {
+                        const res = await fetch('/api/channels/analyze', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                name: fetchedChannelInfo.name,
                                 url: fetchedChannelInfo.url,
                                 category: category,
-                                analysis: json.analysis
+                                limit: analysisLimit // Added limit
                             })
                         });
+                        const json = await res.json();
 
-                        // Success Feedback
-                        alert(`✅ '${fetchedChannelInfo.name}' 채널의 스타일이 학습되었습니다!`);
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
 
-                        closeModal(); // Use local close first
+                        if (json.success) {
+                            // Auto Save (Simplify workflow)
+                            await fetch('/api/channels/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: fetchedChannelInfo.name,
+                                    url: fetchedChannelInfo.url,
+                                    category: category,
+                                    analysis: json.analysis,
+                                    sourceCount: analysisLimit // Added sourceCount
+                                })
+                            });
 
-                        // Internal close function for consistency
-                        const clsModal = () => {
-                            const modal = document.getElementById('analyzeModal');
-                            const modalContent = document.getElementById('modalContent');
-                            modalContent.classList.remove('opacity-100', 'scale-100');
-                            modalContent.classList.add('opacity-0', 'scale-95');
-                            setTimeout(() => {
-                                modal.classList.add('hidden');
-                            }, 200);
+                            // Success Feedback
+                            alert(`✅ '${fetchedChannelInfo.name}' 채널의 스타일이 학습되었습니다!`);
+
+                            closeModal(); // Use local close first
+
+                            // Internal close function for consistency
+                            const clsModal = () => {
+                                const modal = document.getElementById('analyzeModal');
+                                const modalContent = document.getElementById('modalContent');
+                                modalContent.classList.remove('opacity-100', 'scale-100');
+                                modalContent.classList.add('opacity-0', 'scale-95');
+                                setTimeout(() => {
+                                    modal.classList.add('hidden');
+                                }, 200);
+                            }
+                            clsModal();
+
+                            await loadPersonas(); // Refresh Grid
+
+                        } else {
+                            alert('분석 실패: ' + (json.error || '알 수 없는 오류'));
+                            document.getElementById('stepInput').classList.remove('hidden');
+                            document.getElementById('stepLoading').classList.add('hidden');
+                            document.getElementById('startAnalysisBtn').classList.remove('hidden');
+                            document.getElementById('cancelBtn').classList.remove('hidden');
                         }
-                        clsModal();
-
-                        await loadPersonas(); // Refresh Grid
-
-                    } else {
-                        alert('분석 실패: ' + (json.error || '알 수 없는 오류'));
+                    } catch (e) {
+                        console.error(e);
+                        alert('서버 통신 오류');
                         document.getElementById('stepInput').classList.remove('hidden');
                         document.getElementById('stepLoading').classList.add('hidden');
                         document.getElementById('startAnalysisBtn').classList.remove('hidden');
                         document.getElementById('cancelBtn').classList.remove('hidden');
                     }
-                } catch (e) {
-                    console.error(e);
-                    alert('서버 통신 오류');
-                    document.getElementById('stepInput').classList.remove('hidden');
-                    document.getElementById('stepLoading').classList.add('hidden');
-                    document.getElementById('startAnalysisBtn').classList.remove('hidden');
-                    document.getElementById('cancelBtn').classList.remove('hidden');
-                }
-            };
-        }
+                };
+            }
 
-        // Modal Logic Helper (Internal)
-        function closeModal() {
-            const modal = document.getElementById('analyzeModal');
-            const modalContent = document.getElementById('modalContent');
-            modalContent.classList.remove('opacity-100', 'scale-100');
-            modalContent.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 200);
-        }
+            // Modal Logic Helper (Internal)
+            function closeModal() {
+                const modal = document.getElementById('analyzeModal');
+                const modalContent = document.getElementById('modalContent');
+                modalContent.classList.remove('opacity-100', 'scale-100');
+                modalContent.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 200);
+            }
 
-        document.getElementById('closeModalBtn').onclick = closeModal;
-        document.getElementById('cancelBtn').onclick = closeModal;
+            document.getElementById('closeModalBtn').onclick = closeModal;
+            document.getElementById('cancelBtn').onclick = closeModal;
 
-        // Start
-        init();
+            // Start
+            init();
 
-    </script>
-    <!-- DNA Analysis Modal -->
-    <div id="dnaModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center">
-        <div id="dnaModalContent"
-            class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl p-8 transform scale-95 opacity-0 transition-all duration-300 shadow-2xl relative">
-            <button onclick="closeDnaModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
-                    </path>
-                </svg>
-            </button>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Left: Profile -->
-                <div>
-                    <div class="flex items-center gap-4 mb-6">
-                        <div id="dnaAvatar"
-                            class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white">
-                            A
-                        </div>
-                        <div>
-                            <h2 id="dnaName" class="text-2xl font-bold text-white">Channel Name</h2>
-                            <p id="dnaSummary" class="text-slate-400 text-sm mt-1">Summary...</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5 mb-4">
-                        <h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Director's Rules
-                        </h4>
-                        <ul id="dnaRules" class="text-sm text-slate-300 space-y-2 list-disc list-inside">
-                            <li>Loading...</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Right: Structure Graph -->
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <span>📊</span> Viral Structure DNA
-                    </h3>
-                    <p class="text-xs text-slate-400 mb-4">Timestamps & Narrative Flow</p>
-
-                    <div id="dnaTimeline" class="space-y-3">
-                        <!-- Bars will be injected here -->
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 pt-6 border-t border-slate-700 flex justify-end">
-                <button onclick="startDirectorWriteFromModal()"
-                    class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/20 transition-all">
-                    🎬 이 DNA로 대본 쓰기 (Director Mode)
+        </script>
+        <!-- DNA Analysis Modal -->
+        <div id="dnaModal"
+            class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+            <div id="dnaModalContent"
+                class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl p-8 transform scale-95 opacity-0 transition-all duration-300 shadow-2xl relative">
+                <button onclick="closeDnaModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
                 </button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Left: Profile -->
+                    <div>
+                        <div class="flex items-center gap-4 mb-6">
+                            <div id="dnaAvatar"
+                                class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white">
+                                A
+                            </div>
+                            <div>
+                                <h2 id="dnaName" class="text-2xl font-bold text-white">Channel Name</h2>
+                                <p id="dnaSummary" class="text-slate-400 text-sm mt-1">Summary...</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5 mb-4">
+                            <h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Director's Rules
+                            </h4>
+                            <ul id="dnaRules" class="text-sm text-slate-300 space-y-2 list-disc list-inside">
+                                <li>Loading...</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Right: Structure Graph -->
+                    <div>
+                        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <span>📊</span> Viral Structure DNA
+                        </h3>
+                        <p class="text-xs text-slate-400 mb-4">Timestamps & Narrative Flow</p>
+
+                        <div id="dnaTimeline" class="space-y-3">
+                            <!-- Bars will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-slate-700 flex justify-end">
+                    <button onclick="startDirectorWriteFromModal()"
+                        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/20 transition-all">
+                        🎬 이 DNA로 대본 쓰기 (Director Mode)
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <script>
-        // Ensure access to global variable if it exists, or define it for safety (though it should be defined in valid flow)
-        // If 'allPersonas' is defined in the previous script block, it should be accessible.
-        // However, if the previous script block was inside a module or function, it might not be.
-        // Let's assume it's global.
+        <script>
+            // Ensure access to global variable if it exists, or define it for safety (though it should be defined in valid flow)
+            // If 'allPersonas' is defined in the previous script block, it should be accessible.
+            // However, if the previous script block was inside a module or function, it might not be.
+            // Let's assume it's global.
 
-        // DNA Modal Logic
-        let currentDnaId = null;
+            // DNA Modal Logic
+            let currentDnaId = null;
 
-        window.viewDNA = function (id) {
-            // Check if allPersonas is available
-            if (typeof allPersonas === 'undefined') {
-                console.error("allPersonas is undefined. Loading from server...");
-                // Emergency load
-                fetch('/api/channels/list').then(r => r.json()).then(d => {
-                    if (d.success) {
-                        window.allPersonas = d.data; // Force global
-                        window.viewDNA(id); // Retry
-                    }
-                });
-                return;
-            }
+            window.viewDNA = function (id) {
+                // Check if allPersonas is available
+                if (typeof allPersonas === 'undefined') {
+                    console.error("allPersonas is undefined. Loading from server...");
+                    // Emergency load
+                    fetch('/api/channels/list').then(r => r.json()).then(d => {
+                        if (d.success) {
+                            window.allPersonas = d.data; // Force global
+                            window.viewDNA(id); // Retry
+                        }
+                    });
+                    return;
+                }
 
-            currentDnaId = id;
-            const persona = allPersonas.find(p => p.id === id);
-            if (!persona) return;
+                currentDnaId = id;
+                const persona = allPersonas.find(p => p.id === id);
+                if (!persona) return;
 
-            // Populate Info
-            document.getElementById('dnaName').innerText = persona.name;
-            document.getElementById('dnaAvatar').innerText = persona.name.charAt(0);
-            document.getElementById('dnaSummary').innerText = persona.analysis.summary || '요약 정보 없음';
+                // Populate Info
+                document.getElementById('dnaName').innerText = persona.name;
+                document.getElementById('dnaAvatar').innerText = persona.name.charAt(0);
+                document.getElementById('dnaSummary').innerText = persona.analysis.summary || '요약 정보 없음';
 
-            // Populate Rules
-            const rulesList = document.getElementById('dnaRules');
-            rulesList.innerHTML = '';
-            if (persona.analysis.director_rules && persona.analysis.director_rules.length > 0) {
-                persona.analysis.director_rules.forEach(r => {
-                    rulesList.innerHTML += `<li>${r}</li>`;
-                });
-            } else {
-                rulesList.innerHTML = `<li class="text-slate-500 italic">No specific rules found.</li>`;
-            }
+                // Populate Rules
+                const rulesList = document.getElementById('dnaRules');
+                rulesList.innerHTML = '';
+                if (persona.analysis.director_rules && persona.analysis.director_rules.length > 0) {
+                    persona.analysis.director_rules.forEach(r => {
+                        rulesList.innerHTML += `<li>${r}</li>`;
+                    });
+                } else {
+                    rulesList.innerHTML = `<li class="text-slate-500 italic">No specific rules found.</li>`;
+                }
 
-            // Populate Timeline
-            const timeline = document.getElementById('dnaTimeline');
-            timeline.innerHTML = '';
+                // Populate Timeline
+                const timeline = document.getElementById('dnaTimeline');
+                timeline.innerHTML = '';
 
-            if (persona.analysis.structure_template) {
-                persona.analysis.structure_template.forEach(block => {
-                    // Parse "0-5s"
-                    const timeMatch = block.time.match(/(\d+)-(\d+)s/);
-                    let duration = 5;
-                    if (timeMatch) duration = parseInt(timeMatch[2]) - parseInt(timeMatch[1]);
+                if (persona.analysis.structure_template) {
+                    persona.analysis.structure_template.forEach(block => {
+                        // Parse "0-5s"
+                        const timeMatch = block.time.match(/(\d+)-(\d+)s/);
+                        let duration = 5;
+                        if (timeMatch) duration = parseInt(timeMatch[2]) - parseInt(timeMatch[1]);
 
-                    // Color mapping
-                    let bgClass = "bg-slate-600";
-                    if (block.type.includes('Hook')) bgClass = "bg-red-500";
-                    if (block.type.includes('Body')) bgClass = "bg-blue-500";
-                    if (block.type.includes('Climax')) bgClass = "bg-purple-500";
-                    if (block.type.includes('CTA')) bgClass = "bg-green-500";
+                        // Color mapping
+                        let bgClass = "bg-slate-600";
+                        if (block.type.includes('Hook')) bgClass = "bg-red-500";
+                        if (block.type.includes('Body')) bgClass = "bg-blue-500";
+                        if (block.type.includes('Climax')) bgClass = "bg-purple-500";
+                        if (block.type.includes('CTA')) bgClass = "bg-green-500";
 
-                    timeline.innerHTML += `
+                        timeline.innerHTML += `
                         <div class="relative pl-16 py-2 border-l-2 border-slate-700 hover:border-blue-500 transition-colors group">
                             <span class="absolute left-0 top-3 text-xs font-mono text-slate-500 w-12 text-right group-hover:text-blue-400">${block.time}</span>
                             <div class="bg-slate-800 p-3 rounded-lg border border-white/5 relative overflow-hidden">
@@ -821,107 +831,107 @@
                             </div>
                         </div>
                     `;
-                });
-            } else {
-                timeline.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-800 rounded-lg">No DNA structure available.<br>Please re-analyze this channel.</div>`;
-            }
-
-            // Show Modal
-            const modal = document.getElementById('dnaModal');
-            const content = document.getElementById('dnaModalContent');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                content.classList.remove('opacity-0', 'scale-95');
-                content.classList.add('opacity-100', 'scale-100');
-            }, 10);
-        };
-
-        window.closeDnaModal = function () {
-            const modal = document.getElementById('dnaModal');
-            const content = document.getElementById('dnaModalContent');
-            content.classList.remove('opacity-100', 'scale-100');
-            content.classList.add('opacity-0', 'scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        };
-
-        window.openDirectorWrite = function (id) {
-            currentDnaId = id;
-            // Close DNA modal if open
-            closeDnaModal();
-
-            // Open Input Modal
-            const modal = document.getElementById('directorInputModal');
-            modal.classList.remove('hidden');
-            document.getElementById('directorTopicInput').value = '';
-            setTimeout(() => document.getElementById('directorTopicInput').focus(), 100);
-        };
-
-        window.closeDirectorInputHelper = function () {
-            document.getElementById('directorInputModal').classList.add('hidden');
-        };
-
-        window.generateDirectorScript = async function () {
-            const topic = document.getElementById('directorTopicInput').value.trim();
-            const tone = document.getElementById('directorToneSelect').value;
-            if (!topic) return alert('주제를 입력해주세요!');
-
-            // Loading State
-            const btn = document.getElementById('generateDirectorBtn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '🎬 감독이 대본을 쓰는 중... (약 15초)';
-            btn.disabled = true;
-
-            try {
-                const persona = allPersonas.find(p => p.id === currentDnaId);
-                if (!persona) throw new Error('Persona not found');
-
-                const res = await fetch('/api/channels/director/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        topic: topic,
-                        tone: tone,
-                        structure_template: persona.analysis.structure_template,
-                        director_rules: persona.analysis.director_rules
-                    })
-                });
-
-                const json = await res.json();
-                if (json.success) {
-                    window.closeDirectorInputHelper();
-                    showDirectorResult(json.script, persona.name);
+                    });
                 } else {
-                    alert('Error: ' + json.error);
+                    timeline.innerHTML = `<div class="p-4 text-center text-slate-500 bg-slate-800 rounded-lg">No DNA structure available.<br>Please re-analyze this channel.</div>`;
                 }
 
-            } catch (e) {
-                console.error(e);
-                alert('대본 생성 실패');
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-        };
+                // Show Modal
+                const modal = document.getElementById('dnaModal');
+                const content = document.getElementById('dnaModalContent');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    content.classList.remove('opacity-0', 'scale-95');
+                    content.classList.add('opacity-100', 'scale-100');
+                }, 10);
+            };
 
-        function showDirectorResult(script, personaName) {
-            const modal = document.getElementById('directorResultModal');
-            document.getElementById('resultPersonaName').innerText = personaName + " Style";
+            window.closeDnaModal = function () {
+                const modal = document.getElementById('dnaModal');
+                const content = document.getElementById('dnaModalContent');
+                content.classList.remove('opacity-100', 'scale-100');
+                content.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            };
 
-            const container = document.getElementById('scriptTimelineContainer');
-            container.innerHTML = '';
+            window.openDirectorWrite = function (id) {
+                currentDnaId = id;
+                // Close DNA modal if open
+                closeDnaModal();
 
-            script.forEach(block => {
-                // Color mapping
-                let bgClass = "border-slate-600";
-                let textClass = "text-slate-300";
-                if (block.type.includes('Hook')) { bgClass = "border-red-500"; textClass = "text-red-300"; }
-                if (block.type.includes('Body')) { bgClass = "border-blue-500"; textClass = "text-blue-300"; }
-                if (block.type.includes('Climax') || block.type.includes('Twist')) { bgClass = "border-purple-500"; textClass = "text-purple-300"; }
-                if (block.type.includes('CTA')) { bgClass = "border-green-500"; textClass = "text-green-300"; }
+                // Open Input Modal
+                const modal = document.getElementById('directorInputModal');
+                modal.classList.remove('hidden');
+                document.getElementById('directorTopicInput').value = '';
+                setTimeout(() => document.getElementById('directorTopicInput').focus(), 100);
+            };
 
-                container.innerHTML += `
+            window.closeDirectorInputHelper = function () {
+                document.getElementById('directorInputModal').classList.add('hidden');
+            };
+
+            window.generateDirectorScript = async function () {
+                const topic = document.getElementById('directorTopicInput').value.trim();
+                const tone = document.getElementById('directorToneSelect').value;
+                if (!topic) return alert('주제를 입력해주세요!');
+
+                // Loading State
+                const btn = document.getElementById('generateDirectorBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '🎬 감독이 대본을 쓰는 중... (약 15초)';
+                btn.disabled = true;
+
+                try {
+                    const persona = allPersonas.find(p => p.id === currentDnaId);
+                    if (!persona) throw new Error('Persona not found');
+
+                    const res = await fetch('/api/channels/director/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            topic: topic,
+                            tone: tone,
+                            structure_template: persona.analysis.structure_template,
+                            director_rules: persona.analysis.director_rules
+                        })
+                    });
+
+                    const json = await res.json();
+                    if (json.success) {
+                        window.closeDirectorInputHelper();
+                        showDirectorResult(json.script, persona.name);
+                    } else {
+                        alert('Error: ' + json.error);
+                    }
+
+                } catch (e) {
+                    console.error(e);
+                    alert('대본 생성 실패');
+                } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            };
+
+            function showDirectorResult(script, personaName) {
+                const modal = document.getElementById('directorResultModal');
+                document.getElementById('resultPersonaName').innerText = personaName + " Style";
+
+                const container = document.getElementById('scriptTimelineContainer');
+                container.innerHTML = '';
+
+                script.forEach(block => {
+                    // Color mapping
+                    let bgClass = "border-slate-600";
+                    let textClass = "text-slate-300";
+                    if (block.type.includes('Hook')) { bgClass = "border-red-500"; textClass = "text-red-300"; }
+                    if (block.type.includes('Body')) { bgClass = "border-blue-500"; textClass = "text-blue-300"; }
+                    if (block.type.includes('Climax') || block.type.includes('Twist')) { bgClass = "border-purple-500"; textClass = "text-purple-300"; }
+                    if (block.type.includes('CTA')) { bgClass = "border-green-500"; textClass = "text-green-300"; }
+
+                    container.innerHTML += `
                     <div class="flex gap-4 relative">
                         <div class="w-20 pt-2 text-right text-xs font-mono text-slate-500 shrink-0 select-none">
                             ${block.time}
@@ -945,56 +955,56 @@
                         </div>
                     </div>
                 `;
-            });
-
-            modal.classList.remove('hidden');
-        }
-
-        window.closeDirectorResult = function () {
-            document.getElementById('directorResultModal').classList.add('hidden');
-        };
-
-        window.startDirectorWriteFromModal = function () {
-            if (currentDnaId) window.openDirectorWrite(currentDnaId);
-        };
-
-        // --- AI Recommendation Logic ---
-        window.recommendTopics = async function () {
-            const btn = document.getElementById('btnRecommend');
-            const list = document.getElementById('aiRecommendationList');
-
-            if (btn.disabled) return; // Prevent double click
-
-            // UI Loading
-            btn.innerHTML = `<span class="animate-spin">🌀</span> 채널 DNA 분석 중...`;
-            btn.disabled = true;
-            list.classList.remove('hidden');
-            list.innerHTML = `<div class="p-3 text-center text-xs text-slate-500">AI가 이 채널에 딱 맞는 주제를 찾고 있습니다...</div>`;
-
-            try {
-                const persona = allPersonas.find(p => p.id === currentDnaId);
-                if (!persona) throw new Error('Persona not found');
-
-                const res = await fetch('/api/channels/director/recommend', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        channelName: persona.name,
-                        summary: persona.analysis.summary,
-                        category: persona.category,
-                        tone: persona.analysis.tone,
-                        rules: persona.analysis.director_rules
-                    })
                 });
 
-                const json = await res.json();
-                if (json.success && json.recommendations) {
-                    list.innerHTML = ''; // Clear loading
-                    json.recommendations.forEach(rec => {
-                        const el = document.createElement('div');
-                        el.className = "bg-slate-800 p-3 rounded-lg border border-slate-700 hover:border-purple-500 cursor-pointer transition-colors group";
-                        el.onclick = () => applyRecommendation(rec.topic, rec.tone);
-                        el.innerHTML = `
+                modal.classList.remove('hidden');
+            }
+
+            window.closeDirectorResult = function () {
+                document.getElementById('directorResultModal').classList.add('hidden');
+            };
+
+            window.startDirectorWriteFromModal = function () {
+                if (currentDnaId) window.openDirectorWrite(currentDnaId);
+            };
+
+            // --- AI Recommendation Logic ---
+            window.recommendTopics = async function () {
+                const btn = document.getElementById('btnRecommend');
+                const list = document.getElementById('aiRecommendationList');
+
+                if (btn.disabled) return; // Prevent double click
+
+                // UI Loading
+                btn.innerHTML = `<span class="animate-spin">🌀</span> 채널 DNA 분석 중...`;
+                btn.disabled = true;
+                list.classList.remove('hidden');
+                list.innerHTML = `<div class="p-3 text-center text-xs text-slate-500">AI가 이 채널에 딱 맞는 주제를 찾고 있습니다...</div>`;
+
+                try {
+                    const persona = allPersonas.find(p => p.id === currentDnaId);
+                    if (!persona) throw new Error('Persona not found');
+
+                    const res = await fetch('/api/channels/director/recommend', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            channelName: persona.name,
+                            summary: persona.analysis.summary,
+                            category: persona.category,
+                            tone: persona.analysis.tone,
+                            rules: persona.analysis.director_rules
+                        })
+                    });
+
+                    const json = await res.json();
+                    if (json.success && json.recommendations) {
+                        list.innerHTML = ''; // Clear loading
+                        json.recommendations.forEach(rec => {
+                            const el = document.createElement('div');
+                            el.className = "bg-slate-800 p-3 rounded-lg border border-slate-700 hover:border-purple-500 cursor-pointer transition-colors group";
+                            el.onclick = () => applyRecommendation(rec.topic, rec.tone);
+                            el.innerHTML = `
                             <div class="flex justify-between items-start mb-1">
                                 <span class="text-[10px] font-bold text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded">${rec.type}</span>
                                 <span class="text-[10px] text-slate-500 group-hover:text-purple-300">Tone: ${rec.tone}</span>
@@ -1002,39 +1012,39 @@
                             <h5 class="text-sm font-bold text-white mb-1 group-hover:text-purple-200">"${rec.topic}"</h5>
                             <p class="text-xs text-slate-400 leading-tight">${rec.reason}</p>
                          `;
-                        list.appendChild(el);
-                    });
-                    btn.innerHTML = `<span>🤖</span> 다른 주제 다시 추천받기`;
-                } else {
-                    list.innerHTML = `<div class="text-red-400 text-xs p-2">추천 실패: ${json.error || 'Unknown'}</div>`;
+                            list.appendChild(el);
+                        });
+                        btn.innerHTML = `<span>🤖</span> 다른 주제 다시 추천받기`;
+                    } else {
+                        list.innerHTML = `<div class="text-red-400 text-xs p-2">추천 실패: ${json.error || 'Unknown'}</div>`;
+                        btn.innerHTML = `<span>🤖</span> AI 주제 추천받기 (Retry)`;
+                    }
+
+                } catch (e) {
+                    console.error(e);
+                    list.innerHTML = `<div class="text-red-400 text-xs p-2">서버 오류</div>`;
                     btn.innerHTML = `<span>🤖</span> AI 주제 추천받기 (Retry)`;
+                } finally {
+                    btn.disabled = false;
                 }
+            };
 
-            } catch (e) {
-                console.error(e);
-                list.innerHTML = `<div class="text-red-400 text-xs p-2">서버 오류</div>`;
-                btn.innerHTML = `<span>🤖</span> AI 주제 추천받기 (Retry)`;
-            } finally {
-                btn.disabled = false;
-            }
-        };
+            window.applyRecommendation = function (topic, tone) {
+                document.getElementById('directorTopicInput').value = topic;
+                // Try to match tone if exists in select, else add it or ignore
+                const toneSelect = document.getElementById('directorToneSelect');
+                // Simple check: if tone is somewhat matching standard ones, select it.
+                // For now, let's just keep the tone separate or default.
+                // Actually, let's try to set it if it matches value, or default to Engaging
+                // We won't force the select change unless it matches perfectly.
 
-        window.applyRecommendation = function (topic, tone) {
-            document.getElementById('directorTopicInput').value = topic;
-            // Try to match tone if exists in select, else add it or ignore
-            const toneSelect = document.getElementById('directorToneSelect');
-            // Simple check: if tone is somewhat matching standard ones, select it.
-            // For now, let's just keep the tone separate or default.
-            // Actually, let's try to set it if it matches value, or default to Engaging
-            // We won't force the select change unless it matches perfectly.
+                // Visual feedback
+                const input = document.getElementById('directorTopicInput');
+                input.classList.add('ring-2', 'ring-purple-500');
+                setTimeout(() => input.classList.remove('ring-2', 'ring-purple-500'), 500);
+            };
 
-            // Visual feedback
-            const input = document.getElementById('directorTopicInput');
-            input.classList.add('ring-2', 'ring-purple-500');
-            setTimeout(() => input.classList.remove('ring-2', 'ring-purple-500'), 500);
-        };
-
-    </script>
+        </script>
 </body>
 
 <!-- Director Input Modal -->

@@ -6,12 +6,12 @@ const Guideline = require('./models/Guideline');
 const ViolationCheck = require('./models/ViolationCheck');
 const multer = require('multer');
 const fs = require('fs');
-const { geminiGenerateJSON } = require('./server/utils/gemini.util');
+const { geminiGenerateJSON, uploadFileToGemini, deleteFileFromGemini } = require('./server/utils/gemini.util');
 
 // Configure video upload
 const videoUpload = multer({
     dest: 'uploads/temp/',
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+    limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
     fileFilter: (req, file, cb) => {
         const allowed = ['video/mp4', 'video/mov', 'video/avi', 'video/quicktime'];
         if (allowed.includes(file.mimetype)) {
@@ -42,9 +42,9 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
         }
     });
 
-    // API: Check uploaded video file with Gemini Vision
     app.post('/api/guidelines/check-video', videoUpload.single('video'), async (req, res) => {
         let videoPath = null;
+        let uploadedFile = null;
 
         try {
             const { title, description } = req.body;
@@ -57,17 +57,17 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
             console.log('[Guidelines] Analyzing uploaded video:', title);
             console.log('[Guidelines] File:', videoPath, req.file.mimetype);
 
-            // Read video file
-            console.log('[Guidelines] Reading video file...');
-            const videoData = fs.readFileSync(videoPath);
-            const videoBase64 = videoData.toString('base64');
+            // Upload to Gemini File API (Handles large files > 20MB)
+            // 10-minute videos are well supported here
+            console.log('[Guidelines] Uploading to Gemini File API...');
+            uploadedFile = await uploadFileToGemini(videoPath, req.file.mimetype, GEMINI_API_KEY);
 
             // Analyze with Gemini Vision
             console.log('[Guidelines] Starting Gemini Vision analysis...');
             const analysis = await analyzeVideoWithGemini({
-                inlineData: {
-                    data: videoBase64,
-                    mimeType: req.file.mimetype
+                fileData: {
+                    fileUri: uploadedFile.uri,
+                    mimeType: uploadedFile.mimeType
                 }
             }, {
                 title: title || 'Untitled',
@@ -76,7 +76,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
 
             console.log('[Guidelines] Analysis complete');
 
-            // Save to database (Optional - don't fail properly if DB is down)
+            // Save to database
             let checkId = null;
             try {
                 const check = await ViolationCheck.create({
@@ -87,36 +87,37 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
                 });
                 checkId = check._id;
             } catch (dbError) {
-                console.warn('[Guidelines] Warning: Failed to save to DB (Not Primary/Error), but returning analysis.', dbError.message);
-            }
-
-            // Clean up local file
-            if (fs.existsSync(videoPath)) {
-                fs.unlinkSync(videoPath);
-                console.log('[Guidelines] Temp file cleaned up');
+                console.warn('[Guidelines] Warning: Failed to save to DB, but returning analysis.', dbError.message);
             }
 
             res.json({
-                checkId: checkId, // Might be null
+                checkId: checkId,
                 title,
                 analysis
             });
 
         } catch (error) {
             console.error('[Guidelines Check Video] Error:', error);
-
-            // Clean up on error
+            res.status(500).json({ error: error.message });
+        } finally {
+            // Clean up local file
             if (videoPath && fs.existsSync(videoPath)) {
                 fs.unlinkSync(videoPath);
+                console.log('[Guidelines] Local temp file cleaned up');
             }
-
-            res.status(500).json({ error: error.message });
+            // Clean up Gemini file
+            if (uploadedFile) {
+                console.log('[Guidelines] Cleaning up Gemini file...');
+                // Run in background to not block response if it takes time
+                deleteFileFromGemini(GEMINI_API_KEY, uploadedFile.name).catch(e => console.error(e));
+            }
         }
     });
 
     // API: Generate Shorts titles (Korean, Japanese, Japanese pronunciation)
     app.post('/api/guidelines/generate-titles', videoUpload.single('video'), async (req, res) => {
         let videoPath = null;
+        let uploadedFile = null;
 
         try {
             const { title, description } = req.body;
@@ -128,26 +129,20 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
             videoPath = req.file.path;
             console.log('[Title Generation] Analyzing video:', title);
 
-            // Read video file
-            console.log('[Title Generation] Reading video file...');
-            const videoData = fs.readFileSync(videoPath);
-            const videoBase64 = videoData.toString('base64');
+            // Upload to Gemini File API
+            console.log('[Title Generation] Uploading to Gemini File API...');
+            uploadedFile = await uploadFileToGemini(videoPath, req.file.mimetype, GEMINI_API_KEY);
 
             console.log('[Title Generation] Generating titles...');
             const titles = await generateShortsTitle({
-                inlineData: {
-                    data: videoBase64,
-                    mimeType: req.file.mimetype
+                fileData: {
+                    fileUri: uploadedFile.uri,
+                    mimeType: uploadedFile.mimeType
                 }
             }, {
                 title: title || '',
                 description: description || ''
             }, GEMINI_API_KEY);
-
-            // Clean up local file
-            if (fs.existsSync(videoPath)) {
-                fs.unlinkSync(videoPath);
-            }
 
             res.json({
                 success: true,
@@ -156,13 +151,14 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
 
         } catch (error) {
             console.error('[Title Generation] Error:', error);
-
-            // Clean up on error
+            res.status(500).json({ error: error.message });
+        } finally {
             if (videoPath && fs.existsSync(videoPath)) {
                 fs.unlinkSync(videoPath);
             }
-
-            res.status(500).json({ error: error.message });
+            if (uploadedFile) {
+                deleteFileFromGemini(GEMINI_API_KEY, uploadedFile.name).catch(e => console.error(e));
+            }
         }
     });
 
@@ -197,7 +193,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
         }
     });
 
-    // API: Extract Transcript with Translation (Step 1 of progressive workflow)
+    // API: Extract Bilingual Transcript (Step 1)
     app.post('/api/guidelines/extract-transcript', videoUpload.single('video'), async (req, res) => {
         let videoPath = null;
 
@@ -206,8 +202,10 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
                 return res.status(400).json({ error: 'No video file uploaded' });
             }
 
+            const { provider } = req.body; // 'openai' or 'huggingface'
             videoPath = req.file.path;
-            console.log('[Transcript Extract] 📝 Starting bilingual transcript extraction...');
+            console.log('[Transcript Extract] 📝 Starting transcript extraction...');
+            console.log('[Transcript Extract] 🔧 Provider:', provider || 'openai (default)');
 
             // Read video file
             const videoData = fs.readFileSync(videoPath);
@@ -215,23 +213,34 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
             // ═══════════════════════════════════════════════════════════
             // STEP 1: Extract original transcript with Whisper ASR
             // ═══════════════════════════════════════════════════════════
-            console.log('[Transcript Extract] 🎙️ Extracting with Whisper ASR...');
+            const providerName = provider === 'huggingface' ? 'HuggingFace (FREE)' : 'OpenAI (PAID)';
+            console.log(`[Transcript Extract] 🎙️ Extracting with ${providerName} Whisper ASR...`);
 
             const { extractTranscriptWithTimestamps } = require('./server/utils/phi3_asr.util');
 
             const originalTranscript = await extractTranscriptWithTimestamps(videoData, {
                 language: 'auto',
-                model: 'whisper'
+                model: 'whisper',
+                provider: provider || 'openai'
             });
 
             console.log(`[Transcript Extract] ✅ Extracted ${originalTranscript.segments.length} segments in ${originalTranscript.language}`);
 
             // ═══════════════════════════════════════════════════════════
-            // STEP 2: Translate to Korean if not Korean
+            // STEP 2: Translate to Korean (if not already done)
             // ═══════════════════════════════════════════════════════════
             let translatedSegments = null;
 
-            if (originalTranscript.language !== 'ko' && originalTranscript.language !== 'korean') {
+            // Check if ASR already provided translation (Our new prompt does!)
+            if (originalTranscript.hasTranslation) {
+                console.log('[Transcript Extract] ℹ️ Transcript already has translation (Bilingual Mode)');
+                // We don't need to call translateSegmentsToKorean
+                // Just ensure we map it correctly below
+            } else if (originalTranscript.language !== 'ko' && originalTranscript.language !== 'korean') {
+                console.log('[Transcript Extract] 🌐 Skipping Translation (Optimization Mode)...');
+
+                // DISABLED: We want Original Only for Step 1 efficiency
+                /*
                 console.log('[Transcript Extract] 🌐 Translating to Korean with Gemini...');
 
                 try {
@@ -244,6 +253,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
                 } catch (transError) {
                     console.warn('[Transcript Extract] ⚠️ Translation failed, continuing without:', transError.message);
                 }
+                */
             } else {
                 console.log('[Transcript Extract] ℹ️ Already in Korean, skipping translation');
             }
@@ -258,7 +268,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
                 start: seg.start,
                 end: seg.end,
                 text: seg.text,
-                textKo: (translatedSegments && translatedSegments[i]) ? translatedSegments[i] : seg.text,
+                textKo: (translatedSegments && translatedSegments[i]) ? translatedSegments[i] : (seg.textKo || seg.text),
                 emotion: seg.emotion,
                 confidence: seg.confidence || 0.9
             }));
@@ -271,7 +281,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
                     duration: originalTranscript.duration,
                     fullText: originalTranscript.fullText,
                     segments: bilingualSegments,
-                    hasTranslation: translatedSegments !== null
+                    hasTranslation: originalTranscript.hasTranslation || (translatedSegments !== null)
                 }
             });
 
@@ -299,43 +309,102 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
             console.log('[Highlights] 🔍 Analyzing transcript for viral moments...');
 
             // Prepare prompt for Gemini
+            // Provide both MM:SS for context and Seconds for precision
             const segmentsText = transcript.segments.map((s, i) =>
-                `[${formatTimestamp(s.start)}-${formatTimestamp(s.end)}] ${s.textKo || s.text} (${s.emotion || 'neutral'})`
+                `[${formatTimestamp(s.start)} | ${s.start.toFixed(2)}s - ${formatTimestamp(s.end)} | ${s.end.toFixed(2)}s] ${s.textKo || s.text} (${s.emotion || 'neutral'})`
             ).join('\n');
 
             const prompt = `
-당신은 100만 구독자를 보유한 유튜브 쇼츠 전문 PD입니다.
-아래 영상 대본을 분석하여, **조회수가 폭발할만한 바이럴 하이라이트 구간 3개**를 추천해주세요.
+당신은 100만 구독자를 보유한 유튜브 쇼츠 전문 PD이자 편집자입니다.
+제공된 영상 대본을 분석하여, **하나의 완벽한 60초짜리 유튜브 쇼츠를 만들기 위한 "편집 설계도(Director's Cut)"**를 작성해주세요.
 
-**분석 기준:**
-1. **Hook (초반 3초):** 시청자의 주의를 즉시 끌 수 있는 강렬한 시작인가?
-2. **Emotional Peak:** 놀라움, 긴장감, 귀여움 등 감정이 고조되는 순간인가?
-3. **Completeness:** 15초~50초 사이로 기승전결이 있는가?
+**목표:**
+단순히 하이라이트를 뽑는 것이 아니라, **기-승-전-결(Intro-BuildUp-Climax-Outro)** 구조를 갖춘 하나의 완성된 스토리라인을 만들어주세요.
+
+**📌 CRITICAL RULES (절대 규칙 - 반드시 준수):**
+1. ✅ **전체 영상 길이는 정확히 60초 이내**
+   - 모든 scene의 duration 합계가 60초를 초과하면 안 됨
+   - Outro는 반드시 5초 이내로 제한
+   
+2. ✅ **모든 scene에 text_kr, text_jp, text_pron을 반드시 포함**
+   - text_kr: 원문의 한국어 번역 (description 아님!)
+   - text_jp: YouTube Shorts 최적화 일본어 구어체
+   - text_pron: 일본어의 한글 발음 (예: "아레와 조-쿠...")
+   
+3. ✅ **original_transcript는 해당 구간의 실제 대사만 포함**
+   - 타임라인 범위 내의 대사만 정확히 추출
+   - 전체 대본을 뭉쳐서 넣지 말 것
+
+4. ✅ **Narration 구조 (CapCut 자막용)**
+   - **Intro (1개)**: 3초 내 시청자를 사로잡는 강력한 후킹 멘트
+   - **Body (1-2개)**: 중간 환기 또는 상황 간단 설명
+   - **Outro (1개)**: 댓글 유도 CTA (구독 요청 금지)
+   - 각 narration은 narration_kr, narration_jp, narration_pron 세트로 제공
+
+**편집 구조 가이드 & 필수 요소:**
+1. **Intro (0-5초):** 시청자의 시선을 3초 안에 사로잡는 강력한 후킹.
+   - **필수**: narration_kr, narration_jp, narration_pron
+2. **Body (5-45초):** 사건의 전개, 긴장감 고조.
+   - 일부 scene에 narration 추가 (환기/설명용, 1-2개만)
+3. **Climax (45-55초):** 감정 폭발, 반전, 가장 재미있는 순간.
+4. **Outro (55-60초, 최대 5초):**
+   - **필수**: narration_kr, narration_jp, narration_pron (CTA 콜)
+   - 예: "여러분은 어떻게 생각하세요? 댓글로 알려주세요!"
+5. **Infinite Loop 전략:**
+   - 마지막이 처음으로 자연스럽게 이어지도록 설계
 
 **영상 대본:**
 ${segmentsText}
 
 **응답 형식 (JSON):**
 {
-  "highlights": [
+  "directorPlan": [
     {
-      "start": 12.5,
-      "end": 45.0,
-      "title": "강렬한 제목",
-      "reason": "선정 이유 (이 구간이 왜 바이럴 될 것인지)",
-      "viralScore": 95,
-      "emotion": "shcok/cute/tension"
+      "stage": "Intro",
+      "start": 12.52,
+      "end": 15.08,
+      "description": "이 구간을 사용하여 시청자의 이목을 집중시킴",
+      "reason": "운전자가 경찰에게 소리치는 충격적인 장면으로 시작하여 호기심 유발",
+      "original_transcript": "해당 구간(12.52-15.08)의 실제 대사만 작성",
+      "text_kr": "경찰관님, 외교 특권입니다.",
+      "text_jp": "警官さん、外交特権です。",
+      "text_pron": "케이칸상, 가이코 토쿠켄 데스.",
+      "narration_kr": "외교 특권을 주장하는 슈퍼카 운전자?!",
+      "narration_jp": "外交特権を主張するスーパーカーの運転手？！",
+      "narration_pron": "가이코 토쿠켄오 슈초스루 수-파-카-노 운텐슈?!",
+      "sfx_suggestion": "쾅 소리, 사이렌 소리 등 효과음 가이드 (없으면 null)"
     }
-  ]
+  ],
+  "viralTitle": "생성된 쇼츠의 예상 제목 (한 줄, 60자 이내)",
+  "thumbnailText": {
+    "line1": "썸네일 첫 줄 텍스트 (강렬한 키워드, 15자 이내)",
+    "line2": "썸네일 두번째 줄 (부가 설명, 20자 이내)"
+  },
+  "sourceInfo": "영상 출처 또는 채널명 (대본에서 추정 가능하면 작성, 없으면 'Unknown')",
+  "loopStrategy": "이 영상의 무한 루프 연결 포인트 설명",
+  "estimatedDuration": 58
 }
+
+**⚠️ 최종 체크리스트:**
+- [ ] 전체 duration 합계가 60초 이내인가?
+- [ ] Outro가 5초 이내인가?
+- [ ] 모든 scene에 text_kr, text_jp, text_pron 있는가?
+- [ ] Intro에 narration이 있는가? (3개 국어)
+- [ ] Outro에 CTA narration이 있는가? (3개 국어)
+- [ ] thumbnailText가 2줄로 생성되었는가?
 `;
 
             const response = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
                 { text: prompt }
             ]);
 
-            console.log(`[Highlights] ✅ Found ${response.highlights.length} highlights`);
-            res.json({ success: true, highlights: response.highlights });
+            console.log(`[Director Mode] ✅ Plan created with ${response.directorPlan?.length || 0} scenes`);
+            res.json({
+                success: true,
+                directorPlan: response.directorPlan,
+                viralTitle: response.viralTitle,
+                estimatedDuration: response.estimatedDuration
+            });
 
         } catch (error) {
             console.error('[Highlights] Error:', error);
@@ -347,6 +416,7 @@ ${segmentsText}
     // ENHANCED: 2-step process with ASR transcript extraction
     app.post('/api/guidelines/generate-animal-script', videoUpload.single('video'), async (req, res) => {
         let videoPath = null;
+        let uploadedFile = null;
 
         try {
             const { sourceTitle, targetChannel, narrationStyle } = req.body;
@@ -358,10 +428,6 @@ ${segmentsText}
             videoPath = req.file.path;
             console.log('[Animal Script] 🎬 Starting 2-step process for:', targetChannel);
 
-            // Read video file
-            const videoData = fs.readFileSync(videoPath);
-            const videoBase64 = videoData.toString('base64');
-
             // ═══════════════════════════════════════════════════════════
             // STEP 1: Extract original transcript with timestamps (ASR)
             // ═══════════════════════════════════════════════════════════
@@ -371,6 +437,9 @@ ${segmentsText}
 
             let originalTranscript = null;
             try {
+                // For ASR we still need to read the file locally (or stream it)
+                const videoData = fs.readFileSync(videoPath);
+
                 originalTranscript = await extractTranscriptWithTimestamps(videoData, {
                     language: 'auto',
                     model: 'whisper'
@@ -389,10 +458,14 @@ ${segmentsText}
             // ═══════════════════════════════════════════════════════════
             console.log('[Animal Script] 🤖 Step 2/2: Generating Japanese script with Gemini...');
 
+            // Upload to Gemini File API for the vision analysis
+            console.log('[Animal Script] Uploading to Gemini File API...');
+            uploadedFile = await uploadFileToGemini(videoPath, req.file.mimetype, GEMINI_API_KEY);
+
             const script = await generateAnimalChannelScript({
-                inlineData: {
-                    data: videoBase64,
-                    mimeType: req.file.mimetype
+                fileData: {
+                    fileUri: uploadedFile.uri,
+                    mimeType: uploadedFile.mimeType
                 }
             }, {
                 sourceTitle: sourceTitle || '',
@@ -401,26 +474,22 @@ ${segmentsText}
                 originalTranscript: originalTranscript // 🔥 KEY: Pass transcript context
             }, GEMINI_API_KEY);
 
-            // Clean up local file
-            if (fs.existsSync(videoPath)) {
-                fs.unlinkSync(videoPath);
-            }
-
             res.json({
                 success: true,
                 script,
-                originalTranscript: originalTranscript // Include for debugging/reference
+                originalTranscript: originalTranscript
             });
 
         } catch (error) {
             console.error('[Animal Script] Error:', error);
-
-            // Clean up on error
+            res.status(500).json({ error: error.message });
+        } finally {
             if (videoPath && fs.existsSync(videoPath)) {
                 fs.unlinkSync(videoPath);
             }
-
-            res.status(500).json({ error: error.message });
+            if (uploadedFile) {
+                deleteFileFromGemini(GEMINI_API_KEY, uploadedFile.name).catch(e => console.error(e));
+            }
         }
     });
 
@@ -676,8 +745,12 @@ function formatTimestamp(seconds) {
 async function translateSegmentsToKorean(segments, sourceLanguage, GEMINI_API_KEY) {
     const textsToTranslate = segments.map(s => s.text).join('\n');
 
-    const prompt = `다음은 ${sourceLanguage} 언어로 된 영상 대본입니다. 각 줄을 자연스러운 한국어로 번역해주세요.
-타임스탬프와 감정을 고려해서 맥락에 맞게 번역하되, 영상 대본 특성에 맞게 구어체로 번역해주세요.
+    const prompt = `다음은 ${sourceLanguage} 언어로 된 영상 대본입니다. 각 줄을 **한국어 원어민이 말하는 것처럼 자연스러운 구어체(더빙 톤)**로 번역해주세요.
+    
+**번역 가이드라인 (중요):**
+1. **직역 금지**: "좋은 하루 보내시게 해드릴게요" (X) -> "오늘 하루 망치기 싫으면..." 또는 "좋게 말할 때 가시죠" (O) 상황에 맞게 의역하세요.
+2. **구어체 사용**: 문어체나 딱딱한 말투를 피하고, 실제 대화처럼 생생하게 번역하세요.
+3. **감정 반영**: 타임스탬프와 감정 태그를 참고하여, 화자의 기분(화남, 비꼼, 차분함)이 묻어나게 하세요.
 
 원문:
 ${textsToTranslate}
@@ -685,15 +758,15 @@ ${textsToTranslate}
 JSON 형식으로 응답해주세요:
 {
   "translations": [
-    "번역문1",
-    "번역문2",
+    "자연스러운 번역문1",
+    "자연스러운 번역문2",
     ...
   ]
 }
 
 중요: 
-1. 원문의 줄 수(${segments.length}줄)와 **정확히 동일한 개수**의 번역문을 배열에 담아주세요. 하나라도 빠지면 안 됩니다.
-2. 번역이 불필요하거나 어려운 경우에도 원문 그대로라도 넣어주세요. 절대 개수를 줄이지 마세요.`;
+1. 원문의 줄 수(${segments.length}줄)와 **정확히 동일한 개수**의 번역문을 배열에 담아주세요.
+2. 번역이 불필요하면 원문 그대로 두세요. 절대 개수를 줄이지 마세요.`;
 
     try {
         const response = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
