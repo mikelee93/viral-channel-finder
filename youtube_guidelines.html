@@ -118,6 +118,29 @@
                         placeholder="영상 설명을 입력하세요 (선택사항)"></textarea>
                 </div>
 
+                <!-- Comments -->
+                <div class="mb-6">
+                    <label class="block text-slate-300 font-bold mb-2">
+                        💬 바이럴 분석용 댓글 (선택사항)
+                        <span class="text-xs text-slate-500 font-normal ml-2">원본 영상의 베스트 댓글을 넣으면 AI가 더 정확한 하이라이트를
+                            잡습니다</span>
+                    </label>
+                    <!-- URL Scraper Input -->
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="commentUrlInput"
+                            placeholder="YouTube, TikTok, Instagram URL을 입력하면 댓글을 자동으로 긁어옵니다"
+                            class="flex-1 px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-sm focus:border-purple-500 focus:outline-none">
+                        <button type="button" id="scrapeCommentsBtn"
+                            class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors whitespace-nowrap flex items-center gap-2">
+                            <span>🌐 댓글 가져오기</span>
+                        </button>
+                    </div>
+
+                    <textarea id="videoComments" rows="4"
+                        class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none"
+                        placeholder="예: '3:20 이 부분이 진짜 웃김 ㅋㅋ', '마지막 반전 소름돋네 ㄷㄷ' 등\n(여러 댓글을 복사해 넣으셔도 좋습니다)"></textarea>
+                </div>
+
                 <!-- Submit Button -->
                 <button type="submit" id="analyzeBtn"
                     class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02]">
@@ -1505,12 +1528,18 @@
 
                 highlightsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+                // Get metadata from inputs
+                const title = document.getElementById('videoTitle').value;
+                const comments = document.getElementById('videoComments').value;
+
                 try {
                     const response = await fetch('http://localhost:4000/api/guidelines/extract-highlights', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            transcript: currentTranscriptData
+                            transcript: currentTranscriptData,
+                            title: title,
+                            comments: comments
                         })
                     });
 
@@ -1828,10 +1857,18 @@
                     content += `Scene ${i + 1}: ${scene.stage} (${formatTime(scene.start)} - ${formatTime(scene.end)})\n`;
                     content += `------------------------------------\n`;
                     content += `내용: ${scene.description}\n`;
-                    if (scene.narration_draft) content += `내레이션: ${scene.narration_draft}\n`;
                     if (scene.sfx_suggestion) content += `SFX: ${scene.sfx_suggestion}\n`;
+
+                    // Add Narration Section
+                    if (scene.narration_kr || scene.narration_jp) {
+                        content += `\n🗣️ Narration (CapCut 자막용)\n`;
+                        if (scene.narration_kr) content += `🇰🇷 한국어\n"${scene.narration_kr}"\n\n`;
+                        if (scene.narration_jp) content += `🇯🇵 일본어\n"${scene.narration_jp}"\n\n`;
+                        if (scene.narration_pron) content += `🗣️ 발음\n"${scene.narration_pron}"\n`;
+                    }
+
                     content += `\n[대사]\n`;
-                    content += `KR: ${scene.description}\n`; // Using description as KR summary for now or add specific KR text field back if needed
+                    content += `KR: ${scene.description}\n`; // Using description as KR summary
                     if (scene.original_transcript) content += `ORI: ${scene.original_transcript}\n`;
                     if (scene.text_jp) content += `JP: ${scene.text_jp}\n`;
                     if (scene.text_pron) content += `PRON: ${scene.text_pron}\n`;
@@ -1868,6 +1905,7 @@
 
                 let srtContent = '';
                 let index = 1;
+                let accumulatedTime = 0;
 
                 window.currentDirectorPlan.forEach((scene) => {
                     let text = '';
@@ -1880,13 +1918,18 @@
                         default: text = scene.description;
                     }
 
+                    // Calculate duration and relative timestamps for the highlight video
+                    const duration = scene.end - scene.start;
+                    const startTime = accumulatedTime;
+                    const endTime = accumulatedTime + duration;
+
+                    // Update accumulated time for next scene
+                    accumulatedTime += duration;
+
                     if (!text || text.trim() === '') return;
 
-                    const startTime = formatSRTTimestamp(scene.start);
-                    const endTime = formatSRTTimestamp(scene.end);
-
                     srtContent += `${index}\n`;
-                    srtContent += `${startTime} --> ${endTime}\n`;
+                    srtContent += `${formatSRTTimestamp(startTime)} --> ${formatSRTTimestamp(endTime)}\n`;
                     srtContent += `${text}\n\n`;
 
                     index++;
@@ -2082,6 +2125,58 @@
                 const secs = Math.floor(seconds % 60);
                 return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
             }
+
+            // ========================================
+            // COMMENT SCRAPER LOGIC
+            // ========================================
+            document.getElementById('scrapeCommentsBtn').addEventListener('click', async () => {
+                const urlInput = document.getElementById('commentUrlInput');
+                const url = urlInput.value.trim();
+                const btn = document.getElementById('scrapeCommentsBtn');
+                const output = document.getElementById('videoComments');
+
+                if (!url) {
+                    alert('URL을 입력해주세요.');
+                    return;
+                }
+
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="loader w-4 h-4 border-2 border-t-white inline-block mr-2 animate-spin rounded-full"></span> 가져오는 중...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('http://localhost:4000/api/guidelines/scrape-comments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || '댓글 가져오기 실패');
+                    }
+
+                    if (data.comments && data.comments.length > 0) {
+                        const formattedComments = data.comments.join('\n\n');
+                        const existing = output.value ? output.value + '\n\n' : '';
+                        output.value = existing + `--- [${new URL(url).hostname} 댓글] ---\n` + formattedComments;
+
+                        // Flash success
+                        urlInput.value = ''; // Clean input
+                        alert(`✅ ${data.comments.length}개의 댓글을 성공적으로 가져왔습니다!`);
+                    } else {
+                        alert('가져올 댓글이 없습니다.');
+                    }
+
+                } catch (error) {
+                    console.error('Scraper Error:', error);
+                    alert('실패: ' + error.message);
+                } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            });
 
             // ========================================
             // VIDEO CUTTING FUNCTIONALITY

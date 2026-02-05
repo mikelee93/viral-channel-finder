@@ -175,7 +175,7 @@ const PORT = process.env.PORT || 4000;
 const googleSheetsService = require('./google_sheets_service');
 
 // YouTube Guidelines Routes
-require('./guidelines_routes')(app, GEMINI_API_KEY, PERPLEXITY_API_KEY);
+require('./guidelines_routes')(app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_KEY, APIFY_TOKEN);
 
 // VOICEVOX TTS Routes
 const voicevoxRoutes = require('./server/routes/voicevox.routes');

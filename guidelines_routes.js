@@ -22,7 +22,90 @@ const videoUpload = multer({
     }
 });
 
-module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
+const { ApifyClient } = require('apify-client');
+
+module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_KEY, APIFY_TOKEN) {
+
+    // API: Scrape comments from URL (YouTube, TikTok, Instagram)
+    app.post('/api/guidelines/scrape-comments', async (req, res) => {
+        try {
+            const { url } = req.body;
+            if (!url) return res.status(400).json({ error: 'URL is required' });
+
+            console.log(`[Comment Scraper] Processing URL: ${url}`);
+            let comments = [];
+
+            // 1. YouTube
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([^?&]+)/);
+                if (!videoIdMatch) throw new Error('Invalid YouTube URL');
+                const videoId = videoIdMatch[1];
+
+                if (!YOUTUBE_API_KEY) throw new Error('YouTube API Key is missing on server');
+
+                console.log(`[Comment Scraper] Fetching YouTube comments for ID: ${videoId}`);
+                const response = await fetch(`https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}&maxResults=20&order=relevance`);
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error?.message || 'Failed to fetch YouTube comments');
+                }
+
+                const data = await response.json();
+                comments = data.items.map(item => item.snippet.topLevelComment.snippet.textDisplay);
+            }
+
+            // 2. TikTok
+            else if (url.includes('tiktok.com')) {
+                if (!APIFY_TOKEN) throw new Error('Apify Token is missing on server');
+                const client = new ApifyClient({ token: APIFY_TOKEN });
+
+                console.log(`[Comment Scraper] Fetching TikTok comments via Apify...`);
+                // Using clockworks/free-tiktok-scraper
+                const run = await client.actor('clockworks/free-tiktok-scraper').call({
+                    postURLs: [url],
+                    commentsPerVideo: 20,
+                    shouldDownloadVideos: false
+                });
+
+                const { items } = await client.dataset(run.defaultDatasetId).listItems();
+                if (items.length > 0 && items[0].comments) {
+                    comments = items[0].comments.map(c => c.text);
+                } else if (items.length > 0 && items[0].commentsDatasetUrl) {
+                    // Handle separate dataset if needed (simplified for now as usually inline for small batches)
+                    // Try fetching comments dataset
+                    const datasetId = items[0].commentsDatasetUrl.split('/').pop();
+                    const commentItems = await client.dataset(datasetId).listItems();
+                    comments = commentItems.items.map(c => c.text);
+                }
+            }
+
+            // 3. Instagram
+            else if (url.includes('instagram.com')) {
+                if (!APIFY_TOKEN) throw new Error('Apify Token is missing on server');
+                const client = new ApifyClient({ token: APIFY_TOKEN });
+
+                console.log(`[Comment Scraper] Fetching Instagram comments via Apify...`);
+                // Using apify/instagram-comment-scraper
+                const run = await client.actor('apify/instagram-comment-scraper').call({
+                    directUrls: [url],
+                    resultsLimit: 20
+                });
+
+                const { items } = await client.dataset(run.defaultDatasetId).listItems();
+                comments = items.map(item => item.text);
+            } else {
+                return res.status(400).json({ error: 'Unsupported platform. Only YouTube, TikTok, Instagram allowed.' });
+            }
+
+            console.log(`[Comment Scraper] Found ${comments.length} comments`);
+            res.json({ success: true, comments: comments.slice(0, 30) }); // Limit to 30
+
+        } catch (error) {
+            console.error('[Comment Scraper Error]', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
 
     // API: Get all guidelines
     app.get('/api/guidelines', async (req, res) => {
@@ -300,13 +383,14 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
     // API: Extract Viral Highlights (Step 2)
     app.post('/api/guidelines/extract-highlights', async (req, res) => {
         try {
-            const { transcript, narrationStyle } = req.body;
+            const { transcript, narrationStyle, comments, title } = req.body;
 
             if (!transcript || !transcript.segments) {
                 return res.status(400).json({ error: 'Valid transcript data is required' });
             }
 
             console.log('[Highlights] 🔍 Analyzing transcript for viral moments...');
+            if (comments) console.log(`[Highlights] 💬 Applying User Comments for analysis context (${comments.length} chars)`);
 
             // Prepare prompt for Gemini
             // Provide both MM:SS for context and Seconds for precision
@@ -316,10 +400,15 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
 
             const prompt = `
 당신은 100만 구독자를 보유한 유튜브 쇼츠 전문 PD이자 편집자입니다.
-제공된 영상 대본을 분석하여, **하나의 완벽한 65-70초짜리 유튜브 쇼츠/틱톡을 만들기 위한 "편집 설계도(Director's Cut)"**를 작성해주세요.
+제공된 영상 대본과 시청자 댓글을 분석하여, **하나의 완벽한 65-70초짜리 유튜브 쇼츠/틱톡을 만들기 위한 "편집 설계도(Director's Cut)"**를 작성해주세요.
+
+**📺 영상 정보:**
+- 제목: ${title || '미정'}
+- **💬 시청자 주요 반응 (댓글):**
+${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
 
 **목표:**
-단순히 하이라이트를 뽑는 것이 아니라, **기-승-전-결(Intro-BuildUp-Climax-Outro)** 구조를 갖춘 하나의 완성된 스토리라인을 만들되, **원본 대화의 생생한 티키타카**를 최대한 살려주세요.
+단순히 하이라이트를 뽑는 것이 아니라, **시청자 반응이 좋았던 포인트(댓글 참고)**를 중심으로 **기-승-전-결(Intro-BuildUp-Climax-Outro)** 구조를 갖춘 하나의 완성된 스토리라인을 만들어주세요. 특히 **원본 대화의 생생한 티키타카**를 최대한 살려주세요.
 
 **📌 CRITICAL RULES (절대 규칙 - 반드시 준수):**
 1. ✅ **전체 영상 길이는 65-70초 (틱톡 수익화 조건: 1분 1초 이상)**
