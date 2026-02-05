@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube 가이드라인 체크 | Viral Shorts Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -368,7 +369,11 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex justify-between items-center gap-4">
+                    <button id="cutHighlightsVideoBtn" disabled
+                        class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed flex items-center gap-2">
+                        <span>✂️ 하이라이트 영상 자동 생성</span>
+                    </button>
                     <button id="generateFinalScriptBtn" disabled
                         class="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed">
                         🎬 선택한 구간으로 대본 생성 (Step 3)
@@ -1522,7 +1527,8 @@
                             data.viralTitle,
                             data.loopStrategy,
                             data.thumbnailText,
-                            data.sourceInfo
+                            data.sourceInfo,
+                            data  // Pass entire data object
                         );
                     } else if (data.highlights) {
                         // Fallback for old version
@@ -1540,7 +1546,7 @@
                 }
             });
 
-            function displayDirectorPlan(plan, viralTitle, loopStrategy, thumbnailText, sourceInfo) {
+            function displayDirectorPlan(plan, viralTitle, loopStrategy, thumbnailText, sourceInfo, response = {}) {
                 const grid = document.getElementById('highlightsGrid');
                 grid.innerHTML = ''; // Clear existing
 
@@ -1553,10 +1559,54 @@
                             <h3 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">
                                 🎬 AI Director's Cut 설계도
                             </h3>
-                            <p class="text-white text-lg font-bold">제목안: ${viralTitle || '제목 미정'}</p>
+                            
+                            <!-- 3-Language Titles -->
+                            <div class="mb-3">
+                                <p class="text-slate-400 text-xs mb-1">📌 제목안 (3개 국어)</p>
+                                <div class="space-y-1">
+                                    <p class="text-white text-base font-bold">🇰🇷 ${response.viralTitle_kr || viralTitle || '제목 미정'}</p>
+                                    <p class="text-blue-300 text-base font-bold">🇯🇵 ${response.viralTitle_jp || ''}</p>
+                                    <p class="text-orange-300 text-sm font-mono">🗣️ ${response.viralTitle_pron || ''}</p>
+                                </div>
+                            </div>
+                            
                             <p class="text-slate-400 text-sm mt-1">이 설계도를 따라 CapCut에서 편집하세요.</p>
                             
-                            ${thumbnailText ? `
+                            <!-- 3 Thumbnail Options -->
+                            ${response.thumbnailText && Array.isArray(response.thumbnailText) ? `
+                            <div class="mt-4">
+                                <span class="text-yellow-400 font-bold text-xs block mb-2">🎨 썸네일 문구 추천 3가지 (CapCut용)</span>
+                                <div class="grid grid-cols-1 gap-2">
+                                    ${response.thumbnailText.map((thumb, idx) => `
+                                        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-yellow-500 transition-colors">
+                                            <div class="text-[10px] text-slate-500 mb-1">${thumb.strategy || `대안 ${idx + 1}`}</div>
+                                            
+                                            <!-- Line 1 -->
+                                            <div class="mb-2">
+                                                <div class="text-yellow-300 font-black text-lg leading-tight mb-1">
+                                                    ${thumb.line1_jp || thumb.line1 || ''}
+                                                </div>
+                                                <div class="text-orange-300 font-mono text-xs mb-1">
+                                                    ${thumb.line1_pron || ''}
+                                                </div>
+                                                ${thumb.line1_kr ? `<div class="text-slate-400 text-xs">🇰🇷 ${thumb.line1_kr}</div>` : ''}
+                                            </div>
+                                            
+                                            <!-- Line 2 -->
+                                            <div>
+                                                <div class="text-red-400 font-bold text-base leading-tight mb-1">
+                                                    ${thumb.line2_jp || thumb.line2 || ''}
+                                                </div>
+                                                <div class="text-orange-300 font-mono text-xs mb-1">
+                                                    ${thumb.line2_pron || ''}
+                                                </div>
+                                                ${thumb.line2_kr ? `<div class="text-slate-400 text-xs">🇰🇷 ${thumb.line2_kr}</div>` : ''}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ` : thumbnailText ? `
                             <div class="mt-4 bg-slate-800/50 border border-slate-700 rounded-lg p-3 max-w-md">
                                 <span class="text-yellow-400 font-bold text-xs block mb-2">🎨 썸네일 문구 (CapCut용)</span>
                                 <div class="text-white font-black text-xl leading-tight mb-1">${thumbnailText.line1}</div>
@@ -1579,15 +1629,57 @@
 
                 // Add Download Buttons
                 grid.parentElement.insertAdjacentHTML('afterbegin', `
-                    <div class="flex gap-2 mb-4 justify-end">
+                    <div class="flex gap-2 mb-4 justify-end flex-wrap">
+                        <button onclick="downloadDirectorImage()" class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+                            📸 설계도 이미지 저장 (.png)
+                        </button>
                         <button onclick="downloadFullTranscript()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                             📄 전체 대본 다운로드 (.txt)
                         </button>
                         <button onclick="downloadDirectorScript()" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                             🎬 하이라이트 대본 다운로드 (.txt)
                         </button>
+                        <div class="relative">
+                            <button id="srtDropdownBtn" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+                                📝 SRT 자막 다운로드 ▼
+                            </button>
+                            <div id="srtDropdownMenu" class="hidden absolute right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden z-50 min-w-[200px]">
+                                <button onclick="downloadSRT('en')" class="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors text-sm flex items-center gap-2">
+                                    🇺🇸 영어 (English)
+                                </button>
+                                <button onclick="downloadSRT('jp')" class="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors text-sm flex items-center gap-2">
+                                    🇯🇵 일본어 (Japanese)
+                                </button>
+                                <button onclick="downloadSRT('pron')" class="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors text-sm flex items-center gap-2">
+                                    🗣️ 일본어 발음 (Korean Pron.)
+                                </button>
+                                <button onclick="downloadSRT('kr')" class="w-full text-left px-4 py-2 text-white hover:bg-slate-700 transition-colors text-sm flex items-center gap-2">
+                                    🇰🇷 한국어 (Korean)
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 `);
+
+                // Add SRT dropdown toggle functionality
+                setTimeout(() => {
+                    const srtBtn = document.getElementById('srtDropdownBtn');
+                    const srtMenu = document.getElementById('srtDropdownMenu');
+
+                    if (srtBtn && srtMenu) {
+                        srtBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            srtMenu.classList.toggle('hidden');
+                        });
+
+                        // Close dropdown when clicking outside
+                        document.addEventListener('click', (e) => {
+                            if (!srtBtn.contains(e.target) && !srtMenu.contains(e.target)) {
+                                srtMenu.classList.add('hidden');
+                            }
+                        });
+                    }
+                }, 100);
 
                 // Render Plan Items
                 plan.forEach((scene, index) => {
@@ -1617,7 +1709,7 @@
                                 ${scene.narration_pron ? `
                                 <div>
                                     <span class="text-[10px] text-slate-500 block">🗣️ 발음</span>
-                                    <p class="text-orange-300 text-sm font-mono">"${scene.naration_pron}"</p>
+                                    <p class="text-orange-300 text-sm font-mono">"${scene.narration_pron}"</p>
                                 </div>` : ''}
                             </div>
                         </div>` : '';
@@ -1647,13 +1739,13 @@
                                 </div>` : ''}
                                 ${scene.text_jp ? `
                                 <div>
-                                    <span class="text-[10px] text-slate-500 block">🇯🇵 일본어 (번역)</span>
-                                    <p class="text-blue-300 text-sm font-bold">"${scene.text_jp}"</p>
+                                    <span class="text-[10px] text-slate-500 block">🇯🇵 일본어 (번역) - "/" 구분</span>
+                                    <p class="text-blue-300 text-sm font-bold leading-relaxed">"${scene.text_jp.replace(/\//g, '<span class="text-yellow-400 mx-1 font-black">/</span>')}"</p>
                                 </div>` : ''}
                                 ${scene.text_pron ? `
                                 <div>
-                                    <span class="text-[10px] text-slate-500 block">🗣️ 일본어 발음</span>
-                                    <p class="text-orange-300 text-xs font-mono">"${scene.text_pron}"</p>
+                                    <span class="text-[10px] text-slate-500 block">🗣️ 일본어 발음 - "/" 구분</span>
+                                    <p class="text-orange-300 text-xs font-mono leading-relaxed">"${scene.text_pron.replace(/\//g, '<span class="text-yellow-400 mx-1 font-black">/</span>')}"</p>
                                 </div>` : ''}
                             </div>
                         </details>` : '';
@@ -1693,14 +1785,21 @@
                 // Store plan for Step 3
                 window.currentDirectorPlan = plan;
 
-                // Enable Step 3 Button
+                // Enable Step 3 Buttons
                 if (plan.length > 0) {
-                    const btn = document.getElementById('generateFinalScriptBtn');
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    btn.onclick = generateFinalScript; // Bind the function
-                    // Scroll to button
-                    setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+                    const scriptBtn = document.getElementById('generateFinalScriptBtn');
+                    scriptBtn.disabled = false;
+                    scriptBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    scriptBtn.onclick = generateFinalScript; // Bind the function
+
+                    // Enable video cutting button
+                    const cutBtn = document.getElementById('cutHighlightsVideoBtn');
+                    cutBtn.disabled = false;
+                    cutBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    cutBtn.onclick = cutHighlightsVideo; // Bind the function
+
+                    // Scroll to buttons
+                    setTimeout(() => cutBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
                 }
             }
 
@@ -1750,6 +1849,115 @@
                 a.download = filename;
                 a.click();
                 window.URL.revokeObjectURL(url);
+            }
+
+            // Download SRT subtitle file
+            window.downloadSRT = function (language) {
+                if (!window.currentDirectorPlan || window.currentDirectorPlan.length === 0) {
+                    alert('하이라이트 데이터가 없습니다.');
+                    return;
+                }
+
+                let langName = 'Unknown';
+                switch (language) {
+                    case 'en': langName = 'English'; break;
+                    case 'jp': langName = 'Japanese'; break;
+                    case 'pron': langName = 'Japanese_Pronunciation'; break;
+                    case 'kr': langName = 'Korean'; break;
+                }
+
+                let srtContent = '';
+                let index = 1;
+
+                window.currentDirectorPlan.forEach((scene) => {
+                    let text = '';
+
+                    switch (language) {
+                        case 'en': text = scene.original_transcript || scene.description; break;
+                        case 'jp': text = scene.text_jp || scene.narration_jp || ''; break;
+                        case 'pron': text = scene.text_pron || scene.narration_pron || ''; break;
+                        case 'kr': text = scene.text_kr || scene.narration_kr || scene.description; break;
+                        default: text = scene.description;
+                    }
+
+                    if (!text || text.trim() === '') return;
+
+                    const startTime = formatSRTTimestamp(scene.start);
+                    const endTime = formatSRTTimestamp(scene.end);
+
+                    srtContent += `${index}\n`;
+                    srtContent += `${startTime} --> ${endTime}\n`;
+                    srtContent += `${text}\n\n`;
+
+                    index++;
+                });
+
+                if (srtContent === '') {
+                    alert('선택한 언어의 자막 데이터가 없습니다.');
+                    return;
+                }
+
+                const blob = new Blob([srtContent], { type: 'text/plain; charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `highlights_${langName}_${Date.now()}.srt`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            // Download Director Plan as Image
+            window.downloadDirectorImage = async function () {
+                const element = document.getElementById('highlightsGrid');
+                if (!element) return;
+
+                const btn = event.currentTarget || document.querySelector('button[onclick="downloadDirectorImage()"]');
+                const originalText = btn ? btn.innerHTML : '📸 설계도 이미지 저장 (.png)';
+                if (btn) btn.innerHTML = '⏳ 캡처 준비...';
+
+                try {
+                    // 1. 모든 Details 열기 (숨겨진 내용 캡처 위해)
+                    const details = element.querySelectorAll('details');
+                    details.forEach(d => d.open = true);
+
+                    // 2. 렌더링 안정화를 위해 잠시 대기
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                    if (btn) btn.innerHTML = '📸 저장 중...';
+
+                    // 3. html2canvas 캡처 (전체 높이 설정)
+                    const canvas = await html2canvas(element, {
+                        backgroundColor: '#111827', // dark-gray-900 background
+                        scale: 2, // High resolution
+                        logging: false,
+                        useCORS: true,
+                        allowTaint: true,
+                        scrollY: -window.scrollY,      // Handle current scroll position
+                        windowWidth: document.documentElement.offsetWidth,
+                        height: element.scrollHeight + 50, // Force full height
+                        windowHeight: element.scrollHeight + 100
+                    });
+
+                    const link = document.createElement('a');
+                    link.download = `director_plan_full_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } catch (err) {
+                    console.error('Image capture error:', err);
+                    alert('이미지 저장 실패: ' + err.message);
+                } finally {
+                    if (btn) btn.innerHTML = originalText;
+                }
+            }
+
+            // Helper: Format timestamp for SRT (HH:MM:SS,mmm)
+            function formatSRTTimestamp(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
+                const millis = Math.floor((seconds % 1) * 1000);
+
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(millis).padStart(3, '0')}`;
             }
 
             async function generateFinalScript() {
@@ -1873,6 +2081,72 @@
                 const mins = Math.floor(seconds / 60);
                 const secs = Math.floor(seconds % 60);
                 return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+
+            // ========================================
+            // VIDEO CUTTING FUNCTIONALITY
+            // ========================================
+            async function cutHighlightsVideo() {
+                if (!window.currentDirectorPlan || window.currentDirectorPlan.length === 0) {
+                    alert('하이라이트가 선택되지 않았습니다.');
+                    return;
+                }
+
+                if (!selectedFile) {
+                    alert('원본 영상 파일이 필요합니다. 영상을 다시 업로드해주세요.');
+                    return;
+                }
+
+                const cutBtn = document.getElementById('cutHighlightsVideoBtn');
+                const originalHTML = cutBtn.innerHTML;
+                cutBtn.disabled = true;
+                cutBtn.innerHTML = '<span class="loader w-5 h-5 border-2 border-t-white mr-2"></span> 영상 편집 중... (최대 1-2분 소요)';
+
+                try {
+                    // Extract highlights array from director plan
+                    const highlights = window.currentDirectorPlan.map(scene => ({
+                        start: scene.start,
+                        end: scene.end
+                    }));
+
+                    console.log('[Video Cut] Cutting highlights:', highlights);
+
+                    // Create form data
+                    const formData = new FormData();
+                    formData.append('video', selectedFile);
+                    formData.append('highlights', JSON.stringify(highlights));
+
+                    // Send to API
+                    const response = await fetch('http://localhost:4000/api/guidelines/cut-highlights', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || '영상 편집에 실패했습니다');
+                    }
+
+                    // Download the generated video
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `highlights_${Date.now()}.mp4`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    alert('✅ 하이라이트 영상이 성공적으로 생성되었습니다!\n다운로드를 확인하세요.');
+
+                } catch (error) {
+                    console.error('[Video Cut] Error:', error);
+                    alert('❌ 오류 발생: ' + error.message);
+                } finally {
+                    cutBtn.disabled = false;
+                    cutBtn.innerHTML = originalHTML;
+                }
             }
 
         </script>

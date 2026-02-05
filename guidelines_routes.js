@@ -316,42 +316,93 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY) {
 
             const prompt = `
 당신은 100만 구독자를 보유한 유튜브 쇼츠 전문 PD이자 편집자입니다.
-제공된 영상 대본을 분석하여, **하나의 완벽한 60초짜리 유튜브 쇼츠를 만들기 위한 "편집 설계도(Director's Cut)"**를 작성해주세요.
+제공된 영상 대본을 분석하여, **하나의 완벽한 65-70초짜리 유튜브 쇼츠/틱톡을 만들기 위한 "편집 설계도(Director's Cut)"**를 작성해주세요.
 
 **목표:**
-단순히 하이라이트를 뽑는 것이 아니라, **기-승-전-결(Intro-BuildUp-Climax-Outro)** 구조를 갖춘 하나의 완성된 스토리라인을 만들어주세요.
+단순히 하이라이트를 뽑는 것이 아니라, **기-승-전-결(Intro-BuildUp-Climax-Outro)** 구조를 갖춘 하나의 완성된 스토리라인을 만들되, **원본 대화의 생생한 티키타카**를 최대한 살려주세요.
 
 **📌 CRITICAL RULES (절대 규칙 - 반드시 준수):**
-1. ✅ **전체 영상 길이는 정확히 60초 이내**
-   - 모든 scene의 duration 합계가 60초를 초과하면 안 됨
-   - Outro는 반드시 5초 이내로 제한
+1. ✅ **전체 영상 길이는 65-70초 (틱톡 수익화 조건: 1분 1초 이상)**
+   - 모든 scene의 duration 합계가 65-70초 범위여야 함
+   - Outro는 2-3초로 제한 (짧은 CTA만)
    
-2. ✅ **모든 scene에 text_kr, text_jp, text_pron을 반드시 포함**
+2. ✅ **연속된 대화 블록으로 구성 (티키타카 살리기)**
+   - 각 씬은 최소 10초 이상의 연속된 대화여야 함
+   - 2-4초짜리 짧은 씬은 절대 금지
+   - 대화의 자연스러운 흐름이 끊기지 않도록
+   - 질문-답변, 주장-반박 등 완결된 대화 교환 포함
+   
+3. ✅ **모든 scene에 text_kr, text_jp, text_pron을 반드시 포함 (자막용 "/" 구분)**
    - text_kr: 원문의 한국어 번역 (description 아님!)
-   - text_jp: YouTube Shorts 최적화 일본어 구어체
-   - text_pron: 일본어의 한글 발음 (예: "아레와 조-쿠...")
+   - text_jp: YouTube Shorts 최적화 일본어 구어체, **긴 문장은 "/"로 나눠서 표시**
+     * 예: "警察: 窓開けてもらえます？/ できないの？レンタカー？"
+     * 말의 흐름대로 자연스럽게 끊기 (호흡, 문장 단위)
+     * 사람 A/B 대화 교환 시 "/"로 구분
+   - text_pron: 일본어의 한글 발음, **일본어와 동일하게 "/"로 나눔**
+     * 예: "케이사츠: 마도 아케테 모라에마스？/ 데키나이노？ 렌타카-？"
    
-3. ✅ **original_transcript는 해당 구간의 실제 대사만 포함**
+4. ✅ **original_transcript는 해당 구간의 실제 대사만 포함**
    - 타임라인 범위 내의 대사만 정확히 추출
+   - 연속된 대화를 모두 포함할 것
    - 전체 대본을 뭉쳐서 넣지 말 것
 
-4. ✅ **Narration 구조 (CapCut 자막용)**
-   - **Intro (1개)**: 3초 내 시청자를 사로잡는 강력한 후킹 멘트
-   - **Body (1-2개)**: 중간 환기 또는 상황 간단 설명
-   - **Outro (1개)**: 댓글 유도 CTA (구독 요청 금지)
+5. ✅ **Narration 최소화 (대화가 메인!)**
+   - **Intro (1개 필수)**: 4초 내 시청자를 사로잡는 강력한 후킹 멘트
+   - **Body (0-1개만)**: 중간 환기용, 대화 흐름을 끊지 않는 위치에만
+   - **Outro (1개 필수)**: 댓글 유도 CTA (구독 요청 금지)
    - 각 narration은 narration_kr, narration_jp, narration_pron 세트로 제공
+   - 나레이션은 대화 사이의 자연스러운 갭(침묵)에만 삽입
+
+**⚠️ CRITICAL: 타임스탬프는 반드시 원본 영상의 실제 위치를 사용하세요!**
+- start/end 값은 위에 제공된 "영상 대본"의 실제 타임스탬프를 그대로 사용
+- 절대로 0초부터 시작하는 연속된 값을 만들지 마세요
+- 예: start: 322.5 (5분 22.5초), end: 326.0 (5분 26초)
 
 **편집 구조 가이드 & 필수 요소:**
-1. **Intro (0-5초):** 시청자의 시선을 3초 안에 사로잡는 강력한 후킹.
+1. **Intro (총 4초 분량):** 시청자의 시선을 사로잡는 강력한 후킹.
    - **필수**: narration_kr, narration_jp, narration_pron
-2. **Body (5-45초):** 사건의 전개, 긴장감 고조.
-   - 일부 scene에 narration 추가 (환기/설명용, 1-2개만)
-3. **Climax (45-55초):** 감정 폭발, 반전, 가장 재미있는 순간.
-4. **Outro (55-60초, 최대 5초):**
+   - 가장 충격적이거나 호기심을 유발하는 한 문장
+   - 원본 영상에서 가장 임팩트 있는 구간 선택
+   
+2. **Body (총 50-54초 분량):** 사건의 전개, 긴장감 고조. **연속된 대화 블록 2-3개**
+   - 각 블록은 10-20초 길이의 자연스러운 대화
+   - narration은 최대 1개만 (중간 환기용, 대화 흐름을 끊지 않는 위치)
+   - 대화의 티키타카, 감정 변화, 긴장감 상승을 자연스럽게 보여줄 것
+   - 원본 영상의 실제 타임스탬프 사용 (예: 75.0-95.0, 104.0-122.0 등)
+   
+3. **Climax (총 10초 분량):** 감정 폭발, 반전, 가장 재미있는 순간.
+   - 연속된 대화로 구성
+   - 나레이션 없이 대화만으로 클라이맥스 전달
+   - 원본 영상의 실제 타임스탬프 사용
+   
+4. **Outro (총 2-3초 분량):**
    - **필수**: narration_kr, narration_jp, narration_pron (CTA 콜)
-   - 예: "여러분은 어떻게 생각하세요? 댓글로 알려주세요!"
+   - 예: "과연 결말은? 댓글로 여러분의 생각을 알려주세요!"
+   - 원본 영상의 마지막 부분 또는 루프 연결 구간
+   
 5. **Infinite Loop 전략:**
    - 마지막이 처음으로 자연스럽게 이어지도록 설계
+
+6. **📸 썸네일 문구 전략 (3개 대안 필수)**
+   - **대안 1 (숫자 후킹)**: 반드시 숫자를 포함하여 클릭률 극대화
+     * 예: "ハンマーで釘を打てば800万円" (800만엔)
+     * 예: "ラスト2分" (마지막 2분)
+     * 예: "158kmのストレートを背中に受けたら" (158km)
+     * 숫자는 시간, 금액, 속도, 순위, 거리 등 무엇이든 가능
+   - **대안 2 (엔딩 스포일러)**: 영상 마지막 장면의 결과를 암시
+     * 끝까지 보지 않으면 궁금한 문구
+     * 예: "彼が絶対に後悔しない理由" (그가 절대 후회하지 않는 이유)
+     * 예: "最下位でも自国に帰られていた理由" (최하위여도 자국에 돌아갈 수 있었던 이유)
+   - **대안 3 (숫자 또는 충격)**: 숫자나 충격적인 사실 중 선택
+     * 대안 1과 다른 숫자 사용 또는
+     * 시청자가 믿기 어려운 충격적인 사실
+   - **모든 대안**: 한국어(line1_kr, line2_kr) + 일본어(line1_jp, line2_jp) + 발음(line1_pron, line2_pron)
+
+**💡 대화 흐름 최적화 규칙:**
+- 각 scene은 **완결된 대화 교환**이어야 함 (질문-답변, 주장-반박 등)
+- 원본 대사의 티키타카와 감정 변화를 최대한 살릴 것
+- 나레이션은 대화 사이의 자연스러운 갭에만 삽입
+- 대화 중간을 자르지 말고, 한 블록의 대화가 완결되도록
 
 **영상 대본:**
 ${segmentsText}
@@ -362,36 +413,85 @@ ${segmentsText}
     {
       "stage": "Intro",
       "start": 12.52,
-      "end": 15.08,
+      "end": 16.50,
       "description": "이 구간을 사용하여 시청자의 이목을 집중시킴",
-      "reason": "운전자가 경찰에게 소리치는 충격적인 장면으로 시작하여 호기심 유발",
-      "original_transcript": "해당 구간(12.52-15.08)의 실제 대사만 작성",
-      "text_kr": "경찰관님, 외교 특권입니다.",
-      "text_jp": "警官さん、外交特権です。",
-      "text_pron": "케이칸상, 가이코 토쿠켄 데스.",
-      "narration_kr": "외교 특권을 주장하는 슈퍼카 운전자?!",
-      "narration_jp": "外交特権を主張するスーパーカーの運転手？！",
-      "narration_pron": "가이코 토쿠켄오 슈초스루 수-파-카-노 운텐슈?!",
+      "reason": "운전자가 왕족임을 암시하며 외교 특권을 주장하는 충격적인 장면으로 시작하여 호기심 유발",
+      "original_transcript": "해당 구간(12.52-16.50)의 실제 대사를 모두 포함 (연속된 대화)",
+      "text_kr": "특히 우리 나라와 당신네 나라가 함께하는 사업을 고려하면, 왕족 일원이 체포되는 건 좋지 않아 보일 겁니다.",
+      "text_jp": "特に我が国とあなたの国がビジネスしてることを考えると、王族の一員が逮捕されるのはマズイでしょ。",
+      "text_pron": "토쿠니 와가쿠니토 아나타노 쿠니가 비지네스 시테루코토오 칸가에루토, 오-조쿠노 이치인가 타이호사레루노와 마즈이데쇼.",
+      "narration_kr": "외교 특권을 주장하는 왕족?! 충격적인 교통 단속 현장!",
+      "narration_jp": "外交特権を主張する王族？！衝撃の交通取り締まり現場！",
+      "narration_pron": "가이코-톳켄오 슈초-스루 오-조쿠?! 쇼-게키노 코-츠-토리시마리 겐바!",
       "sfx_suggestion": "쾅 소리, 사이렌 소리 등 효과음 가이드 (없으면 null)"
+    },
+    {
+      "stage": "Body",
+      "start": 61.15,
+      "end": 81.21,
+      "description": "경찰과 운전자의 첫 만남, 면허 없음 폭탄 선언, 연속된 대화 티키타카",
+      "reason": "자연스러운 대화 흐름을 통해 상황의 심각성과 운전자의 태도를 보여줌",
+      "original_transcript": "해당 구간의 모든 연속된 대화 포함 (최소 10초 이상)",
+      "text_kr": "면허증과 등록증을 보여주세요. 면허가 없어요. 아랍에미리트 출신이거든요.",
+      "text_jp": "免許証と車検証見せて。免許持ってない。UAEから来たんで。",
+      "text_pron": "멘쿄쇼-토 샤켄쇼- 미세테. 멘쿄 못테나이. 유-에이이-카라 키탄데.",
+      "narration_kr": null,
+      "narration_jp": null,
+      "narration_pron": null,
+      "sfx_suggestion": null
     }
   ],
-  "viralTitle": "생성된 쇼츠의 예상 제목 (한 줄, 60자 이내)",
-  "thumbnailText": {
-    "line1": "썸네일 첫 줄 텍스트 (강렬한 키워드, 15자 이내)",
-    "line2": "썸네일 두번째 줄 (부가 설명, 20자 이내)"
-  },
+  "viralTitle_kr": "생성된 쇼츠의 예상 제목 한국어 (한 줄, 50자 이내)",
+  "viralTitle_jp": "생성된 쇼츠의 예상 제목 일본어 (한 줄, 50자 이내)",
+  "viralTitle_pron": "일본어 제목의 한글 발음",
+  "thumbnailText": [
+    {
+      "line1_kr": "썸네일 첫 줄 한국어",
+      "line1_jp": "썸네일 첫 줄 일본어 (노란색, 15자 이내)",
+      "line1_pron": "첫 줄 한글 발음",
+      "line2_kr": "썸네일 두번째 줄 한국어",
+      "line2_jp": "썸네일 두번째 줄 일본어 (빨간색, 20자 이내)",
+      "line2_pron": "두번째 줄 한글 발음",
+      "strategy": "숫자 포함 (예: 2분, 800万円, 158km 등) - 클릭률 극대화"
+    },
+    {
+      "line1_kr": "대안 1 첫 줄 한국어",
+      "line1_jp": "대안 1 첫 줄 일본어",
+      "line1_pron": "첫 줄 한글 발음",
+      "line2_kr": "대안 1 두번째 줄 한국어",
+      "line2_jp": "대안 1 두번째 줄 일본어",
+      "line2_pron": "두번째 줄 한글 발음",
+      "strategy": "영상 엔딩 스포일러 - 끝까지 볼 수밖에 없게 만들기"
+    },
+    {
+      "line1_kr": "대안 2 첫 줄 한국어",
+      "line1_jp": "대안 2 첫 줄 일본어",
+      "line1_pron": "첫 줄 한글 발음",
+      "line2_kr": "대안 2 두번째 줄 한국어",
+      "line2_jp": "대안 2 두번째 줄 일본어",
+      "line2_pron": "두번째 줄 한글 발음",
+      "strategy": "숫자 또는 충격적인 사실"
+    }
+  ],
   "sourceInfo": "영상 출처 또는 채널명 (대본에서 추정 가능하면 작성, 없으면 'Unknown')",
   "loopStrategy": "이 영상의 무한 루프 연결 포인트 설명",
-  "estimatedDuration": 58
+  "estimatedDuration": 68
 }
 
 **⚠️ 최종 체크리스트:**
-- [ ] 전체 duration 합계가 60초 이내인가?
-- [ ] Outro가 5초 이내인가?
+- [ ] **타임스탬프가 원본 영상의 실제 위치인가? (0초부터 시작 ❌)**
+- [ ] 전체 duration 합계가 65-70초인가?
+- [ ] 각 씬이 최소 10초 이상인가? (Intro/Outro 제외)
+- [ ] Outro가 2-3초인가?
 - [ ] 모든 scene에 text_kr, text_jp, text_pron 있는가?
+- [ ] **text_jp와 text_pron이 "/"로 적절히 나뉘어 있는가?**
 - [ ] Intro에 narration이 있는가? (3개 국어)
+- [ ] Body narration이 최대 1개인가?
 - [ ] Outro에 CTA narration이 있는가? (3개 국어)
-- [ ] thumbnailText가 2줄로 생성되었는가?
+- [ ] **viralTitle이 3개 국어(kr, jp, pron)로 생성되었는가?**
+- [ ] **thumbnailText가 3개 대안으로 생성되었는가? (각각 2줄, 일본어+발음)**
+- [ ] original_transcript가 해당 구간의 연속된 대화를 모두 포함하는가?
+- [ ] 대화의 티키타카가 자연스럽게 이어지는가?
 `;
 
             const response = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
@@ -402,7 +502,18 @@ ${segmentsText}
             res.json({
                 success: true,
                 directorPlan: response.directorPlan,
-                viralTitle: response.viralTitle,
+
+                // Titles
+                viralTitle: response.viralTitle, // Legacy
+                viralTitle_kr: response.viralTitle_kr,
+                viralTitle_jp: response.viralTitle_jp,
+                viralTitle_pron: response.viralTitle_pron,
+
+                // Metadata
+                thumbnailText: response.thumbnailText,
+                loopStrategy: response.loopStrategy,
+                sourceInfo: response.sourceInfo,
+
                 estimatedDuration: response.estimatedDuration
             });
 

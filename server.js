@@ -180,9 +180,11 @@ require('./guidelines_routes')(app, GEMINI_API_KEY, PERPLEXITY_API_KEY);
 // VOICEVOX TTS Routes
 const voicevoxRoutes = require('./server/routes/voicevox.routes');
 const productionRoutes = require('./server/routes/production.routes');
+const guidelinesRoutes = require('./server/routes/guidelines.routes');
 
 app.use('/api/voicevox', voicevoxRoutes);
 app.use('/api/production', productionRoutes);
+app.use('/api/guidelines', guidelinesRoutes);
 
 // URL 분석 서비스
 const { analyzeVideoUrl, isValidUrl } = require('./server/services/url-analyzer.service');
