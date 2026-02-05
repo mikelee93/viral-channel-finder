@@ -392,14 +392,10 @@
                     </div>
                 </div>
 
-                <div class="flex justify-between items-center gap-4">
+                <div class="flex justify-center items-center gap-4">
                     <button id="cutHighlightsVideoBtn" disabled
-                        class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed flex items-center gap-2">
-                        <span>✂️ 하이라이트 영상 자동 생성</span>
-                    </button>
-                    <button id="generateFinalScriptBtn" disabled
-                        class="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed">
-                        🎬 선택한 구간으로 대본 생성 (Step 3)
+                        class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-8 rounded-xl transition-all transform hover:scale-[1.05] opacity-50 cursor-not-allowed flex items-center justify-center gap-2">
+                        <span>✂️ 하이라이트 영상 자동 생성 (FFmpeg)</span>
                     </button>
                 </div>
             </div>
@@ -509,19 +505,9 @@
                 <div class="mb-8">
                     <h3 class="text-xl font-bold text-white mb-4">📝 일본어 대본</h3>
                     <div class="bg-slate-800/50 rounded-xl p-6">
-                        <div class="flex gap-3 mb-4">
-                            <button id="autoGenerateScriptBtn"
-                                class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-lg">
-                                🤖 자동 생성 (Gemini)
-                            </button>
-                            <button id="manualScriptBtn"
-                                class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg">
-                                ✏️ 직접 입력
-                            </button>
-                        </div>
 
-                        <!-- Timeline Editor -->
-                        <div id="timelineEditor" class="space-y-4 hidden">
+                        <!-- Timeline Editor (Always Visible) -->
+                        <div id="timelineEditor" class="space-y-4">
                             <div class="bg-slate-900/50 rounded-lg p-4">
                                 <label class="text-slate-300 font-bold mb-2 block">타임라인 대본</label>
                                 <textarea id="scriptTextarea" rows="10"
@@ -536,19 +522,6 @@
                             </div>
                         </div>
 
-                        <!-- Generated Script Display -->
-                        <div id="generatedScriptDisplay" class="hidden">
-                            <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
-                                <p class="text-green-400 font-bold mb-2">✅ 대본 생성 완료</p>
-                                <div id="generatedScriptContent"
-                                    class="text-white whitespace-pre-wrap font-mono text-sm">
-                                </div>
-                            </div>
-                            <button id="editGeneratedScriptBtn"
-                                class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg">
-                                ✏️ 수정하기
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -1088,89 +1061,9 @@
                 }
             });
 
-            // Manual script input (Always allowed)
-            document.getElementById('manualScriptBtn').addEventListener('click', () => {
-                document.getElementById('timelineEditor').classList.remove('hidden');
-                document.getElementById('generatedScriptDisplay').classList.add('hidden');
-                checkTTSButtonState();
 
-                // Ensure section is visible if opened manually (e.g. future standalone mode)
-                // In current layout, buttons are inside the section, so section must be visible first.
-                // But just in case we add a global entry point:
-                document.getElementById('voicevoxSection').classList.remove('hidden');
-                checkVoicevoxConnection();
-            });
 
-            // Auto generate script with Gemini
-            document.getElementById('autoGenerateScriptBtn').addEventListener('click', async () => {
-                if (!window.currentVideoAnalysis) {
-                    alert('⚠️ 자동 대본 생성은 영상 분석 데이터가 필요합니다.\n먼저 상단의 "가이드라인 분석 시작"을 진행해주세요.\n\n(직접 입력은 언제든지 가능합니다!)');
-                    return;
-                }
 
-                const btn = document.getElementById('autoGenerateScriptBtn');
-                const originalText = btn.textContent;
-                btn.textContent = '⏳ Gemini로 생성 중...';
-                btn.disabled = true;
-
-                try {
-                    const response = await fetch('http://localhost:4000/api/voicevox/generate-script', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            videoAnalysis: window.currentVideoAnalysis,
-                            duration: 15
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.message || '대본 생성에 실패했습니다');
-                    }
-
-                    displayGeneratedScript(data.script);
-
-                } catch (error) {
-                    alert('오류: ' + error.message);
-                } finally {
-                    btn.textContent = originalText;
-                    btn.disabled = false;
-                }
-            });
-
-            function displayGeneratedScript(script) {
-                let scriptSummary = script.scriptSummary || '일본어 쇼츠 대본이 생성되었습니다.';
-                let scriptText = '';
-
-                if (script.timeline) {
-                    script.timeline.forEach(segment => {
-                        // Display Format: [0-3초] JP: ... / KR: ... / 발음: ...
-                        scriptText += `[${segment.start}-${segment.end}초]\n`;
-                        scriptText += `🇯🇵 일본어: ${segment.text_jp}\n`;
-                        scriptText += `🇰🇷 한국어: ${segment.text_kr}\n`;
-                        scriptText += `🗣️ 발음: ${segment.text_pron}\n\n`;
-                    });
-                }
-
-                document.getElementById('generatedScriptContent').innerHTML = `
-                    <div class="mb-4 text-brand-400 font-bold">${scriptSummary}</div>
-                    <div class="whitespace-pre-wrap font-medium">${scriptText}</div>
-                `;
-                document.getElementById('generatedScriptDisplay').classList.remove('hidden');
-                document.getElementById('timelineEditor').classList.add('hidden');
-
-                // Copy to textarea for potential editing
-                document.getElementById('scriptTextarea').value = scriptText;
-
-                checkTTSButtonState();
-            }
-
-            // Edit generated script
-            document.getElementById('editGeneratedScriptBtn').addEventListener('click', () => {
-                document.getElementById('timelineEditor').classList.remove('hidden');
-                document.getElementById('generatedScriptDisplay').classList.add('hidden');
-            });
 
             // Generate TTS
             document.getElementById('generateTTSBtn').addEventListener('click', async () => {
@@ -1185,10 +1078,12 @@
                     return;
                 }
 
-                // Extract Japanese text for TTS
-                // We need to extract the parts after "🇯🇵 일본어: " and before the next line
+                // Extract Japanese text and Timestamps for SRT
                 const lines = scriptText.split('\n');
                 let cleanText = '';
+                let srtContent = '';
+                let srtIndex = 1;
+                let currentStartTime = 0;
 
                 if (scriptText.includes('🇯🇵 일본어:')) {
                     // Trilingual format
@@ -1196,64 +1091,163 @@
                         .filter(line => line.includes('🇯🇵 일본어:'))
                         .map(line => line.replace('🇯🇵 일본어:', '').trim())
                         .join('\n');
-                } else {
-                    // Legacy or direct format
-                    cleanText = lines
-                        .map(line => line.replace(/^\[.*?\]\s*/, '')) // Remove [0-3초] markers
-                        .filter(line => line.trim())
-                        .join('\n');
-                }
 
-                const btn = document.getElementById('generateTTSBtn');
-                const originalText = btn.textContent;
-                btn.textContent = '⏳ 음성 생성 중...';
-                btn.disabled = true;
+                    // Generate SRT
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (line.match(/^\[(\d+)-(\d+)초\]/)) { // Match [0-3초]
+                            const timeMatch = line.match(/^\[(\d+)-(\d+)초\]/);
+                            if (!window.selectedSpeakerId) {
+                                alert('캐릭터를 먼저 선택해주세요');
+                                return;
+                            }
 
-                try {
-                    const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            text: cleanText,
-                            speakerId: window.selectedSpeakerId,
-                            engineUrl: window.selectedEngineUrl,
-                            filename: `tts_${window.selectedSpeakerId}_${Date.now()}.wav`
-                        })
-                    });
+                            const scriptText = document.getElementById('scriptTextarea').value.trim();
+                            if (!scriptText) {
+                                alert('대본을 입력해주세요');
+                                return;
+                            }
 
-                    if (!response.ok) {
-                        throw new Error('TTS 생성에 실패했습니다');
-                    }
+                            // -------------------------------------------------------------
+                            // 1) Parse Script for SRT & clean text for TTS
+                            // -------------------------------------------------------------
+                            const lines = scriptText.split('\n');
+                            let cleanText = '';
+                            let srtContent = '';
+                            let srtIndex = 1;
 
-                    const audioBlob = await response.blob();
-                    const audioUrl = URL.createObjectURL(audioBlob);
+                            // Helper to format srt time: seconds -> 00:00:00,000
+                            const formatSRTTimestamp = (seconds) => {
+                                const date = new Date(0);
+                                date.setSeconds(seconds);
+                                const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
+                                const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+                                const ss = String(Math.floor(seconds % 60)).padStart(2, '0');
+                                return `${hh}:${mm}:${ss},000`;
+                            };
 
-                    // Display generated audio
-                    const audio = document.getElementById('generatedAudio');
-                    audio.src = audioUrl;
-                    document.getElementById('generatedAudioSection').classList.remove('hidden');
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i].trim();
+                                if (!line) continue;
 
-                    // Setup download
-                    document.getElementById('downloadAudioBtn').onclick = () => {
-                        const a = document.createElement('a');
-                        a.href = audioUrl;
-                        a.download = `voicevox_tts_${Date.now()}.wav`;
-                        a.click();
-                    };
+                                // Check for timestamp pattern: [0-4초] ...
+                                const timeMatch = line.match(/^\[(\d+)-(\d+)초\]\s*(.*)/);
 
-                    // Scroll to audio section
-                    document.getElementById('generatedAudioSection').scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
+                                if (timeMatch) {
+                                    const startSec = parseInt(timeMatch[1]);
+                                    const endSec = parseInt(timeMatch[2]);
+                                    const text = timeMatch[3];
 
-                } catch (error) {
-                    alert('오류: ' + error.message);
-                } finally {
-                    btn.textContent = originalText;
-                    btn.disabled = false;
-                }
-            });
+                                    // Append to SRT
+                                    srtContent += `${srtIndex}\n`;
+                                    srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)}\n`;
+                                    srtContent += `${text}\n\n`;
+                                    srtIndex++;
+
+                                    // Append to Audio Text (just the sentence)
+                                    cleanText += text + '\n';
+                                } else {
+                                    // No timestamp, just append text
+                                    cleanText += line + '\n';
+                                }
+                            }
+
+                            if (!cleanText.trim()) {
+                                cleanText = scriptText; // Fallback if parsing failed
+                            }
+
+                            // -------------------------------------------------------------
+                            // 2) Generate Audio
+                            // -------------------------------------------------------------
+                            const btn = document.getElementById('generateTTSBtn');
+                            const originalText = btn.textContent;
+                            btn.textContent = '⏳ 음성 & 자막 생성 중...';
+                            btn.disabled = true;
+
+                            try {
+                                const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        text: cleanText,
+                                        speakerId: window.selectedSpeakerId,
+                                        engineUrl: window.selectedEngineUrl || '', // Fallback to empty if not set
+                                        filename: `tts_${window.selectedSpeakerId}_${Date.now()}.wav`
+                                    })
+                                });
+
+                                if (!response.ok) {
+                                    throw new Error('TTS 생성에 실패했습니다');
+                                }
+
+                                const audioBlob = await response.blob();
+                                const audioUrl = URL.createObjectURL(audioBlob);
+
+                                // Display generated audio
+                                const audio = document.getElementById('generatedAudio');
+                                audio.src = audioUrl;
+                                document.getElementById('generatedAudioSection').classList.remove('hidden');
+
+                                // Setup manual download button
+                                document.getElementById('downloadAudioBtn').onclick = () => {
+                                    const a = document.createElement('a');
+                                    a.href = audioUrl;
+                                    a.download = `voicevox_tts_${Date.now()}.wav`;
+                                    a.click();
+
+                                    // Also download SRT if exists (re-trigger)
+                                    if (srtContent) {
+                                        downloadSRTMlob(srtContent);
+                                    }
+                                };
+
+                                // -------------------------------------------------------------
+                                // 3) Auto-Download Audio & SRT
+                                // -------------------------------------------------------------
+
+                                // Download Audio
+                                const a = document.createElement('a');
+                                a.href = audioUrl;
+                                a.download = `voicevox_tts_${Date.now()}.wav`;
+                                a.click();
+
+                                // Download SRT
+                                if (srtContent) {
+                                    downloadSRTMlob(srtContent);
+                                }
+
+                                // Notify user
+                                const toast = document.createElement('div');
+                                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+                                toast.innerHTML = '✅ <b>오디오 & SRT 자막</b> 다운로드 완료!';
+                                document.body.appendChild(toast);
+                                setTimeout(() => toast.remove(), 3000);
+
+                                // Scroll to audio section
+                                document.getElementById('generatedAudioSection').scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'center'
+                                });
+
+                            } catch (error) {
+                                alert('오류: ' + error.message);
+                            } finally {
+                                btn.textContent = originalText;
+                                btn.disabled = false;
+                            }
+                        });
+
+            function downloadSRTMlob(content) {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `voicevox_subtitle_${Date.now()}.srt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
 
             function checkTTSButtonState() {
                 const scriptText = document.getElementById('scriptTextarea').value.trim();
@@ -1749,35 +1743,39 @@
                             <span class="text-xs text-yellow-100/80">${scene.sfx_suggestion}</span>
                         </div>` : '';
 
-                    // Enhanced Transcript HTML with 4 Languages (Ordered: Original → Korean → Japanese → Pronunciation)
+                    // Enhanced Transcript HTML with 4 Languages (Ordered: Original → Korean → Japanese+Pron paired)
                     const transcriptHtml = (scene.original_transcript || scene.text_jp) ? `
-                        <details class="mt-3 group/details" open>
-                            <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 select-none flex items-center gap-1 mb-2">
-                                <span class="group-open/details:rotate-90 transition-transform">▼</span> 🗣️ 4개 국어 대사 (편집용)
-                            </summary>
-                            <div class="space-y-2 pl-2 border-l-2 border-slate-700">
-                                ${scene.original_transcript ? `
-                                <div>
-                                    <span class="text-[10px] text-slate-500 block">🇺🇸 원문 (Original)</span>
-                                    <p class="text-slate-300 text-xs font-mono">"${scene.original_transcript}"</p>
-                                </div>` : ''}
-                                ${scene.text_kr ? `
-                                <div>
-                                    <span class="text-[10px] text-slate-500 block">🇰🇷 한국어 (자막)</span>
-                                    <p class="text-white text-sm font-bold">"${scene.text_kr}"</p>
-                                </div>` : ''}
-                                ${scene.text_jp ? `
-                                <div>
-                                    <span class="text-[10px] text-slate-500 block">🇯🇵 일본어 (번역) - "/" 구분</span>
-                                    <p class="text-blue-300 text-sm font-bold leading-relaxed">"${scene.text_jp.replace(/\//g, '<span class="text-yellow-400 mx-1 font-black">/</span>')}"</p>
-                                </div>` : ''}
-                                ${scene.text_pron ? `
-                                <div>
-                                    <span class="text-[10px] text-slate-500 block">🗣️ 일본어 발음 - "/" 구분</span>
-                                    <p class="text-orange-300 text-xs font-mono leading-relaxed">"${scene.text_pron.replace(/\//g, '<span class="text-yellow-400 mx-1 font-black">/</span>')}"</p>
-                                </div>` : ''}
-                            </div>
-                        </details>` : '';
+                                <details class="mt-3 group/details" open>
+                                    <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 select-none flex items-center gap-1 mb-2">
+                                        <span class="group-open/details:rotate-90 transition-transform">▼</span> 🗣️ 4개 국어 대사 (편집용)
+                                    </summary>
+                                    <div class="space-y-3 pl-2 border-l-2 border-slate-700">
+                                        ${scene.original_transcript ? `
+                                        <div>
+                                            <span class="text-[10px] text-slate-500 block">🇺🇸 원문 (Original)</span>
+                                            <p class="text-slate-300 text-xs font-mono">"${scene.original_transcript}"</p>
+                                        </div>` : ''}
+                                        
+                                        ${scene.text_kr ? `
+                                        <div>
+                                            <span class="text-[10px] text-slate-500 block">🇰🇷 한국어 (자막)</span>
+                                            <p class="text-white text-sm font-bold">"${scene.text_kr}"</p>
+                                        </div>` : ''}
+
+                                        ${(scene.text_jp || scene.text_pron) ? `
+                                        <div class="bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                                            <span class="text-[10px] text-blue-400 block mb-1">🇯🇵 일본어 & 발음</span>
+                                            ${scene.text_jp ? `
+                                            <p class="text-blue-200 text-sm font-bold leading-relaxed mb-1">
+                                                "${scene.text_jp.replace(/\//g, '<span class="text-yellow-500/50 mx-1">/</span>')}"
+                                            </p>` : ''}
+                                            ${scene.text_pron ? `
+                                            <p class="text-xs text-orange-300/80 font-mono">
+                                                "${scene.text_pron.replace(/\//g, '<span class="text-yellow-500/50 mx-1">/</span>')}"
+                                            </p>` : ''}
+                                        </div>` : ''}
+                                    </div>
+                                </details>` : '';
 
                     sceneCard.innerHTML = `
                         <!-- Timeline at Top (like image) -->
@@ -1814,21 +1812,47 @@
                 // Store plan for Step 3
                 window.currentDirectorPlan = plan;
 
-                // Enable Step 3 Buttons
+                // Enable video cutting status
                 if (plan.length > 0) {
-                    const scriptBtn = document.getElementById('generateFinalScriptBtn');
-                    scriptBtn.disabled = false;
-                    scriptBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    scriptBtn.onclick = generateFinalScript; // Bind the function
-
                     // Enable video cutting button
                     const cutBtn = document.getElementById('cutHighlightsVideoBtn');
                     cutBtn.disabled = false;
                     cutBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     cutBtn.onclick = cutHighlightsVideo; // Bind the function
 
-                    // Scroll to buttons
-                    setTimeout(() => cutBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+                    // ---------------------------------------------------------
+                    // AUTO-POPULATE TIMELINE SCRIPT (VOICEVOX)
+                    // ---------------------------------------------------------
+                    let timelineScript = '';
+                    let accumulatedTime = 0;
+
+                    plan.forEach(scene => {
+                        const duration = scene.end - scene.start;
+                        const startTime = accumulatedTime;
+                        const endTime = accumulatedTime + duration;
+
+                        // Priority: Use strictly Narration JP only
+                        // We do NOT fallback to text_jp (original transcript) because that includes dialogue
+                        // which the user specifically doesn't want in the TTS script.
+                        const text = scene.narration_jp || '';
+
+                        if (text) {
+                            timelineScript += `[${Math.floor(startTime)}-${Math.ceil(endTime)}초] ${text}\n`;
+                        }
+
+                        accumulatedTime += duration;
+                    });
+
+                    const scriptArea = document.getElementById('scriptTextarea');
+                    scriptArea.value = timelineScript;
+
+                    // Flash effect to indicate auto-population
+                    scriptArea.classList.add('bg-blue-900/30', 'transition-colors', 'duration-500');
+                    setTimeout(() => scriptArea.classList.remove('bg-blue-900/30'), 1000);
+
+                    // Update UI state
+                    checkTTSButtonState();
+                    // ---------------------------------------------------------
                 }
             }
 
