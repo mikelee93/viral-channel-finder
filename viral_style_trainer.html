@@ -458,7 +458,7 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-2 mt-auto">
-                        <button onclick="window.viewDNA('${p.id}')" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-center text-white transition-colors">
+                        <button onclick="window.viewDNA('${p.id}')" class="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-xs text-center text-white transition-colors shadow-lg shadow-purple-500/20 font-bold border border-purple-400/30">
                             🧬 DNA 분석
                         </button>
                         <button onclick="window.openDirectorWrite('${p.id}')" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs text-center text-white font-bold transition-colors">
@@ -781,7 +781,7 @@
                 }
 
                 currentDnaId = id;
-                const persona = allPersonas.find(p => p.id === id);
+                const persona = allPersonas.find(p => p.id == id);
                 if (!persona) return;
 
                 // Populate Info

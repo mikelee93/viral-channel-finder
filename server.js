@@ -394,6 +394,8 @@ app.post('/api/analyze-social', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Analyze Viral Video URL (NEW - Clean Architecture)
 // ═══════════════════════════════════════════════════════════════════════════
+// API: Analyze Viral Video URL (NEW - Clean Architecture)
+// ═══════════════════════════════════════════════════════════════════════════
 app.post('/api/analyze-viral-video', async (req, res) => {
     try {
         const { url } = req.body;
@@ -431,6 +433,64 @@ app.post('/api/analyze-viral-video', async (req, res) => {
             success: false,
             error: error.message || '영상 분석 중 오류가 발생했습니다'
         });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Reddit Viral Finder
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/reddit/viral', async (req, res) => {
+    try {
+        const { subreddit = 'all', sort = 'hot', limit = 25, time = 'day' } = req.query;
+        console.log(`[Reddit API] Fetching r/${subreddit} (${sort}, ${time})`);
+
+        // Reddit JSON API URL
+        const redditUrl = `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}&t=${time}`;
+
+        const response = await fetch(redditUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Reddit API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.data || !data.data.children) {
+            throw new Error('Invalid Reddit API response format');
+        }
+
+        // Filter valid video posts
+        const posts = data.data.children
+            .map(child => child.data)
+            .filter(post => {
+                // Must be video or have rich media
+                return post.is_video || post.url.includes('youtu') || post.url.includes('v.redd.it') || post.domain === 'v.redd.it';
+            })
+            .map(post => ({
+                id: post.id,
+                title: post.title,
+                subreddit: post.subreddit_name_prefixed,
+                author: post.author,
+                score: post.score,
+                comments: post.num_comments,
+                url: post.url,
+                permalink: `https://www.reddit.com${post.permalink}`,
+                thumbnail: (post.thumbnail && post.thumbnail.startsWith('http')) ? post.thumbnail : null,
+                created_utc: post.created_utc,
+                is_video: post.is_video,
+                video_url: post.secure_media?.reddit_video?.fallback_url || post.url,
+                hls_url: post.secure_media?.reddit_video?.hls_url // HLS stream for audio support
+            }));
+
+        res.json({ success: true, posts });
+
+    } catch (error) {
+        console.error('[Reddit API Error]', error);
+        res.status(500).json({ error: error.message || 'Failed to fetch Reddit data' });
     }
 });
 

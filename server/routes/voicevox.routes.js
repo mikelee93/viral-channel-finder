@@ -226,7 +226,7 @@ router.get('/image-proxy', async (req, res) => {
  */
 router.post('/preview', async (req, res) => {
     try {
-        const { speakerId, sampleText } = req.body;
+        const { speakerId, sampleText, options = {} } = req.body;
 
         if (!speakerId) {
             return res.status(400).json({
@@ -239,7 +239,8 @@ router.post('/preview', async (req, res) => {
         const audioBuffer = await voicevoxUtil.generatePreview(
             parseInt(speakerId),
             sampleText,
-            engineUrl
+            engineUrl,
+            options
         );
 
         // WAV 파일로 응답
@@ -350,7 +351,7 @@ JSON 형식으로 응답:
  */
 router.post('/generate-tts', async (req, res) => {
     try {
-        const { text, speakerId, filename = 'output.wav' } = req.body;
+        const { text, speakerId, filename = 'output.wav', options = {} } = req.body;
 
         if (!text || !speakerId) {
             return res.status(400).json({
@@ -358,14 +359,15 @@ router.post('/generate-tts', async (req, res) => {
             });
         }
 
-        console.log(`[VOICEVOX API] Generating TTS for: "${text}"`);
+        console.log(`[VOICEVOX API] Generating TTS for: "${text}" with options:`, options);
 
         // TTS 생성
         const { engineUrl } = req.body;
         const audioBuffer = await voicevoxUtil.generateTTS(
             text,
             parseInt(speakerId),
-            engineUrl
+            engineUrl,
+            options
         );
 
         // WAV 파일로 응답

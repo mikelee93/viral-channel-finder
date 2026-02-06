@@ -120,15 +120,37 @@ async function synthesizeSpeech(audioQuery, speakerId, baseUrl = ENGINES.VOICEVO
  * @param {number} speakerId - 화자 ID
  * @returns {Promise<Buffer>} WAV 오디오 데이터
  */
-async function generateTTS(text, speakerId, baseUrl = ENGINES.VOICEVOX) {
+async function generateTTS(text, speakerId, engineUrl = ENGINES.VOICEVOX, options = {}) {
     try {
-        console.log(`[TTS] Generating (${baseUrl}): speaker=${speakerId}, text="${text.slice(0, 20)}..."`);
+        console.log(`[TTS] Generating (${engineUrl}): speaker=${speakerId}, text="${text.slice(0, 20)}..."`);
+        console.log(`[TTS] Options:`, options);
 
         // 1단계: 오디오 쿼리 생성
-        const audioQuery = await generateAudioQuery(text, speakerId, baseUrl);
+        const audioQuery = await generateAudioQuery(text, speakerId, engineUrl);
+
+        // 옵션 적용 (안전하게 파싱)
+        const applyOption = (key, value) => {
+            if (value !== undefined && value !== null && value !== '') {
+                const num = parseFloat(value);
+                if (!isNaN(num)) {
+                    audioQuery[key] = num;
+                }
+            }
+        };
+
+        applyOption('speedScale', options.speedScale);
+        applyOption('pitchScale', options.pitchScale);
+        applyOption('intonationScale', options.intonationScale);
+        applyOption('volumeScale', options.volumeScale);
+        applyOption('prePhonemeLength', options.prePhonemeLength);
+        applyOption('postPhonemeLength', options.postPhonemeLength);
 
         // 2단계: 음성 합성
-        const audioBuffer = await synthesizeSpeech(audioQuery, speakerId, baseUrl);
+        const audioBuffer = await synthesizeSpeech(audioQuery, speakerId, engineUrl);
+
+        if (!audioBuffer || audioBuffer.length === 0) {
+            throw new Error('TTS generation failed: Empty audio buffer received');
+        }
 
         console.log(`[VOICEVOX] TTS generated successfully (${audioBuffer.length} bytes)`);
         return audioBuffer;
@@ -145,10 +167,10 @@ async function generateTTS(text, speakerId, baseUrl = ENGINES.VOICEVOX) {
  * @param {string} sampleText - 샘플 텍스트 (기본값: "こんにちは")
  * @returns {Promise<Buffer>} WAV 오디오 데이터
  */
-async function generatePreview(speakerId, sampleText = 'こんにちは、よろしくお願いします。', baseUrl = ENGINES.VOICEVOX) {
+async function generatePreview(speakerId, sampleText = 'こんにちは、よろしくお願いします。', baseUrl = ENGINES.VOICEVOX, options = {}) {
     try {
         console.log(`[TTS] Generating preview for speaker ${speakerId} on ${baseUrl}`);
-        return await generateTTS(sampleText, speakerId, baseUrl);
+        return await generateTTS(sampleText, speakerId, baseUrl, options);
     } catch (error) {
         console.error('[VOICEVOX] generatePreview error:', error);
         throw error;

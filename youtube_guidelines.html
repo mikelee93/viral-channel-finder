@@ -62,8 +62,13 @@
 
 <body class="p-8">
     <div class="max-w-6xl mx-auto">
-        <!-- Navigation -->
-        <div class="flex justify-end mb-6">
+        <div class="flex justify-end mb-6 gap-3">
+            <a href="reddit_viral_finder.html"
+                class="flex items-center gap-2 bg-orange-600/20 text-orange-400 border border-orange-500/30 px-4 py-2 rounded-lg hover:bg-orange-600/30 transition-colors font-bold">
+                <span class="text-xl">🔥</span>
+                <span>Reddit Viral Finder</span>
+                <span>→</span>
+            </a>
             <a href="viral_style_trainer.html"
                 class="flex items-center gap-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg hover:bg-blue-600/30 transition-colors font-bold">
                 <span class="text-xl">🧪</span>
@@ -494,6 +499,80 @@
                                             class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg hidden transition-colors flex items-center gap-2">
                                             ⏹️ 정지
                                         </button>
+                                    </div>
+                                </div>
+
+                                <!-- Audio Params UI -->
+                                <div id="audioSettingsPanel" class="mt-4 pt-4 border-t border-blue-500/30">
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <!-- Speed -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>話速 (Speed)</span>
+                                                <span id="val-speedScale" class="font-mono">1.00</span>
+                                            </div>
+                                            <input type="range" id="param-speedScale" min="0.50" max="2.00" step="0.01"
+                                                value="1.00"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+                                        <!-- Pitch -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>音高 (Pitch)</span>
+                                                <span id="val-pitchScale" class="font-mono">0.00</span>
+                                            </div>
+                                            <input type="range" id="param-pitchScale" min="-0.15" max="0.15" step="0.01"
+                                                value="0.00"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+                                        <!-- Intonation -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>抑揚 (Intonation)</span>
+                                                <span id="val-intonationScale" class="font-mono">1.00</span>
+                                            </div>
+                                            <input type="range" id="param-intonationScale" min="0.00" max="2.00"
+                                                step="0.01" value="1.00"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+                                        <!-- Volume -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>音量 (Volume)</span>
+                                                <span id="val-volumeScale" class="font-mono">1.00</span>
+                                            </div>
+                                            <input type="range" id="param-volumeScale" min="0.00" max="2.00" step="0.01"
+                                                value="1.00"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+                                        <!-- Pre-phoneme -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>開始無音 (Start Pause)</span>
+                                                <span id="val-prePhonemeLength" class="font-mono">0.10</span>
+                                            </div>
+                                            <input type="range" id="param-prePhonemeLength" min="0.00" max="1.50"
+                                                step="0.01" value="0.10"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+                                        <!-- Post-phoneme -->
+                                        <div>
+                                            <div class="flex justify-between text-[10px] text-blue-300 mb-1">
+                                                <span>間の長さ (Pause/Gap)</span>
+                                                <span id="val-postPhonemeLength" class="font-mono">0.10</span>
+                                            </div>
+                                            <input type="range" id="param-postPhonemeLength" min="0.00" max="1.50"
+                                                step="0.01" value="0.10"
+                                                class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                        </div>
+
+                                        <!-- Reset -->
+                                        <div class="flex items-end justify-end col-span-2">
+                                            <button id="resetAudioParamsBtn"
+                                                class="text-xs text-blue-400 hover:text-white flex items-center gap-1 transition-colors px-2 py-1 bg-blue-500/20 rounded hover:bg-blue-500/40">
+                                                <span>↺</span> 설정 초기화
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1035,12 +1114,23 @@
                 btn.disabled = true;
 
                 try {
+                    // Get Audio Params from UI
+                    const audioOptions = {
+                        speedScale: document.getElementById('param-speedScale') ? document.getElementById('param-speedScale').value : 1.0,
+                        pitchScale: document.getElementById('param-pitchScale') ? document.getElementById('param-pitchScale').value : 0.0,
+                        intonationScale: document.getElementById('param-intonationScale') ? document.getElementById('param-intonationScale').value : 1.0,
+                        volumeScale: document.getElementById('param-volumeScale') ? document.getElementById('param-volumeScale').value : 1.0,
+                        prePhonemeLength: document.getElementById('param-prePhonemeLength') ? document.getElementById('param-prePhonemeLength').value : 0.1,
+                        postPhonemeLength: document.getElementById('param-postPhonemeLength') ? document.getElementById('param-postPhonemeLength').value : 0.1
+                    };
+
                     const response = await fetch('http://localhost:4000/api/voicevox/preview', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             speakerId: window.selectedSpeakerId,
-                            sampleText: 'こんにちは、よろしくお願いします。'
+                            sampleText: 'こんにちは、よろしくお願いします。',
+                            options: audioOptions
                         })
                     });
 
@@ -1078,164 +1168,153 @@
                     return;
                 }
 
-                // Extract Japanese text and Timestamps for SRT
+
+                // -------------------------------------------------------------
+                // 1) Parse Script for SRT & clean text for TTS
+                // -------------------------------------------------------------
                 const lines = scriptText.split('\n');
                 let cleanText = '';
                 let srtContent = '';
                 let srtIndex = 1;
-                let currentStartTime = 0;
 
-                if (scriptText.includes('🇯🇵 일본어:')) {
-                    // Trilingual format
-                    cleanText = lines
-                        .filter(line => line.includes('🇯🇵 일본어:'))
-                        .map(line => line.replace('🇯🇵 일본어:', '').trim())
-                        .join('\n');
+                // Helper to format srt time: seconds -> 00:00:00,000
+                const formatSRTTimestamp = (seconds) => {
+                    const date = new Date(0);
+                    date.setSeconds(seconds);
+                    const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
+                    const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+                    const ss = String(Math.floor(seconds % 60)).padStart(2, '0');
+                    return `${hh}:${mm}:${ss},000`;
+                };
 
-                    // Generate SRT
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i];
-                        if (line.match(/^\[(\d+)-(\d+)초\]/)) { // Match [0-3초]
-                            const timeMatch = line.match(/^\[(\d+)-(\d+)초\]/);
-                            if (!window.selectedSpeakerId) {
-                                alert('캐릭터를 먼저 선택해주세요');
-                                return;
-                            }
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
 
-                            const scriptText = document.getElementById('scriptTextarea').value.trim();
-                            if (!scriptText) {
-                                alert('대본을 입력해주세요');
-                                return;
-                            }
+                    // Check for timestamp pattern: [0-4초] ...
+                    const timeMatch = line.match(/^\[(\d+)-(\d+)초\]\s*(.*)/);
 
-                            // -------------------------------------------------------------
-                            // 1) Parse Script for SRT & clean text for TTS
-                            // -------------------------------------------------------------
-                            const lines = scriptText.split('\n');
-                            let cleanText = '';
-                            let srtContent = '';
-                            let srtIndex = 1;
+                    if (timeMatch) {
+                        const startSec = parseInt(timeMatch[1]);
+                        const endSec = parseInt(timeMatch[2]);
+                        const rawText = timeMatch[3];
 
-                            // Helper to format srt time: seconds -> 00:00:00,000
-                            const formatSRTTimestamp = (seconds) => {
-                                const date = new Date(0);
-                                date.setSeconds(seconds);
-                                const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
-                                const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-                                const ss = String(Math.floor(seconds % 60)).padStart(2, '0');
-                                return `${hh}:${mm}:${ss},000`;
-                            };
+                        // 1. TTS용 정제: 슬래시(/) -> 쉼표(、)로 변환하여 쉼(Pause) 유도, 대괄호 제거
+                        const textForTTS = rawText.replace(/\//g, '、').replace(/[\[\]]/g, ' ');
 
-                            for (let i = 0; i < lines.length; i++) {
-                                const line = lines[i].trim();
-                                if (!line) continue;
+                        // 2. SRT용 정제: 슬래시(/) 제거, 불필요한 공백 제거
+                        const textForSRT = rawText.replace(/\//g, ' ').replace(/[\[\]]/g, '').trim();
 
-                                // Check for timestamp pattern: [0-4초] ...
-                                const timeMatch = line.match(/^\[(\d+)-(\d+)초\]\s*(.*)/);
+                        // Append to SRT
+                        srtContent += `${srtIndex}\n`;
+                        srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)}\n`;
+                        srtContent += `${textForSRT}\n\n`;
+                        srtIndex++;
 
-                                if (timeMatch) {
-                                    const startSec = parseInt(timeMatch[1]);
-                                    const endSec = parseInt(timeMatch[2]);
-                                    const text = timeMatch[3];
+                        // Append to Audio Text
+                        cleanText += textForTTS + '\n';
+                    } else {
+                        // No timestamp, just clean and append
+                        const textForTTS = line.replace(/\//g, '、').replace(/[\[\]]/g, ' ');
+                        cleanText += textForTTS + '\n';
+                    }
+                }
 
-                                    // Append to SRT
-                                    srtContent += `${srtIndex}\n`;
-                                    srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)}\n`;
-                                    srtContent += `${text}\n\n`;
-                                    srtIndex++;
+                if (!cleanText.trim()) {
+                    cleanText = scriptText; // Fallback if parsing failed
+                }
 
-                                    // Append to Audio Text (just the sentence)
-                                    cleanText += text + '\n';
-                                } else {
-                                    // No timestamp, just append text
-                                    cleanText += line + '\n';
-                                }
-                            }
+                // -------------------------------------------------------------
+                // 2) Generate Audio
+                // -------------------------------------------------------------
+                const btn = document.getElementById('generateTTSBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ 음성 & 자막 생성 중...';
+                btn.disabled = true;
 
-                            if (!cleanText.trim()) {
-                                cleanText = scriptText; // Fallback if parsing failed
-                            }
+                try {
+                    // Get Audio Params from UI
+                    const audioOptions = {
+                        speedScale: document.getElementById('param-speedScale') ? document.getElementById('param-speedScale').value : 1.0,
+                        pitchScale: document.getElementById('param-pitchScale') ? document.getElementById('param-pitchScale').value : 0.0,
+                        intonationScale: document.getElementById('param-intonationScale') ? document.getElementById('param-intonationScale').value : 1.0,
+                        volumeScale: document.getElementById('param-volumeScale') ? document.getElementById('param-volumeScale').value : 1.0,
+                        prePhonemeLength: document.getElementById('param-prePhonemeLength') ? document.getElementById('param-prePhonemeLength').value : 0.1,
+                        postPhonemeLength: document.getElementById('param-postPhonemeLength') ? document.getElementById('param-postPhonemeLength').value : 0.1
+                    };
 
-                            // -------------------------------------------------------------
-                            // 2) Generate Audio
-                            // -------------------------------------------------------------
-                            const btn = document.getElementById('generateTTSBtn');
-                            const originalText = btn.textContent;
-                            btn.textContent = '⏳ 음성 & 자막 생성 중...';
-                            btn.disabled = true;
+                    const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: cleanText,
+                            speakerId: window.selectedSpeakerId,
+                            engineUrl: window.selectedEngineUrl || '', // Fallback to empty if not set
+                            filename: `tts_${window.selectedSpeakerId}_${Date.now()}.wav`,
+                            options: audioOptions
+                        })
+                    });
 
-                            try {
-                                const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        text: cleanText,
-                                        speakerId: window.selectedSpeakerId,
-                                        engineUrl: window.selectedEngineUrl || '', // Fallback to empty if not set
-                                        filename: `tts_${window.selectedSpeakerId}_${Date.now()}.wav`
-                                    })
-                                });
+                    if (!response.ok) {
+                        throw new Error('TTS 생성에 실패했습니다');
+                    }
 
-                                if (!response.ok) {
-                                    throw new Error('TTS 생성에 실패했습니다');
-                                }
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
 
-                                const audioBlob = await response.blob();
-                                const audioUrl = URL.createObjectURL(audioBlob);
+                    // Display generated audio
+                    const audio = document.getElementById('generatedAudio');
+                    audio.src = audioUrl;
+                    document.getElementById('generatedAudioSection').classList.remove('hidden');
 
-                                // Display generated audio
-                                const audio = document.getElementById('generatedAudio');
-                                audio.src = audioUrl;
-                                document.getElementById('generatedAudioSection').classList.remove('hidden');
+                    // Setup manual download button
+                    document.getElementById('downloadAudioBtn').onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = audioUrl;
+                        a.download = `voicevox_tts_${Date.now()}.wav`;
+                        a.click();
 
-                                // Setup manual download button
-                                document.getElementById('downloadAudioBtn').onclick = () => {
-                                    const a = document.createElement('a');
-                                    a.href = audioUrl;
-                                    a.download = `voicevox_tts_${Date.now()}.wav`;
-                                    a.click();
+                        // Also download SRT if exists (re-trigger)
+                        if (srtContent) {
+                            downloadSRTMlob(srtContent);
+                        }
+                    };
 
-                                    // Also download SRT if exists (re-trigger)
-                                    if (srtContent) {
-                                        downloadSRTMlob(srtContent);
-                                    }
-                                };
+                    // -------------------------------------------------------------
+                    // 3) Auto-Download Audio & SRT
+                    // -------------------------------------------------------------
 
-                                // -------------------------------------------------------------
-                                // 3) Auto-Download Audio & SRT
-                                // -------------------------------------------------------------
+                    // Download Audio
+                    const a = document.createElement('a');
+                    a.href = audioUrl;
+                    a.download = `voicevox_tts_${Date.now()}.wav`;
+                    a.click();
 
-                                // Download Audio
-                                const a = document.createElement('a');
-                                a.href = audioUrl;
-                                a.download = `voicevox_tts_${Date.now()}.wav`;
-                                a.click();
+                    // Download SRT
+                    if (srtContent) {
+                        downloadSRTMlob(srtContent);
+                    }
 
-                                // Download SRT
-                                if (srtContent) {
-                                    downloadSRTMlob(srtContent);
-                                }
+                    // Notify user
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+                    toast.innerHTML = '✅ <b>오디오 & SRT 자막</b> 다운로드 완료!';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
 
-                                // Notify user
-                                const toast = document.createElement('div');
-                                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
-                                toast.innerHTML = '✅ <b>오디오 & SRT 자막</b> 다운로드 완료!';
-                                document.body.appendChild(toast);
-                                setTimeout(() => toast.remove(), 3000);
+                    // Scroll to audio section
+                    document.getElementById('generatedAudioSection').scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
 
-                                // Scroll to audio section
-                                document.getElementById('generatedAudioSection').scrollIntoView({
-                                    behavior: 'smooth',
-                                    block: 'center'
-                                });
-
-                            } catch (error) {
-                                alert('오류: ' + error.message);
-                            } finally {
-                                btn.textContent = originalText;
-                                btn.disabled = false;
-                            }
-                        });
+                } catch (error) {
+                    alert('오류: ' + error.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            });
 
             function downloadSRTMlob(content) {
                 const blob = new Blob([content], { type: 'text/plain' });
@@ -2670,6 +2749,39 @@
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 }
+            }
+
+            // ========================================
+            // AUDIO SETTINGS UI LOGIC
+            // ========================================
+            document.addEventListener('input', (e) => {
+                if (e.target.id && e.target.id.startsWith('param-')) {
+                    const paramName = e.target.id.replace('param-', '');
+                    const valSpan = document.getElementById('val-' + paramName);
+                    if (valSpan) valSpan.textContent = parseFloat(e.target.value).toFixed(2);
+                }
+            });
+
+            const resetBtn = document.getElementById('resetAudioParamsBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const defaults = {
+                        speedScale: 1.00,
+                        pitchScale: 0.00,
+                        intonationScale: 1.00,
+                        volumeScale: 1.00,
+                        prePhonemeLength: 0.10,
+                        postPhonemeLength: 0.10
+                    };
+
+                    Object.keys(defaults).forEach(key => {
+                        const input = document.getElementById('param-' + key);
+                        const label = document.getElementById('val-' + key);
+                        if (input) input.value = defaults[key];
+                        if (label) label.textContent = defaults[key].toFixed(2);
+                    });
+                });
             }
 
         </script>
