@@ -1,1 +1,178 @@
-[]
+[
+  {
+    "id": "1770505487284",
+    "name": "일분일초",
+    "url": "https://www.youtube.com/channel/UCF24NMvY6K0wUUaRR2jscQA",
+    "category": "general",
+    "analysis": {
+      "tone": "Intrigued, Suspenseful (흥미로운, 긴장감 넘치는)",
+      "hook_style": "Start with a surprising or shocking situation (놀랍거나 충격적인 상황으로 시작)",
+      "catchphrases": [
+        "그런데 (But/However)",
+        "심지어 (Even)",
+        "알고 보니 (Turns out)",
+        "그렇게 (So/Thus)"
+      ],
+      "vocabulary_patterns": {
+        "adjectives": [
+          "수상한 (Suspicious)",
+          "뻔뻔한 (Shameless)",
+          "황당한 (Absurd)",
+          "충격적인 (Shocking)",
+          "능숙하게 (Skillfully)"
+        ],
+        "verbs": [
+          "발견했다 (Discovered)",
+          "자백하다 (Confess)",
+          "체포되다 (Arrested)",
+          "마주치다 (Encounter)",
+          "위협하다 (Threaten)",
+          "설명하다 (Explain)",
+          "기다리다 (Wait)"
+        ],
+        "signature_expressions": [
+          "진상짓 (Acting obnoxiously)",
+          "코스프레 (Cosplay/Pretending)",
+          "소름돋는 건 (What's chilling is)",
+          "대박 터져버린 제품 (A product that became a huge hit)"
+        ]
+      },
+      "sentence_structure": "Primarily short, punchy sentences to create suspense and maintain viewer engagement. (주로 짧고 간결한 문장을 사용하여 긴장감을 조성하고 시청자의 참여를 유지합니다.)",
+      "transition_phrases": [
+        "그런데 (But/However)",
+        "하지만 (However)",
+        "결국 (Eventually)",
+        "심지어 (Even)",
+        "그렇게 (So/Thus)",
+        "갑자기 (Suddenly)",
+        "그때 (Then)",
+        "이 사실을 모른 채 (Unaware of this fact)"
+      ],
+      "pacing": "Dynamic, alternating between fast-paced descriptions of events and slower, more reflective moments. (빠르게 진행되는 사건 설명과 느리고 성찰적인 순간들이 번갈아 나타나는 역동적인 속도.)",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Introduce a surprising or intriguing event/situation. (놀랍거나 흥미로운 사건/상황 소개.)"
+        },
+        {
+          "time": "5-20s",
+          "type": "Rising Action",
+          "description": "Develop the conflict, adding details and suspense. (갈등을 발전시키고 세부 사항과 긴장감을 더합니다.)"
+        },
+        {
+          "time": "20-40s",
+          "type": "Climax/Twist",
+          "description": "Reveal a turning point or unexpected twist in the story. (이야기의 전환점이나 예상치 못한 반전을 공개합니다.)"
+        },
+        {
+          "time": "40-55s",
+          "type": "Resolution/Ending",
+          "description": "Briefly summarize the outcome or leave with a question. (결과를 간략하게 요약하거나 질문으로 마무리합니다.)"
+        }
+      ],
+      "director_rules": [
+        "Always start with a hook to grab the viewer's attention (항상 시청자의 관심을 끌기 위해 시작 부분에 흥미로운 요소를 넣으세요.)",
+        "Keep sentences short and easy to understand (문장을 짧고 이해하기 쉽게 유지하세요.)",
+        "Use suspenseful language to create intrigue (흥미를 유발하기 위해 긴장감을 조성하는 언어를 사용하세요.)",
+        "End with a question or surprising reveal to encourage discussion (토론을 유도하기 위해 질문이나 놀라운 반전으로 마무리하세요.)"
+      ],
+      "humor_code": "Situational irony and unexpected twists, often highlighting the absurdity of everyday situations. (상황적 아이러니와 예상치 못한 반전, 일상적인 상황의 부조리함을 강조.)",
+      "audio_style": {
+        "bgm": "Energetic and suspenseful, complementing the pacing of the narrative. (Inferred) (이야기의 흐름에 맞춰 활기차고 긴장감을 조성하는 배경 음악.)",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This persona presents surprising, often ironic, real-life scenarios in a concise, attention-grabbing manner, leaving viewers pondering the unexpected nature of everyday life. (이 페르소나는 놀랍고 종종 아이러니한 실제 시나리오를 간결하고 눈길을 끄는 방식으로 제시하여 시청자들이 일상 생활의 예상치 못한 본질에 대해 생각하게 만듭니다.)",
+      "prompt_instruction": "Create a short YouTube video script about a surprising real-life situation, using short, punchy sentences and ending with a question to engage the audience, mimicking the style of '일분일초'."
+    },
+    "sourceCount": "all",
+    "createdAt": "2026-02-07T23:04:47.284Z"
+  },
+  {
+    "id": "1770506628505",
+    "name": "바디캠온",
+    "url": "https://www.youtube.com/channel/UChMMd8NQczLL51eAISmuSGQ",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "High-Tension, Confrontational (고도의 긴장감, 대립적)",
+      "hook_style": "Starts with immediate conflict or urgent situation (즉각적인 갈등 또는 긴급한 상황으로 시작)",
+      "catchphrases": [
+        "Get the f**k out of here.",
+        "Don't you f**king touch her!",
+        "I'm not going to jail.",
+        "Put it back.",
+        "Where that money at?"
+      ],
+      "vocabulary_patterns": {
+        "adjectives": [
+          "f**king",
+          "stupid",
+          "aggressive",
+          "lovely",
+          "good",
+          "old"
+        ],
+        "verbs": [
+          "put",
+          "get",
+          "stop",
+          "give",
+          "shoot",
+          "push",
+          "touch",
+          "smell",
+          "eat",
+          "leave",
+          "earn"
+        ],
+        "signature_expressions": [
+          "get the f**k out",
+          "I'm not going to jail tonight.",
+          "You're gonna get it."
+        ]
+      },
+      "sentence_structure": "Primarily short, punchy sentences with frequent use of expletives to convey heightened emotion. (주로 짧고 강렬한 문장으로, 고조된 감정을 전달하기 위해 욕설을 자주 사용합니다.)",
+      "transition_phrases": [
+        "Okay.",
+        "Yeah.",
+        "Well.",
+        "Right now."
+      ],
+      "pacing": "Fast (빠름)",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Immediate establishment of conflict or a tense situation. (갈등이나 긴장된 상황의 즉각적인 설정.) (갈등이나 긴장된 상황의 즉각적인 설정.)"
+        },
+        {
+          "time": "5-15s",
+          "type": "Escalation",
+          "description": "Rapid escalation of the conflict through heated exchanges and direct threats. (격렬한 대화와 직접적인 위협을 통해 갈등이 빠르게 고조됨.) (격렬한 대화와 직접적인 위협을 통해 갈등이 빠르게 고조됨.)"
+        },
+        {
+          "time": "15s+",
+          "type": "Resolution/Standoff",
+          "description": "The conflict either reaches a climax or a tense standoff, often involving law enforcement. (갈등이 절정에 달하거나 긴장된 대치 상태에 도달하며 종종 법 집행 기관이 개입됩니다.) (갈등이 절정에 달하거나 긴장된 대치 상태에 도달하며 종종 법 집행 기관이 개입됩니다.)"
+        }
+      ],
+      "director_rules": [
+        "Focus on immediate conflict and high-stakes situations (즉각적인 갈등과 높은 위험 상황에 집중하세요)",
+        "Use short, direct dialogue with frequent expletives to heighten tension (긴장감을 높이기 위해 짧고 직접적인 대화와 함께 욕설을 자주 사용하세요)",
+        "Create scenarios involving law enforcement and civilian confrontations (법 집행 기관과 민간인 간의 대립을 포함하는 시나리오를 만드세요)",
+        "Emphasize the unpredictable nature of human behavior in stressful circumstances (스트레스 상황에서 예측할 수 없는 인간 행동의 본질을 강조하세요)"
+      ],
+      "humor_code": "Dark humor derived from the absurdity and intensity of the situations presented (제시된 상황의 부조리함과 강렬함에서 비롯된 블랙 유머) (제시된 상황의 부조리함과 강렬함에서 비롯된 블랙 유머)",
+      "audio_style": {
+        "bgm": "Not Analyzed (Inferred: Energetic to heighten tension) (분석되지 않음 (추론: 긴장감을 높이기 위해 활기찬 분위기))",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This persona is characterized by presenting raw, high-tension encounters between individuals and law enforcement, often involving strong language and unpredictable behavior. (이 페르소나는 강한 언어와 예측할 수 없는 행동을 포함하여 개인과 법 집행 기관 간의 날것 그대로의 긴장감 넘치는 만남을 제시하는 것으로 특징지어집니다.)",
+      "prompt_instruction": "Write a scene involving a confrontation with a police officer, using strong language and short, declarative sentences. Focus on the character's defiance and refusal to back down."
+    },
+    "sourceCount": 15,
+    "createdAt": "2026-02-07T23:23:48.505Z"
+  }
+]
