@@ -3,6 +3,16 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
+const OpenAI = require('openai'); // Added for Whisper
+
+// Define directory for storing transcripts
+const TRANSCRIPTS_DIR = path.join(__dirname, '../../transcripts');
+if (!fs.existsSync(TRANSCRIPTS_DIR)) {
+    fs.mkdirSync(TRANSCRIPTS_DIR, { recursive: true });
+}
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ytDlp = require('yt-dlp-exec'); // For audio download
 
 // Helper: Sanitize filename
 function sanitizeFilename(name) {
@@ -176,39 +186,105 @@ router.post('/analyze', async (req, res) => {
     if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY missing' });
     if (!APIFY_TOKEN) return res.status(500).json({ error: 'APIFY_TOKEN missing' });
 
+    // Helper: Extract Channel ID from URL (Robust)
+    async function extractChannelId(url) {
+        if (!url) return null;
+
+        // 1. Direct Channel ID
+        if (url.includes('/channel/')) {
+            const parts = url.split('/channel/');
+            console.log(`[Channel Analyze] Direct Channel ID found: ${parts[1].split('/')[0].split('?')[0]}`);
+            return parts[1].split('/')[0].split('?')[0];
+        }
+
+        // 2. Handle /@username/shorts or /@username
+        if (url.includes('/@')) {
+            const handle = url.split('/@')[1].split('/')[0].split('?')[0];
+            console.log(`[Channel Analyze] Resolving handle: @${handle}`);
+            // Need to call API to resolve handle to ID
+            try {
+                const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=@${handle}&type=channel&key=${YOUTUBE_API_KEY}`;
+                const res = await fetch(searchUrl);
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                    console.log(`[Channel Analyze] Handle @${handle} resolved to ID: ${data.items[0].id.channelId}`);
+                    return data.items[0].id.channelId;
+                }
+            } catch (e) {
+                console.error('[Channel Analyze] Handle resolution failed:', e);
+            }
+        }
+
+        // 3. Fallback: Search by channel name extracted from URL (e.g. youtube.com/c/Name)
+        // Simplified regex for user/c/custom
+        const match = url.match(/youtube\.com\/(?:c\/|user\/|@)([^\/\?]+)/);
+        if (match && match[1]) {
+            const name = match[1];
+            console.log(`[Channel Analyze] Resolving name: ${name}`);
+            try {
+                const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${name}&type=channel&key=${YOUTUBE_API_KEY}`;
+                const res = await fetch(searchUrl);
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                    console.log(`[Channel Analyze] Name ${name} resolved to ID: ${data.items[0].id.channelId}`);
+                    return data.items[0].id.channelId;
+                }
+            } catch (e) {
+                console.error('[Channel Analyze] Name resolution failed:', e);
+            }
+        }
+
+        console.log(`[Channel Analyze] Could not extract channel ID from URL: ${url}`);
+        return null;
+    }
+
     try {
         console.log(`[Channel Analyze] Starting deep analysis for: ${url}`);
 
-        // A. Resolve Channel ID & Name using YouTube API (More Reliable)
-        let channelId = '';
-        let channelName = 'Unknown_Channel';
+        // Helper: Ensure channelInfo is defined in scope
+        let channelId = await extractChannelId(url);
+        let channelName = 'Unknown Channel';
         let customUrl = '';
+        let channelInfo = {
+            title: 'Unknown Channel',
+            description: '',
+            customUrl: '',
+            thumbnail: '',
+            country: 'KR',
+            category: category,
+            url: url
+        };
 
-        // Extract handle or channel ID from URL
-        if (url.includes('youtube.com/@')) {
-            const handle = url.split('@')[1].split('/')[0];
-            const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=@${handle}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
-            const searchRes = await fetch(searchUrl);
-            const searchData = await searchRes.json();
-            if (searchData.items && searchData.items.length > 0) {
-                channelId = searchData.items[0].id.channelId;
-                channelName = searchData.items[0].snippet.title;
-            }
-        } else if (url.includes('/channel/')) {
-            channelId = url.split('/channel/')[1].split('/')[0];
-        }
-
-        // If we have an ID, fetch details to confirm name
         if (channelId) {
-            const chanUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`;
-            const chanRes = await fetch(chanUrl);
-            const chanData = await chanRes.json();
-            if (chanData.items && chanData.items.length > 0) {
-                channelName = chanData.items[0].snippet.title;
-                customUrl = chanData.items[0].snippet.customUrl;
-            }
-        }
+            console.log(`[Channel Analyze] Resolved Channel ID: ${channelId}`);
 
+            try {
+                const chanUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`;
+                const chanRes = await fetch(chanUrl);
+                const chanData = await chanRes.json();
+
+                if (chanData.items && chanData.items.length > 0) {
+                    const snippet = chanData.items[0].snippet;
+                    channelName = snippet.title;
+                    customUrl = snippet.customUrl || '';
+
+                    channelInfo = {
+                        title: snippet.title,
+                        description: snippet.description,
+                        customUrl: snippet.customUrl || '',
+                        thumbnail: snippet.thumbnails?.default?.url || '',
+                        country: snippet.country || 'KR', // Fallback to KR if missing
+                        category: category,
+                        url: url
+                    };
+                }
+            } catch (err) {
+                console.warn('[Channel Analyze] Channel details fetch failed:', err);
+            }
+        } else {
+            console.error('[Channel Analyze] FAILED to extract Channel ID from URL:', url);
+            return res.status(400).json({ error: 'Could not resolve Channel ID from URL.' });
+        }
         console.log(`[Channel Analyze] Target Channel: ${channelName} (${channelId})`);
 
         // B. Fetch Top Videos using YouTube API (Reliable)
@@ -221,29 +297,24 @@ router.post('/analyze', async (req, res) => {
         console.log(`[Channel Analyze] Requested Limit: ${limitStr}, Parsed Limit: ${limit}`);
 
         if (channelId) {
-            // Hard Cap: Ensure limit never exceeds 15 to prevent accidental credit usage
-            const safeLimit = Math.min(limit, 15);
-            console.log(`[Channel Analyze] Final Safe Limit: ${safeLimit} (Requested: ${limit})`);
-
-            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${safeLimit}&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
-            console.log(`[Channel Analyze] API Call: ${videosUrl.replace(YOUTUBE_API_KEY, 'API_KEY_HIDDEN')}`);
+            // SUPER SAFETY & DIVERSITY: Fetch more videos (e.g., 3x limit) then randomize selection
+            const fetchLimit = Math.min(limit * 3, 50); // Get more candidates
+            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${fetchLimit}&order=date&type=video&key=${YOUTUBE_API_KEY}`;
+            console.log(`[Channel Analyze] API Call (ORDER=DATE for diversity): ${videosUrl.replace(YOUTUBE_API_KEY, 'API_KEY_HIDDEN')}`);
 
             const videosRes = await fetch(videosUrl);
             const videosData = await videosRes.json();
 
             if (videosData.items) {
-                videos = videosData.items.map(item => ({
+                // Shuffle array to get random diverse set
+                const shuffled = videosData.items.sort(() => 0.5 - Math.random());
+
+                // Take requested limit
+                videos = shuffled.slice(0, limit).map(item => ({
                     id: item.id.videoId,
                     title: item.snippet.title,
                     url: `https://www.youtube.com/watch?v=${item.id.videoId}`
                 }));
-            }
-
-            // SUPER SAFETY: Explicitly slice the video list to the safe limit
-            // YouTube API might be ignoring maxResults or returning more items for some reason
-            if (videos.length > safeLimit) {
-                console.warn(`[Channel Analyze] API returned ${videos.length} videos, but safety limit is ${safeLimit}. Truncating...`);
-                videos = videos.slice(0, safeLimit);
             }
         } else {
             console.warn('[Channel Analyze] Could not resolve Channel ID via API. Falling back to simple yt-dlp for list (if available)...');
@@ -256,75 +327,177 @@ router.post('/analyze', async (req, res) => {
         console.log(`[Channel Analyze] Found ${videos.length} videos to analyze.`);
 
 
-        // C. Fetch Transcripts using Apify (pintostudio/youtube-transcript-scraper)
-        // Note: The actor 'pintostudio/youtube-transcript-scraper' seems to require 'videoUrl' (singular) based on error logs.
-        // We will run in parallel for the requested videos.
-        console.log('[Channel Analyze] Fetching transcripts via Apify (Parallel)...');
+        // C. Fetch Transcripts
+        const results = [];
+        const transcripts = []; // Definition restored
+        const transcriptSource = req.body.transcriptSource || 'apify';
+        console.log(`[Channel Analyze] Transcript Source: ${transcriptSource}`);
 
-        const { ApifyClient } = require('apify-client');
-        const client = new ApifyClient({ token: APIFY_TOKEN });
+        if (transcriptSource === 'whisper') {
+            console.log('[Channel Analyze] Using Whisper API (high quality, paid)...');
+            const tempDir = path.join(__dirname, '../../temp_audio');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-        const transcripts = [];
+            for (const video of videos) {
+                try {
+                    console.log(`[Whisper] Processing: ${video.title}`);
+                    const audioPath = path.join(tempDir, `${video.id}.mp3`);
 
-        // Function to fetch a single transcript
-        const fetchTranscript = async (video) => {
-            try {
-                const runInput = {
-                    videoUrl: video.url, // Correct field name based on error: 'Field input.videoUrl is required'
-                    preferredLanguage: "ko"
-                };
-
-                const run = await client.actor("pintostudio/youtube-transcript-scraper").call(runInput);
-                const { items } = await client.dataset(run.defaultDatasetId).listItems();
-
-                if (items && items.length > 0) {
-                    const item = items[0];
-                    let fullText = "";
-                    let fragments = [];
-
-                    // Case 1: Direct 'text' field
-                    if (item.text) {
-                        fullText = item.text;
-                    }
-                    // Case 2: 'data' array of captions (start, dur, text)
-                    else if (Array.isArray(item.data)) {
-                        fragments = item.data;
-                        fullText = fragments.map(c => c.text).join(" ");
-                    }
-                    // Case 3: 'captions' array or similar (fallback check)
-                    else if (Array.isArray(item.captions)) {
-                        fragments = item.captions;
-                        fullText = fragments.map(c => c.text).join(" ");
+                    // 1. Download Audio if not exists
+                    if (!fs.existsSync(audioPath)) {
+                        console.log(`[Whisper] Downloading audio...`);
+                        await ytDlp(video.url, {
+                            extractAudio: true,
+                            audioFormat: 'mp3',
+                            output: audioPath,
+                            noPlaylist: true,
+                            // quiet: true
+                        });
                     }
 
-                    if (fullText) {
-                        return {
-                            success: true,
-                            video: video,
-                            text: fullText,
-                            fragments: fragments
-                        };
-                    } else {
-                        console.warn(`[Apify Warning] Item found but no text extracted. Keys: ${Object.keys(item).join(', ')}`);
-                    }
+                    // 2. Transcribe with multilingual hint (Strengthened Prompt)
+                    console.log(`[Whisper] Transcribing with ENHDANCED multilingual detection...`);
+                    const transcription = await openai.audio.transcriptions.create({
+                        file: fs.createReadStream(audioPath),
+                        model: "whisper-1",
+                        response_format: "verbose_json",
+                        timestamp_granularities: ["segment"],
+                        prompt: "This audio is a viral video containing a mix of fast Korean narration and short English exclamations (e.g., 'Oh my god', 'No way', 'Yeah', 'What?'). Please transcribe EVERYTHING exactly as spoken, including these short English phrases and reactions. Do not filter them out."
+                    });
+
+                    const fullText = transcription.text;
+                    const segments = transcription.segments || [];
+
+                    // Preserve full timeline data (start, end, text) for better AI analysis
+                    results.push({
+                        success: true,
+                        video: video,
+                        text: fullText,
+                        fragments: segments.map(s => ({
+                            start: s.start,
+                            end: s.end,
+                            dur: s.end - s.start,
+                            text: s.text
+                        }))
+                    });
+
+                    console.log(`[Whisper] ✅ Success: ${segments.length} segments extracted`);
+
+                    // Cleanup audio to save space? (Optional, maybe keep for cache if needed later)
+                    // fs.unlinkSync(audioPath); 
+
+                } catch (e) {
+                    console.error(`[Whisper Error] Failed for ${video.title}:`, e.message);
+                    results.push({ success: false, video: video });
                 }
-                return { success: false, video: video };
-            } catch (e) {
-                console.error(`[Apify Error] Failed for ${video.title}:`, e.message);
-                return { success: false, video: video };
             }
+
+        } else {
+            // APIFY Logic (Default)
+            console.log('[Channel Analyze] Fetching transcripts via Apify (Parallel)...');
+
+            const { ApifyClient } = require('apify-client');
+            const client = new ApifyClient({ token: APIFY_TOKEN });
+
+            // Function to fetch a single transcript
+            const fetchTranscript = async (video) => {
+                try {
+                    const runInput = {
+                        videoUrl: video.url,
+                        preferredLanguage: "ko"
+                    };
+
+                    const run = await client.actor("pintostudio/youtube-transcript-scraper").call(runInput);
+                    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+                    if (items && items.length > 0) {
+                        const item = items[0];
+                        let fullText = "";
+                        let fragments = [];
+
+                        if (item.text) {
+                            fullText = item.text;
+                        } else if (Array.isArray(item.data)) {
+                            fragments = item.data;
+                            fullText = fragments.map(c => c.text).join(" ");
+                        } else if (Array.isArray(item.captions)) {
+                            fragments = item.captions;
+                            fullText = fragments.map(c => c.text).join(" ");
+                        }
+
+                        if (fullText) {
+                            return {
+                                success: true,
+                                video: video,
+                                text: fullText,
+                                fragments: fragments
+                            };
+                        }
+                    }
+                    return { success: false, video: video };
+                } catch (e) {
+                    console.error(`[Apify Error] Failed for ${video.title}:`, e.message);
+                    return { success: false, video: video };
+                }
+            };
+
+            // Run in batches
+            const BATCH_SIZE = 1;
+            for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+                const batch = videos.slice(i, i + BATCH_SIZE);
+                console.log(`[Channel Analyze] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(videos.length / BATCH_SIZE)} (${batch.length} videos)...`);
+
+                const batchResults = await Promise.all(batch.map(v => fetchTranscript(v)));
+                results.push(...batchResults);
+            }
+        }
+
+        // Process results and Save to Git
+        // Helper to format seconds to MM:SS
+        const formatTime = (seconds) => {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         };
 
-        // Run in batches to avoid Apify memory limits (Limit to 1 concurrent request due to heavy actor usage 4GB/run)
-        const BATCH_SIZE = 1;
-        const results = [];
+        for (const result of results) {
+            if (result.success && result.video && result.fragments) {
+                const safeTitle = sanitizeFilename(result.video.title);
+                const subDir = path.join(TRANSCRIPTS_DIR, channelInfo.country, channelInfo.category, sanitizeFilename(channelInfo.title));
 
-        for (let i = 0; i < videos.length; i += BATCH_SIZE) {
-            const batch = videos.slice(i, i + BATCH_SIZE);
-            console.log(`[Channel Analyze] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(videos.length / BATCH_SIZE)} (${batch.length} videos)...`);
+                if (!fs.existsSync(subDir)) {
+                    fs.mkdirSync(subDir, { recursive: true });
+                }
 
-            const batchResults = await Promise.all(batch.map(v => fetchTranscript(v)));
-            results.push(...batchResults);
+                const filePath = path.join(subDir, `${safeTitle}.txt`);
+
+                // --- Timeline-based Formatting with Gap Detection ---
+                let formattedText = "";
+                let lastEnd = 0;
+
+                // Sort fragments just in case
+                const sortedFragments = result.fragments.sort((a, b) => a.start - b.start);
+
+                for (const frag of sortedFragments) {
+                    // Check for significant gap (> 1.5 sec)
+                    if (frag.start - lastEnd > 1.5) {
+                        formattedText += `[${formatTime(lastEnd)} - ${formatTime(frag.start)}] (Audio Gap / Potential Dialogue or SFX)\n`;
+                    }
+
+                    // Add segment text
+                    // Use end time if available (Whisper usually provides it), otherwise estimate or omit
+                    const endTime = frag.end ? formatTime(frag.end) : formatTime(frag.start + (frag.dur || 3));
+                    formattedText += `[${formatTime(frag.start)} - ${endTime}] ${frag.text}\n`;
+
+                    lastEnd = frag.end || (frag.start + (frag.dur || 0));
+                }
+
+                // Append full text summary at the bottom for quick reading
+                formattedText += `\n--- Full Text Summary ---\n${result.text}`;
+
+                fs.writeFileSync(filePath, formattedText, 'utf8');
+                console.log(`[Channel Analyze] Saved transcript: ${filePath}`);
+            }
         }
 
         // Process results
@@ -341,7 +514,7 @@ router.post('/analyze', async (req, res) => {
 
                 const finalCountry = country || detectedCountry;
 
-                saveTranscript(category, channelName, res.video.title, transcriptText, finalCountry);
+                // saveTranscript(category, channelName, res.video.title, transcriptText, finalCountry); // DISABLED: Overwrites detailed transcript
 
                 // Format Transcript with Timestamps for Analysis (Viral Director Mode)
                 let analyzedText = transcriptText;

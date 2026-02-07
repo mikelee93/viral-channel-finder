@@ -4,6 +4,7 @@
 
 const Guideline = require('./models/Guideline');
 const ViolationCheck = require('./models/ViolationCheck');
+const { refineTimestampsUsingTranscript } = require('./server/utils/timestamp_refiner.util');
 const multer = require('multer');
 const fs = require('fs');
 const { geminiGenerateJSON, uploadFileToGemini, deleteFileFromGemini } = require('./server/utils/gemini.util');
@@ -692,6 +693,18 @@ ${segmentsText}
             ]);
 
             console.log(`[Director Mode] ✅ Plan created with ${response.directorPlan?.length || 0} scenes`);
+
+            // ═══════════════════════════════════════════════════════════
+            // Step 2.1: Refine Timestamps (Fix AI Hallucination)
+            // ═══════════════════════════════════════════════════════════
+            if (response.directorPlan && transcript && transcript.segments) {
+                try {
+                    console.log('[Director Mode] 🔧 Refining timestamps using original transcript...');
+                    response.directorPlan = refineTimestampsUsingTranscript(response.directorPlan, transcript.segments);
+                } catch (refineError) {
+                    console.error('[Director Mode] ⚠️ Timestamp refinement failed:', refineError);
+                }
+            }
 
             // ═══════════════════════════════════════════════════════════
             // Backend Validation: Enforce 5-second max segment length
