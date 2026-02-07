@@ -205,49 +205,85 @@ router.post('/generate', async (req, res) => {
             return res.status(404).json({ error: 'Style Channel not found' });
         }
 
-        // 3. Construct Gemini Prompt
+        // 3. Construct Gemini Prompt with STRONG DNA ENFORCEMENT
         const stylePersona = styleChannel.aiAnalysis?.strategy?.persona || 'A witty and engaging narrator';
         const styleTone = styleChannel.aiAnalysis?.strategy?.tone || 'Energetic and fast-paced';
         const styleHooks = styleChannel.aiAnalysis?.strategy?.hooks || 'Ask a surprising question';
         const directorRules = JSON.stringify(styleChannel.aiAnalysis?.strategy?.director_rules || []);
         const structureTemplate = JSON.stringify(styleChannel.aiAnalysis?.strategy?.structure_template || []);
 
+        // NEW: Extract vocabulary and linguistic patterns
+        const catchphrases = JSON.stringify(styleChannel.aiAnalysis?.strategy?.catchphrases || []);
+        const vocabularyPatterns = JSON.stringify(styleChannel.aiAnalysis?.strategy?.vocabulary_patterns || {});
+        const sentenceStructure = styleChannel.aiAnalysis?.strategy?.sentence_structure || 'Dynamic mix of short and long sentences';
+        const transitionPhrases = JSON.stringify(styleChannel.aiAnalysis?.strategy?.transition_phrases || []);
+
         const prompt = `
         Role: You are a professional YouTube Shorts Director mirroring a specific Creator Persona.
         
-        Target Persona:
+        Target Persona DNA:
         - Name: ${styleChannel.channelTitle}
         - Tone: ${styleTone}
         - Style: ${stylePersona}
         - Hook Strategy: ${styleHooks}
-        - Director Rules: ${directorRules}
         - Structure Template: ${structureTemplate}
+        
+        ═══════════════════════════════════════════════════════════════
+        🧬 CRITICAL DNA APPLICATION RULES (STRICT ENFORCEMENT REQUIRED)
+        ═══════════════════════════════════════════════════════════════
+        
+        1. **VOCABULARY LOCK 🔒**
+           - You MUST use these exact catchphrases: ${catchphrases}
+           - Preferred vocabulary patterns: ${vocabularyPatterns}
+           - Every sentence should feel like it came from the original creator
+        
+        2. **SENTENCE STRUCTURE MATCH 📏**
+           - Target structure: ${sentenceStructure}
+           - Mirror the original's rhythm and flow precisely
+           - DO NOT write in generic "AI voice" - copy the creator's syntax
+        
+        3. **TRANSITION PHRASES 🔗**
+           - Use ONLY these transition words: ${transitionPhrases}
+           - Connect ideas exactly how the original creator would
+        
+        4. **TONE CONSISTENCY 🎭**
+           - Every single line must reflect: ${styleTone}
+           - Check each sentence against this tone requirement
+        
+        5. **STRUCTURE TEMPLATE ⏱️**
+           - Follow this timing EXACTLY: ${structureTemplate}
+           - DO NOT deviate from the original pacing
+        
+        6. **DIRECTOR RULES 🎬**
+           - Apply these rules to every frame: ${directorRules}
+        
+        ═══════════════════════════════════════════════════════════════
 
         Task: 
-        Rewrite the following source video transcript into a new Viral Shorts Script adhering strictly to the Target Persona's style.
-        The output must be a "Full Shorts Processing" script that transforms the source into a high-retention short.
+        Rewrite the following source video transcript into a new Viral Shorts Script that is INDISTINGUISHABLE from the original creator's style.
         
-        Processing Guidelines:
-        1. **Plot Analysis**: Understand the twist and irony of the source.
-        2. **Persona Voice**: Apply the specific tone (e.g. cynical, detached, excited) to the narration.
-        3. **Dialogue Translation**: If characters speak, translate their lines to natural Japanese dialogue (do not summarize them as narration unless appropriate).
-        4. **Structure**: Follow the 'Structure Template' (e.g. Hook -> Twist -> Punchline).
-        5. **Ending (CTA)**: MUST end with a strong Call To Action (CTA) or question to the audience to induce comments (e.g., "What would you do?").
+        VALIDATION CHECKLIST (Check before finalizing):
+        ✓ Uses at least 3 catchphrases from the DNA
+        ✓ Sentence structure matches the creator's pattern
+        ✓ Transitions use the specified phrases
+        ✓ Tone is consistent throughout
+        ✓ Structure template timing is followed
+        ✓ All director rules are applied
 
         Source Transcript:
         "${finalTranscript.slice(0, 6000)}" 
 
         Output Requirements:
-        1. **Title**: Catchy, viral title in Korean.
-        2. **Timeline**: 00:00 - 00:60 (Max 60 sec).
+        1. **Title**: Catchy, viral title in Korean matching creator's style.
+        2. **Timeline**: 00:00 - 00:60 (Max 60 sec), following structure template.
         3. **Script Content**:
-           - "section": Hook / Body / Twist / Conclusion / CTA
+           - "section": Hook / Body / Twist / Conclusion / CTA (based on structure template)
            - "type": Narration (Narrator) or Dialogue (Character)
-           - "text_jp": Natural Japanese line.
-           - "text_pron": Japanese Pronunciation in Romanji or Hangul.
-           - "text_kr": Korean Translation.
-           - "sfx": Specific sound effect cue.
-           - "visual_cue": Camera direction.
+           - "text_jp": Natural Japanese line using DNA vocabulary
+           - "text_pron": Japanese Pronunciation in Romanji or Hangul
+           - "text_kr": Korean Translation using DNA vocabulary
+           - "sfx": Specific sound effect cue
+           - "visual_cue": Camera direction
 
         Output Format (JSON):
         {

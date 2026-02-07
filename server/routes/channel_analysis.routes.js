@@ -293,212 +293,323 @@ router.post('/analyze', async (req, res) => {
 
         let videos = [];
         const limitStr = req.body.limit;
-        const limit = parseInt(limitStr) || 5;
-        console.log(`[Channel Analyze] Requested Limit: ${limitStr}, Parsed Limit: ${limit}`);
+        let limit = 5;
+        let useAllLocalFiles = false;
 
-        if (channelId) {
-            // SUPER SAFETY & DIVERSITY: Fetch more videos (e.g., 3x limit) then randomize selection
-            const fetchLimit = Math.min(limit * 3, 50); // Get more candidates
-            const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${fetchLimit}&order=date&type=video&key=${YOUTUBE_API_KEY}`;
-            console.log(`[Channel Analyze] API Call (ORDER=DATE for diversity): ${videosUrl.replace(YOUTUBE_API_KEY, 'API_KEY_HIDDEN')}`);
-
-            const videosRes = await fetch(videosUrl);
-            const videosData = await videosRes.json();
-
-            if (videosData.items) {
-                // Shuffle array to get random diverse set
-                const shuffled = videosData.items.sort(() => 0.5 - Math.random());
-
-                // Take requested limit
-                videos = shuffled.slice(0, limit).map(item => ({
-                    id: item.id.videoId,
-                    title: item.snippet.title,
-                    url: `https://www.youtube.com/watch?v=${item.id.videoId}`
-                }));
-            }
+        if (limitStr === 'all') {
+            useAllLocalFiles = true;
+            limit = 1000; // Set high limit for safety
+            console.log(`[Channel Analyze] Mode: ALL LOCAL FILES (Using saved transcripts)`);
         } else {
-            console.warn('[Channel Analyze] Could not resolve Channel ID via API. Falling back to simple yt-dlp for list (if available)...');
-            // Fallback (User said yt-dlp is bad, but if we can't find channel ID, we have no choice for YouTube API)
-            // But let's assume API works if key is valid.
-            throw new Error('Could not resolve Channel ID from URL. Please ensure the URL is valid.');
+            limit = parseInt(limitStr) || 5;
+            console.log(`[Channel Analyze] Requested Limit: ${limitStr}, Parsed Limit: ${limit}`);
         }
 
-        if (videos.length === 0) throw new Error('No videos found for this channel.');
-        console.log(`[Channel Analyze] Found ${videos.length} videos to analyze.`);
+        // SPECIAL LOGIC: If 'all', try to load from local transcripts first
+        if (useAllLocalFiles) {
+            console.log(`[Channel Analyze] Searching for local transcripts for: ${channelInfo.title}`);
+
+            const baseDir = path.join(__dirname, '../../transcripts');
+            let targetDir = null;
+
+            // 0. Use Custom Path if provided (User Override)
+            const { customFolderPath } = req.body;
+            if (customFolderPath && customFolderPath.trim() !== '') {
+                console.log(`[Channel Analyze] User provided custom folder: ${customFolderPath}`);
+                if (fs.existsSync(customFolderPath)) {
+                    targetDir = customFolderPath;
+                } else {
+                    console.warn(`[Channel Analyze] Custom folder does not exist: ${customFolderPath}`);
+                }
+            }
+
+            // 1. Try rigid path first (Optimization) if no custom path or custom path failed
+            if (!targetDir) {
+                const rigidPath = path.join(baseDir, channelInfo.country || 'KR', sanitizeFilename(channelInfo.category || 'entertainment'), sanitizeFilename(channelInfo.title));
+                if (fs.existsSync(rigidPath)) {
+                    targetDir = rigidPath;
+                } else {
+                    // 2. Search recursively in baseDir (Depth 2: Country -> Category -> Channel)
+                    console.log('[Channel Analyze] Rigid path not found. Scanning directories...');
+                    try {
+                        const countries = ['KR', 'JP']; // Prioritize main countries
+                        for (const country of countries) {
+                            const countryPath = path.join(baseDir, country);
+                            if (fs.existsSync(countryPath)) {
+                                const categories = fs.readdirSync(countryPath);
+                                for (const cat of categories) {
+                                    const catPath = path.join(countryPath, cat);
+                                    // Check if it is a directory
+                                    if (fs.statSync(catPath).isDirectory()) {
+                                        // Check if channel exists here (Exact match or specialized match)
+                                        // We check for sanitizeFilename(channelInfo.title)
+                                        const targetName = sanitizeFilename(channelInfo.title);
+                                        const channelPath = path.join(catPath, targetName);
+
+                                        if (fs.existsSync(channelPath)) {
+                                            targetDir = channelPath;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (targetDir) break;
+                        }
+                    } catch (e) {
+                        console.error('[Channel Analyze] Error scanning directories:', e);
+                    }
+                }
+
+            } // Close if (!targetDir)
+
+            if (targetDir && fs.existsSync(targetDir)) {
+                console.log(`[Channel Analyze] Found local dir: ${targetDir}`);
+                const files = fs.readdirSync(targetDir).filter(f => f.endsWith('.txt'));
+
+                if (files.length > 0) {
+                    console.log(`[Channel Analyze] Found ${files.length} local transcripts.`);
+                    const fs = require('fs');
+                    const localResults = files.map(file => {
+                        const content = fs.readFileSync(path.join(targetDir, file), 'utf8');
+                        return {
+                            success: true,
+                            video: {
+                                id: 'local_file',
+                                title: file.replace('.txt', ''),
+                                url: 'local_file'
+                            },
+                            text: content,
+                            fragments: []
+                        };
+                    });
+                    req.localResults = localResults;
+                } else {
+                    console.warn('[Channel Analyze] Directory exists but no .txt files found.');
+                    useAllLocalFiles = false;
+                }
+            } else {
+                console.warn(`[Channel Analyze] Local directory for '${channelInfo.title}' NOT FOUND in KR or JP.`);
+                useAllLocalFiles = false;
+                limit = 50;
+            }
+        }
+
+        if (!useAllLocalFiles) {
+            if (channelId) {
+                // SUPER SAFETY & DIVERSITY: Fetch more videos (e.g., 3x limit) then randomize selection
+                const fetchLimit = Math.min(limit * 3, 50); // Get more candidates
+                // Updated to 'viewCount' for most popular viral videos
+                const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${fetchLimit}&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
+                console.log(`[Channel Analyze] API Call (ORDER=VIEWCOUNT for viral dna): ${videosUrl.replace(YOUTUBE_API_KEY, 'API_KEY_HIDDEN')}`);
+
+                const videosRes = await fetch(videosUrl);
+                const videosData = await videosRes.json();
+
+                if (videosData.items) {
+                    // Shuffle array to get random diverse set
+                    const shuffled = videosData.items.sort(() => 0.5 - Math.random());
+
+                    // Take requested limit
+                    videos = shuffled.slice(0, limit).map(item => ({
+                        id: item.id.videoId,
+                        title: item.snippet.title,
+                        url: `https://www.youtube.com/watch?v=${item.id.videoId}`
+                    }));
+                }
+            } else {
+                console.warn('[Channel Analyze] Could not resolve Channel ID via API. Falling back to simple yt-dlp for list (if available)...');
+                // Fallback (User said yt-dlp is bad, but if we can't find channel ID, we have no choice for YouTube API)
+                // But let's assume API works if key is valid.
+                throw new Error('Could not resolve Channel ID from URL. Please ensure the URL is valid.');
+            }
+
+            if (videos.length === 0) throw new Error('No videos found for this channel.');
+            console.log(`[Channel Analyze] Found ${videos.length} videos to analyze.`);
+        }
+
 
 
         // C. Fetch Transcripts
-        const results = [];
-        const transcripts = []; // Definition restored
-        const transcriptSource = req.body.transcriptSource || 'apify';
-        console.log(`[Channel Analyze] Transcript Source: ${transcriptSource}`);
+        let results = [];
+        if (req.localResults) {
+            console.log('[Channel Analyze] Using LOCALLY LOADED transcripts (Skip Download/Transcribe)');
+            results = req.localResults;
+        }
 
-        if (transcriptSource === 'whisper') {
-            console.log('[Channel Analyze] Using Whisper API (high quality, paid)...');
-            const tempDir = path.join(__dirname, '../../temp_audio');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        // Only fetch if no local results
+        if (results.length === 0) {
+            const transcripts = []; // Definition restored
+            const transcriptSource = req.body.transcriptSource || 'apify';
+            console.log(`[Channel Analyze] Transcript Source: ${transcriptSource}`);
 
-            for (const video of videos) {
-                try {
-                    console.log(`[Whisper] Processing: ${video.title}`);
-                    const audioPath = path.join(tempDir, `${video.id}.mp3`);
 
-                    // 1. Download Audio if not exists
-                    if (!fs.existsSync(audioPath)) {
-                        console.log(`[Whisper] Downloading audio...`);
-                        await ytDlp(video.url, {
-                            extractAudio: true,
-                            audioFormat: 'mp3',
-                            output: audioPath,
-                            noPlaylist: true,
-                            // quiet: true
+            if (transcriptSource === 'whisper') {
+                console.log('[Channel Analyze] Using Whisper API (high quality, paid)...');
+                const tempDir = path.join(__dirname, '../../temp_audio');
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+                for (const video of videos) {
+                    try {
+                        console.log(`[Whisper] Processing: ${video.title}`);
+                        const audioPath = path.join(tempDir, `${video.id}.mp3`);
+
+                        // 1. Download Audio if not exists
+                        if (!fs.existsSync(audioPath)) {
+                            console.log(`[Whisper] Downloading audio...`);
+                            await ytDlp(video.url, {
+                                extractAudio: true,
+                                audioFormat: 'mp3',
+                                output: audioPath,
+                                noPlaylist: true,
+                                // quiet: true
+                            });
+                        }
+
+                        // 2. Transcribe with multilingual hint (Strengthened Prompt)
+                        console.log(`[Whisper] Transcribing with ENHDANCED multilingual detection...`);
+                        const transcription = await openai.audio.transcriptions.create({
+                            file: fs.createReadStream(audioPath),
+                            model: "whisper-1",
+                            response_format: "verbose_json",
+                            timestamp_granularities: ["segment"],
+                            prompt: "This audio is a viral video containing a mix of fast Korean narration and short English exclamations (e.g., 'Oh my god', 'No way', 'Yeah', 'What?'). Please transcribe EVERYTHING exactly as spoken, including these short English phrases and reactions. Do not filter them out."
                         });
+
+                        const fullText = transcription.text;
+                        const segments = transcription.segments || [];
+
+                        // Preserve full timeline data (start, end, text) for better AI analysis
+                        results.push({
+                            success: true,
+                            video: video,
+                            text: fullText,
+                            fragments: segments.map(s => ({
+                                start: s.start,
+                                end: s.end,
+                                dur: s.end - s.start,
+                                text: s.text
+                            }))
+                        });
+
+                        console.log(`[Whisper] ✅ Success: ${segments.length} segments extracted`);
+
+                        // Cleanup audio to save space? (Optional, maybe keep for cache if needed later)
+                        // fs.unlinkSync(audioPath); 
+
+                    } catch (e) {
+                        console.error(`[Whisper Error] Failed for ${video.title}:`, e.message);
+                        results.push({ success: false, video: video });
                     }
+                }
 
-                    // 2. Transcribe with multilingual hint (Strengthened Prompt)
-                    console.log(`[Whisper] Transcribing with ENHDANCED multilingual detection...`);
-                    const transcription = await openai.audio.transcriptions.create({
-                        file: fs.createReadStream(audioPath),
-                        model: "whisper-1",
-                        response_format: "verbose_json",
-                        timestamp_granularities: ["segment"],
-                        prompt: "This audio is a viral video containing a mix of fast Korean narration and short English exclamations (e.g., 'Oh my god', 'No way', 'Yeah', 'What?'). Please transcribe EVERYTHING exactly as spoken, including these short English phrases and reactions. Do not filter them out."
-                    });
+            } else {
+                // APIFY Logic (Default)
+                console.log('[Channel Analyze] Fetching transcripts via Apify (Parallel)...');
 
-                    const fullText = transcription.text;
-                    const segments = transcription.segments || [];
+                const { ApifyClient } = require('apify-client');
+                const client = new ApifyClient({ token: APIFY_TOKEN });
 
-                    // Preserve full timeline data (start, end, text) for better AI analysis
-                    results.push({
-                        success: true,
-                        video: video,
-                        text: fullText,
-                        fragments: segments.map(s => ({
-                            start: s.start,
-                            end: s.end,
-                            dur: s.end - s.start,
-                            text: s.text
-                        }))
-                    });
+                // Function to fetch a single transcript
+                const fetchTranscript = async (video) => {
+                    try {
+                        const runInput = {
+                            videoUrl: video.url,
+                            preferredLanguage: "ko"
+                        };
 
-                    console.log(`[Whisper] ✅ Success: ${segments.length} segments extracted`);
+                        const run = await client.actor("pintostudio/youtube-transcript-scraper").call(runInput);
+                        const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-                    // Cleanup audio to save space? (Optional, maybe keep for cache if needed later)
-                    // fs.unlinkSync(audioPath); 
+                        if (items && items.length > 0) {
+                            const item = items[0];
+                            let fullText = "";
+                            let fragments = [];
 
-                } catch (e) {
-                    console.error(`[Whisper Error] Failed for ${video.title}:`, e.message);
-                    results.push({ success: false, video: video });
+                            if (item.text) {
+                                fullText = item.text;
+                            } else if (Array.isArray(item.data)) {
+                                fragments = item.data;
+                                fullText = fragments.map(c => c.text).join(" ");
+                            } else if (Array.isArray(item.captions)) {
+                                fragments = item.captions;
+                                fullText = fragments.map(c => c.text).join(" ");
+                            }
+
+                            if (fullText) {
+                                return {
+                                    success: true,
+                                    video: video,
+                                    text: fullText,
+                                    fragments: fragments
+                                };
+                            }
+                        }
+                        return { success: false, video: video };
+                    } catch (e) {
+                        console.error(`[Apify Error] Failed for ${video.title}:`, e.message);
+                        return { success: false, video: video };
+                    }
+                };
+
+                // Run in batches
+                const BATCH_SIZE = 1;
+                for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+                    const batch = videos.slice(i, i + BATCH_SIZE);
+                    console.log(`[Channel Analyze] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(videos.length / BATCH_SIZE)} (${batch.length} videos)...`);
+
+                    const batchResults = await Promise.all(batch.map(v => fetchTranscript(v)));
+                    results.push(...batchResults);
                 }
             }
 
-        } else {
-            // APIFY Logic (Default)
-            console.log('[Channel Analyze] Fetching transcripts via Apify (Parallel)...');
-
-            const { ApifyClient } = require('apify-client');
-            const client = new ApifyClient({ token: APIFY_TOKEN });
-
-            // Function to fetch a single transcript
-            const fetchTranscript = async (video) => {
-                try {
-                    const runInput = {
-                        videoUrl: video.url,
-                        preferredLanguage: "ko"
-                    };
-
-                    const run = await client.actor("pintostudio/youtube-transcript-scraper").call(runInput);
-                    const { items } = await client.dataset(run.defaultDatasetId).listItems();
-
-                    if (items && items.length > 0) {
-                        const item = items[0];
-                        let fullText = "";
-                        let fragments = [];
-
-                        if (item.text) {
-                            fullText = item.text;
-                        } else if (Array.isArray(item.data)) {
-                            fragments = item.data;
-                            fullText = fragments.map(c => c.text).join(" ");
-                        } else if (Array.isArray(item.captions)) {
-                            fragments = item.captions;
-                            fullText = fragments.map(c => c.text).join(" ");
-                        }
-
-                        if (fullText) {
-                            return {
-                                success: true,
-                                video: video,
-                                text: fullText,
-                                fragments: fragments
-                            };
-                        }
-                    }
-                    return { success: false, video: video };
-                } catch (e) {
-                    console.error(`[Apify Error] Failed for ${video.title}:`, e.message);
-                    return { success: false, video: video };
-                }
+            // Process results and Save to Git
+            // Helper to format seconds to MM:SS
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             };
 
-            // Run in batches
-            const BATCH_SIZE = 1;
-            for (let i = 0; i < videos.length; i += BATCH_SIZE) {
-                const batch = videos.slice(i, i + BATCH_SIZE);
-                console.log(`[Channel Analyze] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(videos.length / BATCH_SIZE)} (${batch.length} videos)...`);
+            for (const result of results) {
+                if (result.success && result.video && result.fragments) {
+                    const safeTitle = sanitizeFilename(result.video.title);
+                    const subDir = path.join(TRANSCRIPTS_DIR, channelInfo.country, channelInfo.category, sanitizeFilename(channelInfo.title));
 
-                const batchResults = await Promise.all(batch.map(v => fetchTranscript(v)));
-                results.push(...batchResults);
-            }
-        }
-
-        // Process results and Save to Git
-        // Helper to format seconds to MM:SS
-        const formatTime = (seconds) => {
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60);
-            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        };
-
-        for (const result of results) {
-            if (result.success && result.video && result.fragments) {
-                const safeTitle = sanitizeFilename(result.video.title);
-                const subDir = path.join(TRANSCRIPTS_DIR, channelInfo.country, channelInfo.category, sanitizeFilename(channelInfo.title));
-
-                if (!fs.existsSync(subDir)) {
-                    fs.mkdirSync(subDir, { recursive: true });
-                }
-
-                const filePath = path.join(subDir, `${safeTitle}.txt`);
-
-                // --- Timeline-based Formatting with Gap Detection ---
-                let formattedText = "";
-                let lastEnd = 0;
-
-                // Sort fragments just in case
-                const sortedFragments = result.fragments.sort((a, b) => a.start - b.start);
-
-                for (const frag of sortedFragments) {
-                    // Check for significant gap (> 1.5 sec)
-                    if (frag.start - lastEnd > 1.5) {
-                        formattedText += `[${formatTime(lastEnd)} - ${formatTime(frag.start)}] (Audio Gap / Potential Dialogue or SFX)\n`;
+                    if (!fs.existsSync(subDir)) {
+                        fs.mkdirSync(subDir, { recursive: true });
                     }
 
-                    // Add segment text
-                    // Use end time if available (Whisper usually provides it), otherwise estimate or omit
-                    const endTime = frag.end ? formatTime(frag.end) : formatTime(frag.start + (frag.dur || 3));
-                    formattedText += `[${formatTime(frag.start)} - ${endTime}] ${frag.text}\n`;
+                    const filePath = path.join(subDir, `${safeTitle}.txt`);
 
-                    lastEnd = frag.end || (frag.start + (frag.dur || 0));
+                    // --- Timeline-based Formatting with Gap Detection ---
+                    let formattedText = "";
+                    let lastEnd = 0;
+
+                    // Sort fragments just in case
+                    const sortedFragments = result.fragments.sort((a, b) => a.start - b.start);
+
+                    for (const frag of sortedFragments) {
+                        // Check for significant gap (> 1.5 sec)
+                        if (frag.start - lastEnd > 1.5) {
+                            formattedText += `[${formatTime(lastEnd)} - ${formatTime(frag.start)}] (Audio Gap / Potential Dialogue or SFX)\n`;
+                        }
+
+                        // Add segment text
+                        // Use end time if available (Whisper usually provides it), otherwise estimate or omit
+                        const endTime = frag.end ? formatTime(frag.end) : formatTime(frag.start + (frag.dur || 3));
+                        formattedText += `[${formatTime(frag.start)} - ${endTime}] ${frag.text}\n`;
+
+                        lastEnd = frag.end || (frag.start + (frag.dur || 0));
+                    }
+
+                    // Append full text summary at the bottom for quick reading
+                    formattedText += `\n--- Full Text Summary ---\n${result.text}`;
+
+                    fs.writeFileSync(filePath, formattedText, 'utf8');
+                    console.log(`[Channel Analyze] Saved transcript: ${filePath}`);
                 }
-
-                // Append full text summary at the bottom for quick reading
-                formattedText += `\n--- Full Text Summary ---\n${result.text}`;
-
-                fs.writeFileSync(filePath, formattedText, 'utf8');
-                console.log(`[Channel Analyze] Saved transcript: ${filePath}`);
             }
-        }
+        } // Close 'if (results.length === 0)' block
 
         // Process results
         for (const res of results) {
@@ -554,14 +665,28 @@ router.post('/analyze', async (req, res) => {
         Input Data (Top ${videos.length} Popular Videos):
         ${combinedData}
         
-        Task: Extract the creator's specific style, tone, viral patterns.
-        Since we skipped audio analysis, focus heavily on the text content, pacing, and structure inferred from the transcript.
+        Task: Extract the creator's specific style, tone, viral patterns, AND vocabulary/linguistic patterns.
+        Since we skipped audio analysis, focus heavily on the text content, pacing, structure, and LANGUAGE PATTERNS.
+        
+        CRITICAL: Pay special attention to:
+        1. **Vocabulary Patterns**: What specific words, adjectives, verbs do they use repeatedly?
+        2. **Sentence Structure**: Are sentences short and punchy? Long and flowing? Mix of both?
+        3. **Transition Phrases**: How do they connect ideas? (e.g., "그런데", "하지만", "여기서")
+        4. **Catchphrases**: Exact recurring phrases that define their voice
+        5. **Ending Patterns**: How do they typically conclude videos? (Questions, CTAs, cliffhangers)
         
         Output JSON Format:
         {
             "tone": "Keywords like High-Tension, Calm, Sarcastic, etc. (with Korean translation)",
             "hook_style": "How they usually start videos (e.g., Starts with a scream) (with Korean translation)",
-            "catchphrases": ["List", "of", "recurring", "phrases"],
+            "catchphrases": ["Exact recurring phrases they use", "Another signature phrase", "etc."],
+            "vocabulary_patterns": {
+                "adjectives": ["specific adjectives they favor"],
+                "verbs": ["common action verbs"],
+                "signature_expressions": ["unique phrases or idioms"]
+            },
+            "sentence_structure": "Short punchy sentences / Long flowing narration / Dynamic mix (Provide detailed description)",
+            "transition_phrases": ["그런데", "하지만", "여기서", "etc."],
             "pacing": "Fast/Slow/Dynamic (Inferred from text density)",
             "structure_template": [
                 { "time": "0-5s", "type": "Hook", "description": "Description of content in English (Korean translation)" },
