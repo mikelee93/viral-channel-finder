@@ -95,8 +95,33 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
 
                 const { items } = await client.dataset(run.defaultDatasetId).listItems();
                 comments = items.map(item => item.text);
+            }
+
+            // 4. Reddit
+            else if (url.includes('reddit.com') || url.includes('v.redd.it')) {
+                console.log(`[Comment Scraper] Fetching Reddit comments...`);
+
+                // Use our new Reddit comments API
+                const redditResponse = await fetch(`http://localhost:4000/api/reddit/comments?url=${encodeURIComponent(url)}`);
+
+                if (!redditResponse.ok) {
+                    const error = await redditResponse.json();
+                    throw new Error(error.error || 'Failed to fetch Reddit comments');
+                }
+
+                const redditData = await redditResponse.json();
+
+                if (redditData.success && redditData.comments) {
+                    // Format Reddit comments with score and author
+                    comments = redditData.comments.map(c =>
+                        `[${c.score}↑] ${c.author}: ${c.text}`
+                    );
+                    console.log(`[Comment Scraper] Fetched ${comments.length} Reddit comments`);
+                } else {
+                    throw new Error('Invalid Reddit comments response');
+                }
             } else {
-                return res.status(400).json({ error: 'Unsupported platform. Only YouTube, TikTok, Instagram allowed.' });
+                return res.status(400).json({ error: 'Unsupported platform. Only YouTube, TikTok, Instagram, Reddit allowed.' });
             }
 
             console.log(`[Comment Scraper] Found ${comments.length} comments`);

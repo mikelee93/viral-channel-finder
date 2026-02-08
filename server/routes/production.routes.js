@@ -12,6 +12,15 @@ const HotChannel = require('../../models/HotChannel'); // Adjusted path to root 
 const { extractYouTubeId } = require('../services/youtube-analyzer.service');
 
 /**
+ * Helper: Format seconds to MM:SS
+ */
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
  * GET /api/production/styles
  * Returns list of available styles (Hot Channels)
  */
@@ -130,7 +139,7 @@ router.get('/styles', async (req, res) => {
  */
 router.post('/generate', async (req, res) => {
     try {
-        const { sourceUrl, styleId, transcriptText } = req.body;
+        const { sourceUrl, styleId, transcriptText, transcriptSegments } = req.body;
 
         if ((!sourceUrl && !transcriptText) || !styleId) {
             return res.status(400).json({ error: 'Source URL (or Transcript) and Style ID are required' });
@@ -141,11 +150,21 @@ router.post('/generate', async (req, res) => {
         // 1. Get Source Transcript
         let finalTranscript = '';
         let sourceMetadata = {};
+        let timelineData = ''; // NEW: Timeline with timestamps
 
         if (transcriptText) {
             // Case A: Transcript provided directly (from Local File Whisper)
             finalTranscript = transcriptText;
             sourceMetadata = { title: 'Local File Upload' };
+
+            // NEW: Format timeline with timestamps if segments are provided
+            if (transcriptSegments && Array.isArray(transcriptSegments)) {
+                timelineData = transcriptSegments.map(seg => {
+                    const start = formatTime(seg.start);
+                    const end = formatTime(seg.end);
+                    return `[${start} → ${end}] ${seg.text}`;
+                }).join('\n');
+            }
         } else {
             // Case B: URL provided (YouTube)
             try {
@@ -262,6 +281,16 @@ router.post('/generate', async (req, res) => {
         Task: 
         Rewrite the following source video transcript into a new Viral Shorts Script that is INDISTINGUISHABLE from the original creator's style.
         
+        **IMPORTANT: The source transcript may be in ANY language (English, French, Spanish, etc.). You MUST:**
+        1. Understand the content and context of the source transcript regardless of language
+        2. Translate and adapt it to Japanese (text_jp), Japanese Pronunciation in Hangul (text_pron), and Korean (text_kr)
+        3. Apply the creator's DNA style to the translated content
+        4. Ensure text_pron accurately represents the Japanese pronunciation using Korean Hangul characters
+        5. **USE THE ORIGINAL TIMELINE TIMESTAMPS** - Map your script to the exact timestamps from the source video
+        6. **DISTINGUISH BETWEEN:**
+           - **"Narration"**: New voiceover you create to add context/style (type: "Narration")
+           - **"Dialogue"**: Original dialogue from the source video (type: "Dialogue", use original timestamps)
+        
         VALIDATION CHECKLIST (Check before finalizing):
         ✓ Uses at least 3 catchphrases from the DNA
         ✓ Sentence structure matches the creator's pattern
@@ -269,38 +298,112 @@ router.post('/generate', async (req, res) => {
         ✓ Tone is consistent throughout
         ✓ Structure template timing is followed
         ✓ All director rules are applied
+        ✓ **Timestamps match the original video timeline**
+        ✓ **Type is correctly set (Narration vs Dialogue)**
 
-        Source Transcript:
-        "${finalTranscript.slice(0, 6000)}" 
-
+        Source Video Timeline (with original dialogue):
+        ${timelineData || finalTranscript.slice(0, 6000)}
+        
+        
+        **INSTRUCTIONS FOR TIMELINE MAPPING:**
+        - For **Dialogue** segments: Use the EXACT timestamps from the source timeline above
+        - For **Narration** segments: Insert between dialogue segments where appropriate
+        - **CRITICAL**: ALL segments (both Narration and Dialogue) MUST include:
+          - "time": Display time in MM:SS format (e.g., "00:15")
+          - "start_time": Start timestamp in MM:SS format (e.g., "00:15")
+          - "end_time": End timestamp in MM:SS format (e.g., "00:18")
+        - Narration segments should have realistic durations (typically 3-5 seconds per sentence)
+        
         Output Requirements:
-        1. **Title**: Catchy, viral title in Korean matching creator's style.
-        2. **Timeline**: 00:00 - 00:60 (Max 60 sec), following structure template.
-        3. **Script Content**:
+        1. **Titles**: Generate 3 viral title variations in Korean matching creator's style
+           - Title 1: Hook-focused (curiosity-driven)
+           - Title 2: Emotion-focused (shock/surprise)
+           - Title 3: Question-focused (engagement)
+        2. **Thumbnail Texts**: Generate 3 thumbnail text variations (2 lines max, short and punchy)
+           - Thumbnail 1: General hook (emotion/situation-based)
+           - Thumbnail 2: Number hook (use specific numbers for impact, e.g., "3초만에", "100% 반전")
+           - Thumbnail 3: Question/curiosity hook
+           - Each thumbnail must include: Korean (kr), Japanese (jp), Japanese Pronunciation in Hangul (pron)
+           - Use \n for line breaks (max 2 lines)
+        3. **Timeline**: 00:00 - 00:60 (Max 60 sec), following structure template.
+        4. **Script Content**:
            - "section": Hook / Body / Twist / Conclusion / CTA (based on structure template)
            - "type": Narration (Narrator) or Dialogue (Character)
-           - "text_jp": Natural Japanese line using DNA vocabulary
-           - "text_pron": Japanese Pronunciation in Romanji or Hangul
+           - "time": Display time MM:SS
+           - "start_time": Start time MM:SS (REQUIRED for ALL segments)
+           - "end_time": End time MM:SS (REQUIRED for ALL segments)
+           - "text_jp": Japanese with "/" separators between words/phrases for Shorts subtitle timing
+             Example: "常識外れの / 行動に、/ 怒りは / 募るばかりですが..."
+             Add CapCut color tags for emphasis: <color=#FF6B6B>重要な言葉</color>
+           - "text_pron": Hangul pronunciation with "/" matching text_jp separators exactly
+             Example: "죠-시키하즈레노 / 코-도-니, / 이카리와 / 츠노루 바카리 데스가..."
+             Add same CapCut color tags: <color=#FF6B6B>중요한 단어</color>
            - "text_kr": Korean Translation using DNA vocabulary
+           - "emphasis": { "words": ["word1", "word2"], "color": "#FF6B6B", "reason": "emotion/key point" }
            - "sfx": Specific sound effect cue
            - "visual_cue": Camera direction
+        
+        **CapCut Color Guidelines:**
+        - Red (#FF6B6B): Strong emotions, shocking moments
+        - Yellow (#FFD93D): Numbers, key facts, important data
+        - Blue (#6BCF7F): Questions, curiosity hooks
+        - Purple (#B794F6): Twist moments, surprises
+
 
         Output Format (JSON):
         {
-          "title": "Viral Title (KR)",
+          "titles": [
+            "🔥 스키장에서 벌어진 충격적인 상황! 당신의 생각은?",
+            "😱 블랙코스 한가운데서 멈춘 남자... 믿을 수 없는 주장!",
+            "❓ 이 상황, 누가 잘못한 걸까요?"
+          ],
+          "thumbnails": [
+            {
+              "kr": "블랙코스 한가운데서\n멈춘 남자",
+              "jp": "ブラックコースの\n真ん中で止まった男",
+              "pron": "부랏쿠코-스노\n만나카데 토맛타 오토코"
+            },
+            {
+              "kr": "3초만에\n상황 반전!",
+              "jp": "3秒で\n状況が逆転！",
+              "pron": "산뵤-데\n죠-쿄-가 갸쿠텐!"
+            },
+            {
+              "kr": "충격적인 주장\n과연 누가?",
+              "jp": "衝撃的な主張\n果たして誰が？",
+              "pron": "쇼-게키테키나 슈쵸-\n하타시테 다레가?"
+            }
+          ],
           "bgm_mood": "Mood description",
           "keywords": ["#Shorts", "#Keyword"],
           "script": [
             {
               "time": "00:00",
+              "start_time": "00:00",
+              "end_time": "00:04",
               "section": "Hook",
               "type": "Narration",
               "speaker": "Narrator",
-              "text_jp": "...",
-              "text_pron": "...",
-              "text_kr": "...",
+              "text_jp": "スキー場で / 起きた / <color=#FF6B6B>衝撃的な</color> / 状況！",
+              "text_pron": "스키-죠-데 / 오키타 / <color=#FF6B6B>쇼-게키테키나</color> / 죠-쿄-!",
+              "text_kr": "스키장에서 벌어진 충격적인 상황!",
+              "emphasis": { "words": ["衝撃的な"], "color": "#FF6B6B", "reason": "shock emotion" },
               "sfx": "Boom",
               "visual_cue": "Close up"
+            },
+            {
+              "time": "00:05",
+              "start_time": "00:05",
+              "end_time": "00:08",
+              "section": "Rising Action",
+              "type": "Dialogue",
+              "speaker": "Original Speaker",
+              "text_jp": "もっと / 速く / 滑ってみたら / どうだ？",
+              "text_pron": "못토 / 하야쿠 / 스베테 미타라 / 도-다?",
+              "text_kr": "좀 더 빨리 타보지 그래?",
+              "original_text": "Tu pourrais essayer d'aller plus vite",
+              "sfx": "None",
+              "visual_cue": "Medium shot"
             }
           ]
         }
@@ -355,7 +458,7 @@ router.post('/generate', async (req, res) => {
 
         res.json({
             success: true,
-            data: result,
+            data: scriptJson,  // Return parsed JSON, not raw Gemini result
             sourceMetadata,
             styleMetadata: {
                 name: styleChannel.channelTitle,

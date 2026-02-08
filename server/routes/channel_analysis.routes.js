@@ -97,6 +97,10 @@ function getPersonas() {
 // Helper: Write DB
 function savePersonas(personas) {
     fs.writeFileSync(DB_PATH, JSON.stringify(personas, null, 2));
+
+    // Git Sync (Automatic)
+    const gitCmd = `git add "channel_personas.json" && git commit -m "[Persona Lab] Sync style personas" && git push origin master`;
+    queueGitCommand(gitCmd);
 }
 
 // 1. GET /list - Get all personas
@@ -611,6 +615,9 @@ router.post('/analyze', async (req, res) => {
             }
         } // Close 'if (results.length === 0)' block
 
+        // Initialize transcripts array
+        let transcripts = [];
+
         // Process results
         for (const res of results) {
             if (res.success) {
@@ -871,6 +878,26 @@ router.post('/director/recommend', async (req, res) => {
         console.error('[Director Recommend Error]', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// 8. POST /util/pick-folder - Open Windows Folder Picker
+router.post('/util/pick-folder', async (req, res) => {
+    const { exec } = require('child_process');
+    // Set PowerShell output encoding to UTF8 to support Korean characters
+    const psCommand = `powershell -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.ShowDialog() | Out-Null; $f.SelectedPath"`;
+
+    exec(psCommand, { encoding: 'utf8' }, (error, stdout, stderr) => {
+        if (error) {
+            console.error('[Folder Picker Error]', error);
+            return res.status(500).json({ error: 'Failed to open folder picker' });
+        }
+        const path = stdout.trim();
+        if (path) {
+            res.json({ success: true, path: path });
+        } else {
+            res.json({ success: false, path: null }); // Cancelled
+        }
+    });
 });
 
 module.exports = router;

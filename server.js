@@ -449,7 +449,13 @@ app.get('/api/reddit/viral', async (req, res) => {
 
         const response = await fetch(redditUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
             }
         });
 
@@ -493,6 +499,119 @@ app.get('/api/reddit/viral', async (req, res) => {
         res.status(500).json({ error: error.message || 'Failed to fetch Reddit data' });
     }
 });
+
+// API: Reddit Comments Fetcher
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/reddit/comments', async (req, res) => {
+    try {
+        const { url } = req.query;
+
+        if (!url) {
+            return res.status(400).json({ error: 'URL parameter is required' });
+        }
+
+        console.log(`[Reddit Comments] Fetching comments for: ${url}`);
+
+        // Extract post ID from Reddit URL
+        // Supports: https://www.reddit.com/r/subreddit/comments/POST_ID/...
+        //           https://v.redd.it/POST_ID
+        let postUrl = url;
+
+        // If it's a v.redd.it URL, we need the full reddit.com URL
+        if (url.includes('v.redd.it')) {
+            return res.status(400).json({
+                error: 'Please provide the full Reddit post URL (reddit.com/r/.../comments/...), not the video URL'
+            });
+        }
+
+        // Ensure URL ends with .json
+        if (!postUrl.endsWith('.json')) {
+            postUrl = postUrl.replace(/\/$/, '') + '.json';
+        }
+
+        const response = await fetch(postUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Reddit API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data) || data.length < 2) {
+            throw new Error('Invalid Reddit comments response format');
+        }
+
+        // data[0] = post info, data[1] = comments
+        const postData = data[0].data.children[0].data;
+        const commentsData = data[1].data.children;
+
+        // Recursive function to flatten nested comments
+        function flattenComments(commentNode, depth = 0) {
+            const comments = [];
+
+            if (commentNode.kind === 't1') { // t1 = comment
+                const comment = commentNode.data;
+
+                // Skip deleted/removed comments
+                if (comment.body && comment.body !== '[deleted]' && comment.body !== '[removed]') {
+                    comments.push({
+                        author: comment.author,
+                        text: comment.body,
+                        score: comment.score,
+                        created_utc: comment.created_utc,
+                        depth: depth
+                    });
+                }
+
+                // Recursively process replies
+                if (comment.replies && comment.replies.data && comment.replies.data.children) {
+                    comment.replies.data.children.forEach(reply => {
+                        comments.push(...flattenComments(reply, depth + 1));
+                    });
+                }
+            }
+
+            return comments;
+        }
+
+        // Flatten all comments
+        const allComments = [];
+        commentsData.forEach(commentNode => {
+            allComments.push(...flattenComments(commentNode));
+        });
+
+        console.log(`[Reddit Comments] Fetched ${allComments.length} comments`);
+
+        res.json({
+            success: true,
+            post: {
+                title: postData.title,
+                author: postData.author,
+                subreddit: postData.subreddit_name_prefixed,
+                score: postData.score,
+                num_comments: postData.num_comments,
+                url: postData.url,
+                permalink: `https://www.reddit.com${postData.permalink}`
+            },
+            comments: allComments
+        });
+
+    } catch (error) {
+        console.error('[Reddit Comments Error]', error);
+        res.status(500).json({ error: error.message || 'Failed to fetch Reddit comments' });
+    }
+});
+
+
 
 
 // API: Transcript Rewrite with Viral Pattern Learning

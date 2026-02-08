@@ -80,7 +80,7 @@
         <!-- Header -->
         <div class="text-center mb-12">
             <h1 class="text-5xl font-black text-white mb-4">
-                📋 YouTube 가이드라인 체크
+                📋 YouTube/Reddit 가이드라인 체크
             </h1>
             <p class="text-slate-400 text-lg">
                 업로드 전 가이드라인 위반 여부를 AI로 사전 체크하세요
@@ -133,7 +133,7 @@
                     <!-- URL Scraper Input -->
                     <div class="flex gap-2 mb-3">
                         <input type="text" id="commentUrlInput"
-                            placeholder="YouTube, TikTok, Instagram URL을 입력하면 댓글을 자동으로 긁어옵니다"
+                            placeholder="YouTube 또는 Reddit URL을 입력하면 댓글을 자동으로 긁어옵니다 (예: reddit.com/r/.../comments/...)"
                             class="flex-1 px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-sm focus:border-purple-500 focus:outline-none">
                         <button type="button" id="scrapeCommentsBtn"
                             class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors whitespace-nowrap flex items-center gap-2">
@@ -318,7 +318,7 @@
                         </div>
                         <button id="startProductionBtn" disabled
                             class="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-400 hover:to-pink-500 text-white font-bold py-3 px-10 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg transform hover:scale-[1.02]">
-                            🚀 대본 및 오디오 생성 시작
+                            🚀 스타일 대본 생성 시작
                         </button>
                     </div>
                 </div>
@@ -2558,11 +2558,12 @@
                 if (!selectedStyleId || !currentTranscriptData) return;
 
                 const btn = document.getElementById('startProductionBtn');
-                btn.textContent = '⏳ AI가 대본을 재구성하는 중...';
+                btn.textContent = '⏳ AI가 스타일에 맞춰 대본을 재구성하는 중...';
                 btn.disabled = true;
 
-                // Prepare Text
+                // Prepare Text AND Segments (for timeline mapping)
                 const transcriptText = currentTranscriptData.segments.map(s => s.text).join(' ');
+                const transcriptSegments = currentTranscriptData.segments; // Include full timeline data
 
                 try {
                     const response = await fetch('http://localhost:4000/api/production/generate', {
@@ -2570,6 +2571,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             transcriptText: transcriptText,
+                            transcriptSegments: transcriptSegments, // Send segments with timestamps
                             styleId: selectedStyleId
                         })
                     });
@@ -2585,7 +2587,7 @@
                 } catch (error) {
                     alert('오류: ' + error.message);
                 } finally {
-                    btn.textContent = '🚀 대본 및 오디오 생성 시작';
+                    btn.textContent = '🚀 스타일 대본 생성 시작';
                     btn.disabled = false;
                 }
             });
@@ -2599,6 +2601,10 @@
                 const styleName = result.styleMetadata?.name || 'Unknown Style';
                 const scriptData = result.data.script || [];
 
+                // Collect narration text for Voicevox
+                const narrationSegments = scriptData.filter(s => s.type === 'Narration');
+                const narrationJapaneseText = narrationSegments.map(s => s.text_jp).join('\n');
+
                 // Unified Display HTML for Full Shorts Processing
                 let scriptHTML = scriptData.map((s, idx) => {
                     // Segment Badge Color
@@ -2607,12 +2613,23 @@
                     if (s.section?.includes('Twist') || s.section?.includes('Climax')) segColor = 'bg-purple-600';
                     if (s.section?.includes('Conclusion')) segColor = 'bg-green-600';
 
-                    // Type Icon
-                    const typeIcon = s.type === 'Dialogue' ? '💬' : '🎙️';
+                    // Type Icon & Color Coding
+                    const isDialogue = s.type === 'Dialogue';
+                    const typeIcon = isDialogue ? '💬' : '🎙️';
                     const typeLabel = s.type || 'Narration';
 
+                    // Color coding: Dialogue = blue, Narration = orange
+                    const typeColor = isDialogue ? 'bg-blue-600' : 'bg-orange-600';
+                    const borderColor = isDialogue ? 'border-blue-500/30' : 'border-orange-500/30';
+                    const bgColor = isDialogue ? 'bg-slate-800/80' : 'bg-slate-800/60';
+
+                    // Timeline display for Dialogue (CapCut editing)
+                    const timelineInfo = (isDialogue && s.start_time && s.end_time)
+                        ? `<span class="font-mono text-xs text-blue-300 ml-2">📹 ${s.start_time} → ${s.end_time}</span>`
+                        : '';
+
                     return `
-                        <div class="mb-6 bg-slate-800/80 rounded-xl overflow-hidden border border-slate-700/50 hover:border-indigo-500/30 transition-colors" >
+                        <div class="mb-6 ${bgColor} rounded-xl overflow-hidden border ${borderColor} hover:border-indigo-500/30 transition-colors" >
                         <!--Header with Segment & Time-->
                         <div class="bg-slate-700/30 px-5 py-3 flex items-center justify-between border-b border-white/5">
                             <div class="flex items-center gap-3">
@@ -2620,6 +2637,7 @@
                                     ${s.section || 'Segment'}
                                 </span>
                                 <span class="font-mono text-sm text-indigo-300 font-bold">⏱️ ${s.time}</span>
+                                ${timelineInfo}
                             </div>
                             <div class="flex gap-2">
                                 ${s.visual_cue ? `<span class="text-xs text-slate-400 bg-slate-900/50 px-2 py-1 rounded border border-white/10" title="Visual Cue">🎥 ${s.visual_cue}</span>` : ''}
@@ -2628,10 +2646,16 @@
                         </div>
                         
                         <div class="p-6 space-y-5">
-                            <!-- Speaker Info (if Dialogue) -->
-                            ${s.speaker ? `
+                            <!-- Speaker Info with Type Badge -->
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="text-xs font-bold text-slate-300 bg-slate-700 px-2 py-0.5 rounded-md">${typeIcon} ${s.speaker}</span>
+                                <span class="text-xs font-bold text-white ${typeColor} px-2 py-0.5 rounded-md">${typeIcon} ${s.speaker || typeLabel}</span>
+                            </div>
+
+                            <!-- Original Text (for Dialogue only) -->
+                            ${isDialogue && s.original_text ? `
+                            <div class="bg-slate-900/40 border border-blue-500/20 rounded-lg p-3 mb-3">
+                                <p class="text-xs text-blue-400 font-semibold mb-1">📄 원본 대사</p>
+                                <p class="text-sm text-slate-300 italic leading-relaxed">${s.original_text}</p>
                             </div>` : ''}
 
                             <!-- Japanese (Main) -->
@@ -2671,37 +2695,136 @@
                             </button>
                         </div>
 
-                        <div id="unifiedScriptContainer" class="mb-10">
-                            ${scriptHTML}
+                        <!-- Timeline Script Section (Integrated) -->
+                        <div class="bg-slate-900/50 rounded-2xl p-6 mb-8 border border-orange-500/20">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="text-2xl">📝</span>
+                                <div>
+                                    <h3 class="text-lg font-bold text-white">타임라인 대본</h3>
+                                    <p class="text-sm text-slate-400">나레이션을 Voicevox로 생성하거나 SRT로 다운로드하세요</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <textarea id="scriptTextarea" rows="10" 
+                                    class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-purple-500 focus:outline-none font-mono" 
+                                    placeholder="예시:
+[0-3초] 皆さん、こんにちは！
+[3-10초] 今日は面白い動画を紹介します
+[10-15초] チャンネル登録お願いします！">${narrationJapaneseText}</textarea>
+                                <p class="text-slate-500 text-sm mt-2">
+                                    💡 타임라인 형식으로 입력하거나, 일반 텍스트로 입력하세요
+                                </p>
+                            </div>
+
+                            <div class="flex gap-3 flex-wrap">
+                                <button id="downloadSrtBtn" 
+                                    class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-purple-500/25 flex items-center gap-2">
+                                    <span>📥</span>
+                                    <span>SRT 자막 다운로드</span>
+                                </button>
+                                <button id="generateNarrationBtn" 
+                                    class="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-orange-500/25 flex items-center gap-2">
+                                    <span>🔊</span>
+                                    <span>Voicevox로 나레이션 생성</span>
+                                </button>
+                                <div id="narrationAudioPlayer" class="hidden flex-1 bg-black/40 rounded-xl p-2 border border-orange-500/20">
+                                    <audio id="narrationAudio" controls class="w-full h-10"></audio>
+                                </div>
+                            </div>
                         </div>
 
-                        <!--Audio Generation Section-->
-                        <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 border border-white/5 shadow-2xl">
-                            <div class="flex items-center justify-between mb-6">
-                                <div>
-                                    <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
-                                        <span>🎤</span> Voicevox Audio
-                                    </h3>
-                                    <p class="text-sm text-slate-400">Generate high-quality Japanese audio using selected persona.</p>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col sm:flex-row gap-4 items-center">
-                                <button id="prodGenerateAudioBtn" class="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center justify-center gap-3 group">
-                                    <span class="text-xl group-hover:scale-110 transition-transform">🔊</span>
-                                    <span>Generate Audio</span>
-                                </button>
-
-                                <div id="prodAudioPlayer" class="hidden flex-1 w-full bg-black/40 rounded-xl p-2 border border-white/5">
-                                    <audio id="prodAudio" controls class="w-full h-10"></audio>
-                                </div>
-                            </div>
+                        <div id="unifiedScriptContainer" class="mb-10">
+                            ${scriptHTML}
                         </div>
                     </div>
                 `;
 
-                // Re-attach listener
-                document.getElementById('prodGenerateAudioBtn').addEventListener('click', () => generateProductionAudio(scriptData));
+                // Attach Voicevox generation event listener for narration
+                document.getElementById('generateNarrationBtn').addEventListener('click', async () => {
+                    if (!window.selectedSpeakerId) {
+                        alert('⚠️ Voicevox 캐릭터를 먼저 선택해주세요!\n아래 Voicevox 섹션에서 캐릭터를 선택하세요.');
+                        document.getElementById('voicevoxSection')?.scrollIntoView({ behavior: 'smooth' });
+                        return;
+                    }
+
+                    const btn = document.getElementById('generateNarrationBtn');
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<span>⏳</span><span>생성 중...</span>';
+                    btn.disabled = true;
+
+                    const narrationText = document.getElementById('scriptTextarea').value;
+
+                    try {
+                        const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: narrationText,
+                                speakerId: window.selectedSpeakerId
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('Voicevox 생성 실패');
+
+                        const blob = await response.blob();
+                        const url = URL.createObjectURL(blob);
+
+                        const audio = document.getElementById('narrationAudio');
+                        audio.src = url;
+                        document.getElementById('narrationAudioPlayer').classList.remove('hidden');
+                        audio.play();
+
+                        alert('✅ 나레이션 오디오가 생성되었습니다!');
+                    } catch (error) {
+                        alert('❌ 오류: ' + error.message);
+                    } finally {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    }
+                });
+
+                // Attach SRT download event listener
+                document.getElementById('downloadSrtBtn').addEventListener('click', () => {
+                    const scriptData = result.data.script || [];
+                    const narrationSegments = scriptData.filter(s => s.type === 'Narration');
+
+                    if (narrationSegments.length === 0) {
+                        alert('⚠️ 나레이션 세그먼트가 없습니다.');
+                        return;
+                    }
+
+                    // Generate SRT content
+                    let srtContent = '';
+                    narrationSegments.forEach((seg, idx) => {
+                        const index = idx + 1;
+                        const startTime = seg.start_time || seg.time || '00:00';
+                        const endTime = seg.end_time || seg.time || '00:00';
+
+                        // Convert MM:SS to SRT format (HH:MM:SS,mmm)
+                        const formatSrtTime = (time) => {
+                            const [min, sec] = time.split(':').map(Number);
+                            return `00:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')},000`;
+                        };
+
+                        srtContent += `${index}\n`;
+                        srtContent += `${formatSrtTime(startTime)} --> ${formatSrtTime(endTime)}\n`;
+                        srtContent += `${seg.text_jp}\n\n`;
+                    });
+
+                    // Download SRT file
+                    const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `narration_${Date.now()}.srt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    alert('✅ SRT 파일이 다운로드되었습니다!');
+                });
             }
 
             // Audio Generation Helper
@@ -2809,6 +2932,81 @@
                 </div>
             </div>
         </div>
+
+        <script>
+            // ═══════════════════════════════════════════════════════════════════════════
+            // Comment Scraping Functionality (YouTube + Reddit)
+            // ═══════════════════════════════════════════════════════════════════════════
+            document.getElementById('scrapeCommentsBtn').addEventListener('click', async () => {
+                const urlInput = document.getElementById('commentUrlInput');
+                const commentsTextarea = document.getElementById('videoComments');
+                const btn = document.getElementById('scrapeCommentsBtn');
+                const url = urlInput.value.trim();
+
+                if (!url) {
+                    alert('URL을 입력해주세요');
+                    return;
+                }
+
+                // Detect platform
+                const isReddit = url.includes('reddit.com') || url.includes('v.redd.it');
+                const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+
+                if (!isReddit && !isYouTube) {
+                    alert('YouTube 또는 Reddit URL만 지원합니다');
+                    return;
+                }
+
+                // Update button state
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳ 댓글 가져오는 중...</span>';
+
+                try {
+                    if (isReddit) {
+                        await scrapeRedditComments(url, commentsTextarea);
+                    } else if (isYouTube) {
+                        alert('YouTube 댓글 가져오기는 아직 구현되지 않았습니다.\n현재는 Reddit URL만 지원합니다.');
+                    }
+                } catch (error) {
+                    console.error('Comment scraping error:', error);
+                    alert('댓글 가져오기 실패: ' + error.message);
+                } finally {
+                    // Restore button
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>🌐 댓글 가져오기</span>';
+                }
+            });
+
+            async function scrapeRedditComments(url, textarea) {
+                const response = await fetch(`http://localhost:4000/api/reddit/comments?url=${encodeURIComponent(url)}`);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Reddit API 호출 실패');
+                }
+
+                const data = await response.json();
+
+                if (!data.success || !data.comments) {
+                    throw new Error('댓글 데이터를 가져올 수 없습니다');
+                }
+
+                // Format comments for textarea
+                const formattedComments = data.comments
+                    .slice(0, 50) // Limit to top 50 comments
+                    .map(comment => {
+                        const indent = '  '.repeat(comment.depth);
+                        return `${indent}[${comment.score}↑] ${comment.author}: ${comment.text}`;
+                    })
+                    .join('\n\n');
+
+                textarea.value = formattedComments;
+
+                // Show success message
+                alert(`✅ Reddit 댓글 ${data.comments.length}개를 가져왔습니다!\n게시물: ${data.post.title}`);
+            }
+        </script>
 </body>
+
 
 </html>
