@@ -765,6 +765,30 @@
                 // Summary
                 document.getElementById('summary').textContent = summary || '분석 완료';
 
+                // Video Explanation
+                const explanationContainer = document.getElementById('explanationContainer') || (() => {
+                    const div = document.createElement('div');
+                    div.id = 'explanationContainer';
+                    div.className = 'bg-blue-600/10 border border-blue-500/20 rounded-xl p-6 mb-6';
+                    document.getElementById('bgmSection').insertAdjacentElement('beforebegin', div);
+                    return div;
+                })();
+
+                if (analysis.videoExplanation) {
+                    explanationContainer.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="text-2xl">📝</div>
+                            <div>
+                                <h3 class="text-blue-400 font-bold mb-2">영상 상세 설명</h3>
+                                <p class="text-slate-300 leading-relaxed">${renderColorTags(analysis.videoExplanation)}</p>
+                            </div>
+                        </div>
+                    `;
+                    explanationContainer.classList.remove('hidden');
+                } else {
+                    explanationContainer.classList.add('hidden');
+                }
+
                 // BGM Analysis
                 if (bgmAnalysis) {
                     displayBgmAnalysis(bgmAnalysis);
@@ -1514,6 +1538,30 @@
                     document.getElementById('translationBadge').classList.remove('hidden');
                 }
 
+                // Video Explanation (Summary)
+                const transcriptExplanation = document.getElementById('transcriptExplanation') || (() => {
+                    const div = document.createElement('div');
+                    div.id = 'transcriptExplanation';
+                    div.className = 'bg-purple-600/10 border border-purple-500/20 rounded-xl p-6 mb-6';
+                    document.getElementById('bilingualTranscriptContainer').insertAdjacentElement('beforebegin', div);
+                    return div;
+                })();
+
+                if (transcript.videoExplanation) {
+                    transcriptExplanation.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="text-2xl">💡</div>
+                            <div>
+                                <h3 class="text-purple-400 font-bold mb-2">AI 영상 요약</h3>
+                                <p class="text-slate-300 leading-relaxed">${renderColorTags(transcript.videoExplanation)}</p>
+                            </div>
+                        </div>
+                    `;
+                    transcriptExplanation.classList.remove('hidden');
+                } else {
+                    transcriptExplanation.classList.add('hidden');
+                }
+
                 // Build bilingual segments
                 const segmentsHTML = transcript.segments.map((seg, i) => {
                     const emotionColor = seg.emotion === 'excitement' ? 'border-yellow-400' :
@@ -2180,18 +2228,18 @@
 
                     html += '<div>';
                     html += '<span class="text-xs text-slate-500 block mb-1">🇰🇷 한국어 (자막용)</span>';
-                    html += '<p class="text-white font-bold text-lg">' + line.textKO + '</p>';
+                    html += '<p class="text-white font-bold text-lg">' + renderColorTags(line.textKO) + '</p>';
                     html += '</div>';
 
                     html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
                     html += '<div class="bg-slate-900/50 p-3 rounded-lg">';
                     html += '<span class="text-xs text-slate-500 block mb-1">🇯🇵 일본어</span>';
-                    html += '<p class="text-slate-300">' + line.textJP + '</p>';
+                    html += '<p class="text-slate-300">' + renderColorTags(line.textJP) + '</p>';
                     html += '</div>';
 
                     html += '<div class="bg-slate-900/50 p-3 rounded-lg">';
                     html += '<span class="text-xs text-slate-500 block mb-1">🗣️ 발음</span>';
-                    html += '<p class="text-orange-300 font-mono">' + line.textPron + '</p>';
+                    html += '<p class="text-orange-300 font-mono">' + renderColorTags(line.textPron) + '</p>';
                     html += '</div>';
 
                     html += '</div>'; // End grid
@@ -2227,6 +2275,16 @@
                 const mins = Math.floor(seconds / 60);
                 const secs = Math.floor(seconds % 60);
                 return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+
+            // Render Color Tags helper
+            function renderColorTags(text) {
+                if (!text) return '';
+                // Convert <color=#HEX>...</color> to <span> with style
+                // Add subtle glow and bold for premium feel
+                return text.replace(/<color=(#[0-9A-F]{6})>(.*?)<\/color>/gi, (match, color, p2) => {
+                    return `<span style="color:${color}; font-weight: 800; text-shadow: 0 0 10px ${color}44;">${p2}</span>`;
+                });
             }
 
             // ========================================
@@ -2601,9 +2659,12 @@
                 const styleName = result.styleMetadata?.name || 'Unknown Style';
                 const scriptData = result.data.script || [];
 
-                // Collect narration text for Voicevox
+                // Collect narration text for Voicevox (Strip color tags for clean audio generation)
                 const narrationSegments = scriptData.filter(s => s.type === 'Narration');
-                const narrationJapaneseText = narrationSegments.map(s => s.text_jp).join('\n');
+                const narrationJapaneseText = narrationSegments.map(s => {
+                    // Strip <color=#HEX> and </color> but keep text
+                    return s.text_jp.replace(/<color=#[A-Fa-f0-9]{6}>/g, '').replace(/<\/color>/g, '');
+                }).join('\n');
 
                 // Unified Display HTML for Full Shorts Processing
                 let scriptHTML = scriptData.map((s, idx) => {
@@ -2660,22 +2721,91 @@
 
                             <!-- Japanese (Main) -->
                             <div>
-                                <p class="text-xl text-white font-medium leading-relaxed font-sans tracking-wide">${s.text_jp}</p>
+                                <p class="text-xl text-white font-medium leading-relaxed font-sans tracking-wide mb-3">${renderColorTags(s.text_jp)}</p>
                             </div>
 
                             <!-- Pronunciation -->
                             <div class="pl-4 border-l-2 border-slate-700">
-                                <p class="text-slate-400 text-sm leading-relaxed font-mono opacity-80">${s.text_pron}</p>
+                                <p class="text-slate-400 text-sm leading-relaxed font-mono opacity-80 mb-2">${renderColorTags(s.text_pron)}</p>
                             </div>
 
                             <!-- Korean -->
                             <div class="pl-4 border-l-2 border-slate-700">
-                                <p class="text-slate-500 text-sm leading-relaxed">${s.text_kr}</p>
+                                <p class="text-slate-500 text-sm leading-relaxed">${renderColorTags(s.text_kr)}</p>
                             </div>
                         </div>
                     </div>
                         `;
                 }).join('');
+
+                const titles = result.data.titles || [];
+                const thumbnails = result.data.thumbnails || [];
+
+                // Render Titles Row
+                let titlesHTML = '';
+                if (titles.length > 0) {
+                    titlesHTML = `
+                        <div class="bg-indigo-900/20 rounded-2xl p-6 mb-8 border border-indigo-500/20">
+                            <div class="flex items-center gap-3 mb-6">
+                                <span class="text-2xl">🔥</span>
+                                <h3 class="text-lg font-bold text-white">AI 추천 바이럴 제목</h3>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4">
+                                ${titles.map((t, i) => `
+                                    <div class="bg-indigo-900/40 p-5 rounded-xl border border-indigo-500/10 hover:border-indigo-500/30 transition-all">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <span class="bg-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded text-white">VARIANT #${i + 1}</span>
+                                        </div>
+                                        <p class="text-white font-bold text-lg mb-3 leading-tight">${t.kr}</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-80">
+                                            <div class="bg-black/20 p-2 rounded">
+                                                <span class="text-[9px] text-slate-500 block mb-0.5">🇯🇵 일본어</span>
+                                                <p class="text-slate-300 text-xs">${t.jp}</p>
+                                            </div>
+                                            <div class="bg-black/20 p-2 rounded">
+                                                <span class="text-[9px] text-slate-500 block mb-0.5">🗣️ 발음</span>
+                                                <p class="text-indigo-300 text-xs font-mono">${t.pron}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Render Thumbnail Phrases Row
+                let thumbnailsHTML = '';
+                if (thumbnails.length > 0) {
+                    thumbnailsHTML = `
+                        <div class="bg-amber-900/20 rounded-2xl p-6 mb-8 border border-amber-500/20">
+                            <div class="flex items-center gap-3 mb-6">
+                                <span class="text-2xl">🖼️</span>
+                                <h3 class="text-lg font-bold text-white">썸네일 문구 추천</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                ${thumbnails.map((t, i) => `
+                                    <div class="bg-amber-900/40 p-4 rounded-xl border border-amber-500/10 flex flex-col h-full">
+                                        <div class="mb-3">
+                                            <span class="bg-amber-600 text-[10px] font-bold px-2 py-0.5 rounded text-white uppercase">Design #${i + 1}</span>
+                                        </div>
+                                        <p class="text-white font-black text-base mb-3 leading-snug whitespace-pre-line flex-grow">${t.kr}</p>
+                                        <div class="space-y-2 pt-3 border-t border-white/5 opacity-80">
+                                            <div>
+                                                <span class="text-[9px] text-slate-500 block">🇯🇵 JP</span>
+                                                <p class="text-slate-300 text-[11px] leading-tight whitespace-pre-line">${t.jp}</p>
+                                            </div>
+                                            <div>
+                                                <span class="text-[9px] text-slate-500 block">🗣️ PRON</span>
+                                                <p class="text-amber-200 text-[11px] font-mono leading-tight whitespace-pre-line">${t.pron}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
 
                 section.innerHTML = `
                         <div class="max-w-4xl mx-auto py-8" >
@@ -2694,6 +2824,9 @@
                                 Close
                             </button>
                         </div>
+
+                        ${titlesHTML}
+                        ${thumbnailsHTML}
 
                         <!-- Timeline Script Section (Integrated) -->
                         <div class="bg-slate-900/50 rounded-2xl p-6 mb-8 border border-orange-500/20">
@@ -2718,15 +2851,20 @@
                             </div>
 
                             <div class="flex gap-3 flex-wrap">
-                                <button id="downloadSrtBtn" 
-                                    class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-purple-500/25 flex items-center gap-2">
-                                    <span>📥</span>
-                                    <span>SRT 자막 다운로드</span>
+                                <button id="downloadNarrationSrtBtn" 
+                                    class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-purple-500/25 flex items-center gap-2">
+                                    <span>🎙️</span>
+                                    <span>나레이션 SRT</span>
+                                </button>
+                                <button id="downloadDialogueSrtBtn" 
+                                    class="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-blue-500/25 flex items-center gap-2">
+                                    <span>💬</span>
+                                    <span>원본 대사 SRT</span>
                                 </button>
                                 <button id="generateNarrationBtn" 
-                                    class="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-orange-500/25 flex items-center gap-2">
+                                    class="px-5 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-orange-500/25 flex items-center gap-2">
                                     <span>🔊</span>
-                                    <span>Voicevox로 나레이션 생성</span>
+                                    <span>Voicevox 생성</span>
                                 </button>
                                 <div id="narrationAudioPlayer" class="hidden flex-1 bg-black/40 rounded-xl p-2 border border-orange-500/20">
                                     <audio id="narrationAudio" controls class="w-full h-10"></audio>
@@ -2753,15 +2891,28 @@
                     btn.innerHTML = '<span>⏳</span><span>생성 중...</span>';
                     btn.disabled = true;
 
-                    const narrationText = document.getElementById('scriptTextarea').value;
+                    // Strip word separators ("/") completely for natural Japanese audio flow
+                    // Japanese doesn't use spaces, so we remove "/" without replacement
+                    const cleanNarrationText = narrationJapaneseText.replace(/\s*\/\s*/g, '');
+
+                    // Collect Voicevox audio settings from UI
+                    const options = {
+                        speedScale: parseFloat(document.getElementById('param-speedScale')?.value || 1.0),
+                        pitchScale: parseFloat(document.getElementById('param-pitchScale')?.value || 0.0),
+                        intonationScale: parseFloat(document.getElementById('param-intonationScale')?.value || 1.0),
+                        volumeScale: parseFloat(document.getElementById('param-volumeScale')?.value || 1.0),
+                        prePhonemeLength: parseFloat(document.getElementById('param-prePhonemeLength')?.value || 0.1),
+                        postPhonemeLength: parseFloat(document.getElementById('param-postPhonemeLength')?.value || 0.1)
+                    };
 
                     try {
-                        const response = await fetch('http://localhost:4000/api/voicevox/generate-tts', {
+                        const response = await fetch('/api/voicevox/generate-tts', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                text: narrationText,
-                                speakerId: window.selectedSpeakerId
+                                text: cleanNarrationText,
+                                speakerId: window.selectedSpeakerId,
+                                options: options
                             })
                         });
 
@@ -2784,47 +2935,78 @@
                     }
                 });
 
-                // Attach SRT download event listener
-                document.getElementById('downloadSrtBtn').addEventListener('click', () => {
+                // Helper to generate and download SRT
+                const downloadSRT = (type) => {
                     const scriptData = result.data.script || [];
-                    const narrationSegments = scriptData.filter(s => s.type === 'Narration');
+                    let validSegments = [];
+                    let filenamePrefix = '';
 
-                    if (narrationSegments.length === 0) {
-                        alert('⚠️ 나레이션 세그먼트가 없습니다.');
+                    if (type === 'narration') {
+                        validSegments = scriptData.filter(s => s.type === 'Narration' && s.text_jp);
+                        filenamePrefix = 'Narration';
+                    } else if (type === 'dialogue') {
+                        validSegments = scriptData.filter(s => s.type === 'Dialogue' && s.text_jp);
+                        filenamePrefix = 'Dialogue';
+                    }
+
+                    if (validSegments.length === 0) {
+                        alert(`⚠️ SRT로 변환할 ${type === 'narration' ? '나레이션' : '대사'}가 없습니다.`);
                         return;
                     }
 
-                    // Generate SRT content
                     let srtContent = '';
-                    narrationSegments.forEach((seg, idx) => {
+                    validSegments.forEach((seg, idx) => {
                         const index = idx + 1;
-                        const startTime = seg.start_time || seg.time || '00:00';
-                        const endTime = seg.end_time || seg.time || '00:00';
+                        let startTime = seg.start_time || '00:00';
+                        let endTime = seg.end_time || '00:00';
 
-                        // Convert MM:SS to SRT format (HH:MM:SS,mmm)
-                        const formatSrtTime = (time) => {
-                            const [min, sec] = time.split(':').map(Number);
-                            return `00:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')},000`;
+                        // Infer end time if missing
+                        if (!seg.end_time && seg.time) {
+                            startTime = seg.time;
+                        }
+
+                        // Helper to convert MM:SS to HH:MM:SS,mmm
+                        const formatTime = (timeStr) => {
+                            if (!timeStr) return '00:00:00,000';
+                            const parts = timeStr.split(':');
+                            const mm = parts[0].padStart(2, '0');
+                            const ssPart = parts[1] || '00';
+                            const ss = ssPart.split('.')[0].padStart(2, '0');
+                            const ms = ssPart.split('.')[1]
+                                ? ssPart.split('.')[1].padEnd(3, '0').substring(0, 3)
+                                : '000';
+                            return `00:${mm}:${ss},${ms}`;
                         };
 
-                        srtContent += `${index}\n`;
-                        srtContent += `${formatSrtTime(startTime)} --> ${formatSrtTime(endTime)}\n`;
-                        srtContent += `${seg.text_jp}\n\n`;
+                        const srtStart = formatTime(startTime);
+                        const srtEnd = formatTime(endTime);
+
+                        // CLEAN TEXT: Remove HTML tags, Remove "/", Remove spaces
+                        let cleanText = seg.text_jp
+                            .replace(/<[^>]*>/g, '')
+                            .replace(/\//g, '')
+                            .replace(/\s+/g, '')
+                            .trim();
+
+                        srtContent += `${index}\n${srtStart} --> ${srtEnd}\n${cleanText}\n\n`;
                     });
 
-                    // Download SRT file
-                    const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+                    // Download SRT file with UTF-8 BOM for compatibility
+                    const blob = new Blob(['\uFEFF' + srtContent], { type: 'text/plain;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `narration_${Date.now()}.srt`;
+                    a.download = `${filenamePrefix}_${new Date().getTime()}.srt`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
+                };
 
-                    alert('✅ SRT 파일이 다운로드되었습니다!');
-                });
+                // Attach SRT download event listeners
+                document.getElementById('downloadNarrationSrtBtn').addEventListener('click', () => downloadSRT('narration'));
+                document.getElementById('downloadDialogueSrtBtn').addEventListener('click', () => downloadSRT('dialogue'));
+
             }
 
             // Audio Generation Helper

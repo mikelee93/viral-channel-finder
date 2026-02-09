@@ -382,6 +382,28 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
                 confidence: seg.confidence || 0.9
             }));
 
+            // ═══════════════════════════════════════════════════════════
+            // STEP 3: Generate Korean Video Explanation (Gemini)
+            // ═══════════════════════════════════════════════════════════
+            let videoExplanation = "";
+            try {
+                console.log('[Transcript Extract] 🤖 Generating Korean video explanation with Gemini...');
+                const summaryPrompt = `다음 대본을 바탕으로 이 영상이 어떤 내용인지 3-4문장 정도의 상세한 한국어 설명(영상 요약)을 작성해주세요.
+                
+                대본:
+                ${originalTranscript.fullText.substring(0, 5000)}
+                
+                JSON 형식으로 응답:
+                {
+                  "videoExplanation": "상세한 한국어 설명..."
+                }`;
+
+                const summaryResponse = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-1.5-flash', [{ text: summaryPrompt }]);
+                videoExplanation = summaryResponse.videoExplanation;
+            } catch (sumError) {
+                console.warn('[Transcript Extract] ⚠️ Video explanation generation failed:', sumError.message);
+            }
+
             res.json({
                 success: true,
                 transcript: {
@@ -390,7 +412,8 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
                     duration: originalTranscript.duration,
                     fullText: originalTranscript.fullText,
                     segments: bilingualSegments,
-                    hasTranslation: originalTranscript.hasTranslation || (translatedSegments !== null)
+                    hasTranslation: originalTranscript.hasTranslation || (translatedSegments !== null),
+                    videoExplanation: videoExplanation
                 }
             });
 
@@ -915,6 +938,7 @@ JSON 형식으로만 응답:
     }
   ],
   "summary": "전반적인 평가",
+  "videoExplanation": "영상에 대한 상세한 한국어 설명 (어떤 내용인지, 분위기는 어떤지, 주요 장면은 무엇인지 등)",
   "bgmAnalysis": {
     "hasCopyrightRisk": true,
     "copyrightRiskLevel": "low",

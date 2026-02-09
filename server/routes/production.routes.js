@@ -283,13 +283,24 @@ router.post('/generate', async (req, res) => {
         
         **IMPORTANT: The source transcript may be in ANY language (English, French, Spanish, etc.). You MUST:**
         1. Understand the content and context of the source transcript regardless of language
-        2. Translate and adapt it to Japanese (text_jp), Japanese Pronunciation in Hangul (text_pron), and Korean (text_kr)
+        2. Translate and adapt it to **NATURAL, HIGH-QUALITY SPOKEN JAPANESE**
+           - **Style**: Use native-like phrasing, not robotic literal translation.
+           - **Nuance**: Capture the exact emotion (anger, sarcasm, shock) of the original speaker.
+           - **Constraints**: Do NOT change key facts or meanings (e.g. "stain" -> "snow").
         3. Apply the creator's DNA style to the translated content
-        4. Ensure text_pron accurately represents the Japanese pronunciation using Korean Hangul characters
+        4. Ensure text_pron accurately represents the natural Japanese pronunciation using Korean Hangul characters (use strong consonants for emphasis)
         5. **USE THE ORIGINAL TIMELINE TIMESTAMPS** - Map your script to the exact timestamps from the source video
         6. **DISTINGUISH BETWEEN:**
            - **"Narration"**: New voiceover you create to add context/style (type: "Narration")
            - **"Dialogue"**: Original dialogue from the source video (type: "Dialogue", use original timestamps)
+        
+        7. 🚨 **CRITICAL - DIALOGUE TRANSLATION ACCURACY:**
+           - **DO NOT reinterpret or change the meaning of original dialogue**
+           - Translate dialogue LITERALLY and ACCURATELY
+           - Example: "je te met une tache" = "I'll put a stain on you" → "跡をつける" (leave a mark)
+           - **DO NOT** change threatening language into playful language
+           - **DO NOT** add context that isn't in the original (e.g., changing "stain" to "snow")
+           - Keep the original tone, emotion, and intent
         
         VALIDATION CHECKLIST (Check before finalizing):
         ✓ Uses at least 3 catchphrases from the DNA
@@ -305,6 +316,38 @@ router.post('/generate', async (req, res) => {
         ${timelineData || finalTranscript.slice(0, 6000)}
         
         
+        **🚨 CRITICAL: STRUCTURE TEMPLATE COMPLIANCE (MANDATORY)**
+        You MUST follow the creator's Viral Structure DNA template. Each section requires BOTH Narration and Dialogue:
+        
+        **🚨🚨🚨 CRITICAL: NARRATOR REQUIREMENTS - YOU WILL BE PENALIZED IF YOU SKIP THIS 🚨🚨🚨**
+        
+        **MANDATORY NARRATOR COUNT (MINIMUM per section) - COUNT THEM BEFORE SUBMITTING:**
+        - **Hook (0-5s)**: Minimum 1 Narrator
+        - **Rising Action (5-20s)**: Minimum 2 Narrators
+        - **Climax/Twist (20-40s+)**: � **MINIMUM 3 NARRATORS - THIS IS NON-NEGOTIABLE** 🔴
+          * **RULE**: After every 2-3 dialogue segments, INSERT 1 narrator segment
+                    * **Example pattern**: NARRATOR → Dialogue → Dialogue → NARRATOR → Dialogue → Dialogue → NARRATOR → Dialogue → NARRATOR
+          * Narrator examples for Climax:
+            - "しかし、この男の主張は..." (But this man's claim...)
+            - "果たして、誰が正しいのか？" (Who is right?)
+            - "常識外れの行動に、怒りは募るばかりですが..." (This outrageous behavior only fuels anger...)
+        - **Resolution (40-55s+)**: Minimum 1-2 Narrators
+          * Wrap up with ironic commentary
+          * Ask audience question: "皆さんはどう思いますか？"
+        
+        **VALIDATION CHECKLIST - CHECK BEFORE SUBMITTING:**
+        ✅ Hook section has at least 1 narrator? 
+        ✅ Rising Action has at least 2 narrators?
+        ✅ **Climax/Twist has at least 3 narrators?** ← MOST IMPORTANT
+        ✅ Resolution has at least 1 narrator?
+        ✅ Total narrator count is at least 7-8?
+        
+        **Narrator Style**: Use ${styleChannel.persona || 'INTRIGUED, SUSPENSEFUL'} tone:
+        - Add dramatic context between dialogue
+        - Build suspense and curiosity
+        - Highlight ironic or shocking elements
+        - **DO NOT just translate dialogue - ADD NEW NARRATIVE CONTEXT**
+        
         **INSTRUCTIONS FOR TIMELINE MAPPING:**
         - For **Dialogue** segments: Use the EXACT timestamps from the source timeline above
         - For **Narration** segments: Insert between dialogue segments where appropriate
@@ -314,64 +357,85 @@ router.post('/generate', async (req, res) => {
           - "end_time": End timestamp in MM:SS format (e.g., "00:18")
         - Narration segments should have realistic durations (typically 3-5 seconds per sentence)
         
-        Output Requirements:
-        1. **Titles**: Generate 3 viral title variations in Korean matching creator's style
-           - Title 1: Hook-focused (curiosity-driven)
-           - Title 2: Emotion-focused (shock/surprise)
-           - Title 3: Question-focused (engagement)
-        2. **Thumbnail Texts**: Generate 3 thumbnail text variations (2 lines max, short and punchy)
-           - Thumbnail 1: General hook (emotion/situation-based)
-           - Thumbnail 2: Number hook (use specific numbers for impact, e.g., "3초만에", "100% 반전")
-           - Thumbnail 3: Question/curiosity hook
-           - Each thumbnail must include: Korean (kr), Japanese (jp), Japanese Pronunciation in Hangul (pron)
-           - Use \n for line breaks (max 2 lines)
-        3. **Timeline**: 00:00 - 00:60 (Max 60 sec), following structure template.
-        4. **Script Content**:
-           - "section": Hook / Body / Twist / Conclusion / CTA (based on structure template)
-           - "type": Narration (Narrator) or Dialogue (Character)
-           - "time": Display time MM:SS
-           - "start_time": Start time MM:SS (REQUIRED for ALL segments)
-           - "end_time": End time MM:SS (REQUIRED for ALL segments)
-           - "text_jp": Japanese with "/" separators between words/phrases for Shorts subtitle timing
-             Example: "常識外れの / 行動に、/ 怒りは / 募るばかりですが..."
-             Add CapCut color tags for emphasis: <color=#FF6B6B>重要な言葉</color>
-           - "text_pron": Hangul pronunciation with "/" matching text_jp separators exactly
-             Example: "죠-시키하즈레노 / 코-도-니, / 이카리와 / 츠노루 바카리 데스가..."
-             Add same CapCut color tags: <color=#FF6B6B>중요한 단어</color>
-           - "text_kr": Korean Translation using DNA vocabulary
-           - "emphasis": { "words": ["word1", "word2"], "color": "#FF6B6B", "reason": "emotion/key point" }
-           - "sfx": Specific sound effect cue
-           - "visual_cue": Camera direction
-        
-        **CapCut Color Guidelines:**
-        - Red (#FF6B6B): Strong emotions, shocking moments
-        - Yellow (#FFD93D): Numbers, key facts, important data
-        - Blue (#6BCF7F): Questions, curiosity hooks
-        - Purple (#B794F6): Twist moments, surprises
-
+         Output Requirements:
+         1. **Titles**: Generate 3 viral title variations matching the high-impact style in the reference images.
+            - Patterns: [Specific Subject/Situation] + [Shocking Result/Emotion/Question]
+            - Example: "스키장에서 벌어진 충격적인 상황! 당신의 생각은?" or "고의로 사고를 낸 사기꾼들의 최후"
+            - Each title must include: Korean (kr), Japanese (jp), Japanese Pronunciation (pron)
+            - Title 1: Hook-focused (curiosity-driven, extreme situation)
+            - Title 2: Emotion-focused (shock/surprise/outrage)
+            - Title 3: Question-focused (user engagement/judgment)
+         2. **Thumbnail Texts**: Generate 3 thumbnail text variations (STRICTLY 2 lines, short and punchy)
+            - MUST use \\n to separate exactly two lines for design impact.
+            - Pattern: Top line (context/subject), Bottom line (main hook/result)
+            - Thumbnail 1: Situation hook
+            - Thumbnail 2: Number hook (e.g., "3초만에\\n상황 반전!")
+            - Thumbnail 3: Mystery/Curiosity hook
+            - Each thumbnail must include: Korean (kr), Japanese (jp), Japanese Pronunciation in Hangul (pron)
+            - **CRITICAL**: Use \\n for ALL languages (kr, jp, pron) to split into exactly 2 lines.
+          3. **Timeline**: FULL DURATION of the story (60s+ allowed if necessary to cover the ending/twist)
+             - **DO NOT CUT OFF THE ENDING**
+             - If the source video is longer than 60s, compress dialogue or speed up pacing, but **INCLUDE THE RESOLUTION**.
+         4. **Script Content**:
+            - "section": Hook / Body / Twist / Conclusion / CTA (based on structure template)
+            - "type": Narration (Narrator) or Dialogue (Character)
+            - "time": Display time MM:SS
+            - "start_time": Start time MM:SS (REQUIRED for ALL segments)
+            - "end_time": End time MM:SS (REQUIRED for ALL segments)
+            - "text_jp": Japanese with "/" separators between words/phrases for Shorts subtitle timing
+              **MANDATORY**: Add CapCut color tags to 2-3 key words per sentence
+              Example: "常識外れの / <color=#B794F6>行動</color>に、/ <color=#FF6B6B>怒り</color>は / 募るばかりですが..."
+            - "text_pron": Hangul pronunciation with "/" matching text_jp separators exactly
+              **MANDATORY**: Apply SAME color tags as text_jp to corresponding words
+              Example: "죠-시키하즈레노 / <color=#B794F6>코-도-</color>니, / <color=#FF6B6B>이카리</color>와 / 츠노루 바카리 데스가..."
+            - "text_kr": Korean Translation using DNA vocabulary
+            - "emphasis": { "words": ["word1", "word2"], "color": "#FF6B6B", "reason": "emotion/key point" }
+            - "sfx": Specific sound effect cue
+            - "visual_cue": Camera direction
+         
+          - **🚨 CRITICAL: 전략적 컬러 강조 (CapCut 스타일) - MANDATORY FOR EVERY SEGMENT**
+            * EVERY script segment MUST have 2-3 color-tagged words in both text_jp and text_pron
+            * Use <color=#HEX>단어</color> format for key words:
+              - **#B794F6 (보라)**: 주인공, 핵심 명사, 깜짝 반전 요소, 충격, 미스터리
+              - **#FF6B6B (빨강)**: 위기, 강렬 감정(분노), 액션 키워드, 경고
+              - **#FFD93D (노랑)**: 숫자, 팩트, 꿀팁, 핵심 정보, 긍정 감정
+              - **#6BCF7F (초록)**: 질문, 궁금증 유발, 새로운 사실, 안정
+              - **#4DABF7 (파랑)**: 슬픔, 냉정, 이성적 판단, 차가움
 
         Output Format (JSON):
         {
           "titles": [
-            "🔥 스키장에서 벌어진 충격적인 상황! 당신의 생각은?",
-            "😱 블랙코스 한가운데서 멈춘 남자... 믿을 수 없는 주장!",
-            "❓ 이 상황, 누가 잘못한 걸까요?"
+            {
+              "kr": "🔥 스키장에서 벌어진 충격적인 상황! 당신의 생각은?",
+              "jp": "🔥 スキー場で起きた衝撃的な状況！皆さんの考えは？",
+              "pron": "🔥 스키-죠-데 오키타 쇼-게키테키나 죠-쿄-! 미나산노 칸가에와?"
+            },
+            {
+              "kr": "😱 블랙코스 한가운데서 멈춘 남자... 믿을 수 없는 주장!",
+              "jp": "😱 ブラックコースの真ん中で止まった男…信じられない主張！",
+              "pron": "😱 부랏쿠코-스노 만나카데 토맛타 오토코... 신지라레나이 슈쵸-!"
+            },
+            {
+              "kr": "❓ 이 상황, 누가 잘못한 걸까요?",
+              "jp": "❓ この状況、誰が悪いのでしょうか？",
+              "pron": "❓ 코노 죠-쿄-, 다레가 와루이노데쇼-카?"
+            }
           ],
           "thumbnails": [
             {
-              "kr": "블랙코스 한가운데서\n멈춘 남자",
-              "jp": "ブラックコースの\n真ん中で止まった男",
-              "pron": "부랏쿠코-스노\n만나카데 토맛타 오토코"
+              "kr": "블랙코스 한가운데서\\n멈춘 남자",
+              "jp": "ブラックコースの\\n真ん中で止まった男",
+              "pron": "부랏쿠코-스노\\n만나카데 토맛타 오토코"
             },
             {
-              "kr": "3초만에\n상황 반전!",
-              "jp": "3秒で\n状況が逆転！",
-              "pron": "산뵤-데\n죠-쿄-가 갸쿠텐!"
+              "kr": "3초만에\\n상황 반전!",
+              "jp": "3秒で\\n状況が逆転！",
+              "pron": "산뵤-데\\n죠-쿄-가 갸쿠텐!"
             },
             {
-              "kr": "충격적인 주장\n과연 누가?",
-              "jp": "衝撃的な主張\n果たして誰が？",
-              "pron": "쇼-게키테키나 슈쵸-\n하타시테 다레가?"
+              "kr": "충격적인 주장\\n과연 누가?",
+              "jp": "衝撃的な主張\\n果たして誰が？",
+              "pron": "쇼-게키테키나 슈쵸-\\n하타시테 다레가?"
             }
           ],
           "bgm_mood": "Mood description",
@@ -398,9 +462,10 @@ router.post('/generate', async (req, res) => {
               "section": "Rising Action",
               "type": "Dialogue",
               "speaker": "Original Speaker",
-              "text_jp": "もっと / 速く / 滑ってみたら / どうだ？",
-              "text_pron": "못토 / 하야쿠 / 스베테 미타라 / 도-다?",
+              "text_jp": "もっと / <color=#FFD93D>速く</color> / 滑ってみたら / <color=#6BCF7F>どうだ</color>？",
+              "text_pron": "못토 / <color=#FFD93D>하야쿠</color> / 스베테 미타라 / <color=#6BCF7F>도-다</color>?",
               "text_kr": "좀 더 빨리 타보지 그래?",
+              "emphasis": { "words": ["速く", "どうだ"], "color": "#FFD93D, #6BCF7F", "reason": "speed emphasis, question" },
               "original_text": "Tu pourrais essayer d'aller plus vite",
               "sfx": "None",
               "visual_cue": "Medium shot"
@@ -412,7 +477,7 @@ router.post('/generate', async (req, res) => {
         // 4. Call Gemini (Direct Client with Stability Settings)
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash",
             generationConfig: {
                 maxOutputTokens: 65536,
                 temperature: 0.7,
@@ -433,18 +498,64 @@ router.post('/generate', async (req, res) => {
 
         let scriptJson;
         try {
-            // Direct JSON parse since responseMimeType is set
-            scriptJson = JSON.parse(responseText);
+            // 1. Extract JSON block (find first { and last })
+            let jsonContent = responseText.trim();
+            const firstBrace = jsonContent.indexOf('{');
+            const lastBrace = jsonContent.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+            }
+
+            // 2. Robust JSON cleanup: Only escape control chars if they are INSIDE double quotes
+            // This prevents breaking the overall JSON structure while fixing "Bad control character" errors
+            let sanitizedResponse = "";
+            let inString = false;
+            let escaped = false;
+
+            for (let i = 0; i < jsonContent.length; i++) {
+                const char = jsonContent[i];
+
+                if (char === '"' && !escaped) {
+                    inString = !inString;
+                    sanitizedResponse += char;
+                } else if (inString) {
+                    if (char === '\n') sanitizedResponse += '\\n';
+                    else if (char === '\r') sanitizedResponse += '\\r';
+                    else if (char === '\t') sanitizedResponse += '\\t';
+                    else if (char === '\\' && !escaped) {
+                        escaped = true;
+                        sanitizedResponse += char;
+                        continue;
+                    } else sanitizedResponse += char;
+                } else {
+                    sanitizedResponse += char;
+                }
+                escaped = false;
+            }
+
+            scriptJson = JSON.parse(sanitizedResponse);
         } catch (e) {
             console.warn('[Production] ⚠️ JSON Parse Failed. Attempting Truncation Repair...');
-            const jsonStr = responseText;
-            const lastSegmentEnd = jsonStr.lastIndexOf('},');
+            let jsonStr = responseText.trim();
 
-            if (lastSegmentEnd !== -1) {
-                const repairedJson = jsonStr.substring(0, lastSegmentEnd + 1) + '] }';
+            // Try to find the last valid object/array completion
+            const lastCompleteObject = jsonStr.lastIndexOf('},');
+            const lastCompleteArray = jsonStr.lastIndexOf(']');
+
+            if (lastCompleteObject !== -1) {
+                const repairedJson = jsonStr.substring(0, lastCompleteObject + 1) + '] }';
                 try {
                     scriptJson = JSON.parse(repairedJson);
-                    console.log('[Production] 🔧 JSON Repaired Successfully!');
+                    console.log('[Production] 🔧 JSON Repaired Successfully (Object Truncation)!');
+                } catch (repairError) {
+                    console.error('[Production] ❌ Repair Failed:', repairError);
+                    throw e;
+                }
+            } else if (lastCompleteArray !== -1) {
+                const repairedJson = jsonStr.substring(0, lastCompleteArray + 1) + ' }';
+                try {
+                    scriptJson = JSON.parse(repairedJson);
+                    console.log('[Production] 🔧 JSON Repaired Successfully (Array Truncation)!');
                 } catch (repairError) {
                     console.error('[Production] ❌ Repair Failed:', repairError);
                     throw e;
