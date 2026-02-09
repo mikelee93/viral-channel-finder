@@ -402,6 +402,16 @@ router.post('/generate', async (req, res) => {
               - **#6BCF7F (초록)**: 질문, 궁금증 유발, 새로운 사실, 안정
               - **#4DABF7 (파랑)**: 슬픔, 냉정, 이성적 판단, 차가움
 
+        8. **VISUAL DIRECTION Rules 🎥**
+           - You act as the Video Editor. For every segment, provide a specific 'visual_cue'.
+           - Must match the 'director_rules' and pacing.
+           - Examples: "Zoom In (Fast)", "Camera Shake", "Black & White Filter", "Slow Motion", "Split Screen", "Text Overlay: [Text]"
+           - **Hook Section**: Must be visually aggressive (e.g., "Rapid Zoom", "Flash Effect").
+
+        9. **VIRAL REASONING 🧠**
+           - Explain WHY you chose this specific Hook and Title in a new field 'viral_logic'.
+           - Connect it back to the Creator's Persona.
+
         Output Format (JSON):
         {
           "titles": [
@@ -438,6 +448,7 @@ router.post('/generate', async (req, res) => {
               "pron": "쇼-게키테키나 슈쵸-\\n하타시테 다레가?"
             }
           ],
+          "viral_logic": "Hook uses 'Shocking Situation' strategy because the visual of stopping entirely in a black course creates immediate conflict. Title 1 focuses on the 'Mystery' element to drive clicks.",
           "bgm_mood": "Mood description",
           "keywords": ["#Shorts", "#Keyword"],
           "script": [

@@ -7,7 +7,9 @@ const ViolationCheck = require('./models/ViolationCheck');
 const { refineTimestampsUsingTranscript } = require('./server/utils/timestamp_refiner.util');
 const multer = require('multer');
 const fs = require('fs');
-const { geminiGenerateJSON, uploadFileToGemini, deleteFileFromGemini } = require('./server/utils/gemini.util');
+const path = require('path');
+const ytDlp = require('yt-dlp-exec'); // Added for URL processing
+const { geminiGenerateJSON, uploadFileToGemini, deleteFileFromGemini, analyzeVideoWithGemini, generateShortsTitle } = require('./server/utils/gemini.util');
 
 // Configure video upload
 const videoUpload = multer({
@@ -148,6 +150,226 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
         } catch (error) {
             console.error('[Guidelines API] Error:', error);
             res.status(500).json({ error: error.message });
+        }
+    });
+
+    // API: Check Video from URL (New)
+    app.post('/api/guidelines/check-video-url', async (req, res) => {
+        let videoPath = null;
+        let uploadedFile = null;
+
+        try {
+            let { url, title: providedTitle, description: providedDesc } = req.body;
+            if (!url) return res.status(400).json({ error: 'URL is required' });
+
+            console.log('[Guidelines URL] Processing URL:', url);
+
+            // 0. Resolve v.redd.it to Permalink (Server-side Fail-safe)
+            if (url.includes('v.redd.it')) {
+                console.log('[Guidelines URL] Detected v.redd.it link. Resolving to permalink...');
+                try {
+                    const response = await fetch(url, {
+                        redirect: 'follow',
+                        method: 'HEAD', // Use HEAD to just get headers/url
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                            'Referer': 'https://www.reddit.com/'
+                        }
+                    });
+
+                    // v.redd.it usually redirects to the post page or a CDN link. 
+                    // If it redirects to reddit.com/r/..., use that.
+                    // If it's a direct file link (CDN), yt-dlp might still fail if blocked.
+                    // But typically browsing v.redd.it redirects to the comments page.
+                    if (response.url && response.url.includes('reddit.com/r/')) {
+                        console.log('[Guidelines URL] Resolved to:', response.url);
+                        url = response.url;
+                    } else {
+                        console.log('[Guidelines URL] Could not resolve to reddit.com post. Using original:', response.url);
+                        // Fallback: If we can't find the post, maybe we shouldn't continue? 
+                        // But let's try original just in case.
+                    }
+                } catch (e) {
+                    console.warn('[Guidelines URL] Failed to resolve v.redd.it:', e.message);
+                }
+            }
+
+            // 1. Download Video using yt-dlp
+            const timestamp = Date.now();
+            const outputTemplate = path.join(__dirname, 'uploads/temp', `download_${timestamp}.%(ext)s`);
+
+            console.log('[Guidelines URL] Downloading video... (max 1080p)');
+
+            // Execute download
+            // We expect yt-dlp to handle the file extension automatically
+            await ytDlp(url, {
+                output: outputTemplate,
+                format: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]', // Limit to 1080p
+                mergeOutputFormat: 'mp4',
+                noPlaylist: true,
+                maxFilesize: '500m', // Limit size,
+                addHeader: [
+                    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Referer:https://www.reddit.com/'
+                ]
+            });
+
+            // Find the downloaded file (since extension might vary, though we asked for mp4)
+            // We constructed filename pattern `download_${timestamp}.mp4` effectively
+            const expectedPath = path.join(__dirname, 'uploads/temp', `download_${timestamp}.mp4`);
+
+            if (!fs.existsSync(expectedPath)) {
+                // Try finding any file starting with that prefix if mp4 merge failed or differs
+                const dir = path.join(__dirname, 'uploads/temp');
+                const files = fs.readdirSync(dir);
+                const found = files.find(f => f.startsWith(`download_${timestamp}`));
+                if (found) {
+                    videoPath = path.join(dir, found);
+                    console.log('[Guidelines URL] Found downloaded file:', found);
+                } else {
+                    throw new Error('Download failed: Output file not found');
+                }
+            } else {
+                videoPath = expectedPath;
+            }
+
+            console.log('[Guidelines URL] Video downloaded:', videoPath);
+
+            // 2. Metadata (Use provided or fetch?)
+            // For now use provided title from Finder, fallback to filename
+            const title = providedTitle || `Imported Video ${timestamp}`;
+            const description = providedDesc || `Imported from ${url}`;
+
+
+            // Check file size to ensure valid download
+            const stats = fs.statSync(videoPath);
+            const fileSizeInBytes = stats.size;
+            console.log(`[Guidelines URL] Downloaded file size: ${(fileSizeInBytes / 1024 / 1024).toFixed(2)} MB`);
+
+            if (fileSizeInBytes < 10240) { // Less than 10KB is likely an error page
+                throw new Error('Download failed: File is too small (likely an error page). URL might be blocked.');
+            }
+
+            // 3. Upload to Gemini File API
+            console.log('[Guidelines URL] Uploading to Gemini File API...');
+            uploadedFile = await uploadFileToGemini(videoPath, 'video/mp4', GEMINI_API_KEY);
+
+            // 1.5 Fetch Reddit Comments (if applicable)
+            let redditComments = [];
+            if (url.includes('reddit.com')) {
+                try {
+                    console.log('[Guidelines URL] Fetching Reddit comments...');
+                    let jsonUrl = url;
+                    if (!jsonUrl.endsWith('.json')) {
+                        jsonUrl = jsonUrl.replace(/\/$/, '') + '.json';
+                    }
+
+                    const commentResp = await fetch(jsonUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                    });
+
+                    if (commentResp.ok) {
+                        const data = await commentResp.json();
+                        if (Array.isArray(data) && data.length > 1) {
+                            // Extract comments similar to server.js logic
+                            const commentsData = data[1].data.children;
+                            const flattenComments = (nodes) => {
+                                let results = [];
+                                nodes.forEach(node => {
+                                    if (node.kind === 't1') {
+                                        results.push({
+                                            author: node.data.author,
+                                            body: node.data.body,
+                                            score: node.data.score
+                                        });
+                                        if (node.data.replies && node.data.replies.data) {
+                                            results.push(...flattenComments(node.data.replies.data.children));
+                                        }
+                                    }
+                                });
+                                return results;
+                            };
+
+                            // Get top 20 comments by score
+                            redditComments = flattenComments(commentsData)
+                                .sort((a, b) => b.score - a.score)
+                                .slice(0, 20)
+                                .map(c => `${c.author}: ${c.body} (Score: ${c.score})`);
+
+                            console.log(`[Guidelines URL] Fetched ${redditComments.length} comments.`);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Guidelines URL] Failed to fetch comments:', e.message);
+                }
+            }
+
+            // 4. Analyze with Gemini Vision
+            console.log('[Guidelines URL] Starting Gemini Vision analysis...');
+
+            // Execute Guidelines Analysis and Title Generation in parallel
+            const analysisPromise = analyzeVideoWithGemini({
+                fileUri: uploadedFile.uri,
+                mimeType: uploadedFile.mimeType
+            }, {
+                title: title,
+                description: description,
+                comments: redditComments
+            }, GEMINI_API_KEY);
+
+            const titlesPromise = generateShortsTitle({
+                fileUri: uploadedFile.uri,
+                mimeType: uploadedFile.mimeType
+            }, {
+                title: title,
+                description: description
+            }, GEMINI_API_KEY);
+
+            // Wait for both to complete
+            const [analysis, suggestedTitles] = await Promise.all([analysisPromise, titlesPromise]);
+
+            // Attach titles to analysis object for frontend
+            analysis.suggestedTitles = suggestedTitles;
+
+            console.log('[Guidelines URL] Analysis and Title Generation complete');
+
+            // 5. Save to database
+            let checkId = null;
+            try {
+                const check = await ViolationCheck.create({
+                    videoFile: path.basename(videoPath), // Store filename
+                    title: title,
+                    description: description,
+                    analysis
+                });
+                checkId = check._id;
+            } catch (dbError) {
+                console.warn('[Guidelines URL] Warning: Failed to save to DB:', dbError.message);
+            }
+
+            res.json({
+                checkId: checkId,
+                title,
+                analysis
+            });
+
+        } catch (error) {
+            console.error('[Guidelines URL] Error:', error);
+            res.status(500).json({ error: error.message });
+        } finally {
+            // Clean up
+            if (videoPath && fs.existsSync(videoPath)) {
+                try {
+                    fs.unlinkSync(videoPath);
+                    console.log('[Guidelines URL] Local temp file cleaned up');
+                } catch (e) { console.error('Failed to delete temp file', e); }
+            }
+            if (uploadedFile) {
+                console.log('[Guidelines URL] Cleaning up Gemini file...');
+                deleteFileFromGemini(GEMINI_API_KEY, uploadedFile.name).catch(e => console.error(e));
+            }
         }
     });
 
@@ -549,669 +771,91 @@ ${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
 
 3. **Climax (~5초):** 가장 재미있거나 충격적인 순간
    - 대사 또는 나레이션 (상황에 따라 선택)
-   - 반전, 감정 폭발, 핵심 포인트
-   - **🚨 최대 5초 준수**
-   
-4. **Outro (2~5초):**
-   - **옵션 1: CTA** - narration_kr/jp/pron으로 "과연 결말은? 댓글로 여러분의 생각을 남겨주세요!"
-   - **옵션 2: 여운** - 원본 대사의 마지막 부분으로 끝맺음, 반전 남기기
-   - narration 사용 시 3개 국어 필수
 
-**🎤 나레이션 스타일 가이드 (매우 중요!):**
-절대 딱딱하게 설명하지 마세요! 친구에게 말하듯 자연스럽게:
+4. **Outro (총 3초 분량):** 여운을 남기고 댓글 유도.
+   - **필수**: narration_kr, narration_jp, narration_pron
+   - 절대 "구독해주세요" 하지 말 것
+   - "여러분의 생각은?", "진짜 어이없네 ㅋㅋ" 등 친구처럼 마무리
 
-**좋은 예시 ✅ (성공한 실제 쇼츠 나레이션):**
-- "진입하자마자 문을 열어본 경찰관이 개깜놀해서 문을 닫아버리는데"
-- "범인은 사람이 아니라 사슴이었죠. 경찰도 너무 황당한지 헛웃음을 참지 못하는데"
-- "사슴은 안방 침대까지 점령하고 난동을 부리는데"
-- "배테랑 경찰도 뇌정지가 와버리니다"
-- "결국 총 대신 의자를 방패 삼아 사슴을 몰아내기 시작하고"
-- "놀란 사슴이 탈출하면서 사건은 끝이 났다고 하네요"
-
-**나쁜 예시 ❌:**
-- "이 영상은 경찰이 사슴을 발견한 장면입니다" (뉴스 톤)
-- "다음 장면에서 놀라운 반전이 펼쳐집니다" (설명투)
-- "경찰관이 당황하는 모습을 확인할 수 있습니다" (관찰자 톤)
-
-**핵심 특징:**
-- **연결어미 "~는데"**: 이야기가 계속 이어지는 느낌 (끊지 않고 흐름 유지)
-- **자연스러운 종결**: "~였죠", "~하네요", "~와버리니다"
-- **생생한 표현**: "개깜놀", "뇌정지가 와버리니다", "참지 못하는데"
-- **짧은 문장**: 한 호흡에 하나의 장면만
-- **감정 전달**: 단순 설명이 아닌 감정과 반응 중심
-
-**📸 썸네일 문구 전략 (3개 대안 필수)**
-   - **대안 1 (숫자 후킹)**: 반드시 숫자를 포함하여 클릭률 극대화
-     * 예: "ハンマーで釘を打てば800万円" (800만엔)
-     * 예: "ラスト2分" (마지막 2분)
-     * 예: "158kmのストレートを背中に受けたら" (158km)
-     * 숫자는 시간, 금액, 속도, 순위, 거리 등 무엇이든 가능
-   - **대안 2 (엔딩 스포일러)**: 영상 마지막 장면의 결과를 암시
-     * 끝까지 보지 않으면 궁금한 문구
-     * 예: "彼が絶対に後悔しない理由" (그가 절대 후회하지 않는 이유)
-     * 예: "最下位でも自国に帰られていた理由" (최하위여도 자국에 돌아갈 수 있었던 이유)
-   - **대안 3 (숫자 또는 충격)**: 숫자나 충격적인 사실 중 선택
-     * 대안 1과 다른 숫자 사용 또는
-     * 시청자가 믿기 어려운 충격적인 사실
-   - **모든 대안**: 한국어(line1_kr, line2_kr) + 일본어(line1_jp, line2_jp) + 발음(line1_pron, line2_pron)
-
-**💡 씬 배치 최적화:**
-- 각 scene은 5초 이하로 제한
-- 나레이션 → 대사 → 나레이션 → 대사 (리듬 만들기)
-- 나레이션은 대화 사이의 자연스러운 갭에 삽입
-- 원본 대사는 가장 임팩트 있는 순간만 선택 (5초 단위로 끊기)
-
-**영상 대본:**
-${segmentsText}
-
-**응답 형식 (JSON):**
+**Response JSON Format:**
+\`\`\`json
 {
-  "directorPlan": [
+  "viralReason": "왜 이 부분이 바이럴 될 것 같은지 1줄 설명",
+  "targetAudience": "주 타겟층 (예: 20대 남성, 운전자 등)",
+  "editorial_strategy": "1줄 편집 의도 (예: 긴장감 고조 후 반전 유머)",
+  "scenes": [
     {
-      "stage": "Intro",
-      "start": 12.52,
-      "end": 16.50,
-      "description": "충격적인 후킹으로 시청자 이목 집중",
-      "reason": "가장 임팩트 있는 순간으로 호기심 유발",
-      "original_transcript": null,
-      "text_kr": null,
-      "text_jp": null,
-      "text_pron": null,
-      "narration_kr": "진입하자마자 문을 열어본 경찰관이 개깜놀해서 문을 닫아버리는데",
-      "narration_jp": "突入するやいなや、ドアを開けた警察官がビックリして閉めちゃうんだけど",
-      "narration_pron": "톳뉴-스루야이나야, 도아오 아케타 케이사츠칸가 빗쿠리시테 시메챠운다케도",
-      "sfx_suggestion": "긴장감 있는 배경음"
+      "order": 1,
+      "type": "narration_intro", // narration_intro, narration_bridge, narration_outro, original_clip
+      "start": 12.5, // Original timestamp (if clip)
+      "end": 16.5,   // Original timestamp (if clip, max 5s diff)
+      "duration": 4.0,
+      "narration_kr": "경찰이 문을 열라는데 도대체 왜 이러는 걸까요?", // required for narration type
+      "narration_jp": "警察がドアを開けろって言ってるのに、一体どうしたんでしょう？", // required for narration type
+      "narration_pron": "케이사츠가 도아오 아케로떼 잇떼루노니, 잇따이 도-시탄데쇼-?", // required for narration type
+      "original_transcript": "",
+      "description": "Intro hook narration"
     },
     {
-      "stage": "Body 1",
-      "start": 61.15,
-      "end": 64.80,
-      "description": "경찰과 운전자 첫 대화",
-      "reason": "면허 없음 폭탄 발언으로 상황 심각성 전달",
-      "original_transcript": "Sir, can I see your license? I don't have a license.",
-      "text_kr": "면허증 보여주시겠어요? 면허가 없어요.",
-      "text_jp": "免許証見せてもらえます？/免許持ってないです。",
-      "text_pron": "멘쿄쇼- 미세테 모라에마스？/멘쿄 못테나인데스。",
+      "order": 2,
+      "type": "original_clip",
+      "start": 45.2,
+      "end": 50.1,
+      "duration": 4.9,
+      "text_kr": "창문 좀 열어주시겠습니까? 면허증 보여주세요.", // required for clip type
+      "text_jp": "窓開けてもらえます？／免許証見せてください", // required for clip type (Use / for split)
+      "text_pron": "마도 아케테 모라에마스? / 멘쿄쇼 미세테 쿠다사이", // required for clip type (Use / for split)
       "narration_kr": null,
       "narration_jp": null,
       "narration_pron": null,
-      "sfx_suggestion": null
-    },
-    {
-      "stage": "Body 2",
-      "start": 68.20,
-      "end": 71.50,
-      "description": "상황 전환 및 긴장감 고조",
-      "reason": "나레이션으로 분위기 전환 및 다음 장면 예고",
-      "original_transcript": null,
-      "text_kr": null,
-      "text_jp": null,
-      "text_pron": null,
-      "narration_kr": "범인은 사람이 아니라 사슴이었죠. 경찰도 너무 황당한지 헛웃음을 참지 못하는데",
-      "narration_jp": "犯人は人じゃなくて鹿だったんです。警察も呆れて笑いを堪えられないんだけど",
-      "narration_pron": "한닌와 히토쟈나쿠테 시카닷탄데스。케이사츠모 아키레테 와라이오 코라에라레나인다케도",
-      "sfx_suggestion": null
-    },
-    {
-      "stage": "Climax",
-      "start": 145.30,
-      "end": 149.80,
-      "description": "클라이맥스 - 가장 재미있는 순간",
-      "reason": "사슴 탈출 장면으로 반전과 해결 제시",
-      "original_transcript": "It jumped out the window!",
-      "text_kr": "창문으로 뛰어내렸어요!",
-      "text_jp": "窓から飛び降りた！",
-      "text_pron": "마도카라 토비오리타！",
-      "narration_kr": null,
-      "narration_jp": null,
-      "narration_pron": null,
-      "sfx_suggestion": "충격음"
-    },
-    {
-      "stage": "Outro",
-      "start": 152.10,
-      "end": 155.50,
-      "description": "마무리 CTA",
-      "reason": "여운과 댓글 유도",
-      "original_transcript": null,
-      "text_kr": null,
-      "text_jp": null,
-      "text_pron": null,
-      "narration_kr": "놀란 사슴이 탈출하면서 사건은 끝이 났다고 하네요. 과연 여러분이라면 어땠을까요?",
-      "narration_jp": "驚いた鹿が逃げ出して事件は終わったそうです。皆さんならどうしますか？",
-      "narration_pron": "오도로이타 시카가 니게다시테 지켄와 오왓타소-데스。미나산나라 도-시마스카？",
-      "sfx_suggestion": null
+      "original_transcript": "Can you roll down your window? License please.",
+      "description": "Police asks driver"
     }
-  ],
-  "viralTitle_kr": "집에 침입한 범인의 정체는?! (경찰도 당황)",
-  "viralTitle_jp": "家に侵入した犯人の正体は？！（警察も困惑）",
-  "viralTitle_pron": "이에니 신뉴-시타 한닌노 쇼-타이와？！（케이사츠모 콘와쿠）",
-  "thumbnailText": [
-    {
-      "line1_kr": "집에 침입한",
-      "line1_jp": "家に侵入した",
-      "line1_pron": "이에니 신뉴-시타",
-      "line2_kr": "범인의 정체는?!",
-      "line2_jp": "犯人の正体は？！",
-      "line2_pron": "한닌노 쇼-타이와？！",
-      "strategy": "호기심 유발 + 엔딩 스포일러"
-    },
-    {
-      "line1_kr": "경찰도 당황한",
-      "line1_jp": "警察も困惑した",
-      "line1_pron": "케이사츠모 콘와쿠시타",
-      "line2_kr": "충격의 범인",
-      "line2_jp": "衝撃の犯人",
-      "line2_pron": "쇼-게키노 한닌",
-      "strategy": "감정 강조"
-    },
-    {
-      "line1_kr": "3분간의",
-      "line1_jp": "3分間の",
-      "line1_pron": "산분칸노",
-      "line2_kr": "경찰 VS 사슴",
-      "line2_jp": "警察VS鹿",
-      "line2_pron": "케이사츠 VS 시카",
-      "strategy": "숫자 후킹 (3분)"
-    }
-  ],
-  "sourceInfo": "Unknown",
-  "loopStrategy": "마지막 장면에서 다시 Intro의 충격적인 순간으로 자연스럽게 연결",
-  "estimatedDuration": 45
+    // ... more scenes (alternating narration/clip) ...
+  ]
 }
+\`\`\`
 
-**⚠️ 최종 체크리스트:**
-- [ ] **타임스탬프가 원본 영상의 실제 위치인가? (0초부터 시작 ❌)**
-- [ ] 전체 duration 합계가 **30-70초**인가?
-- [ ] **각 씬이 최대 5초 이하**인가?
-- [ ] Outro가 2-5초인가?
-- [ ] 모든 scene에 text_kr, text_jp, text_pron 있는가? (또는 narration)
-- [ ] **text_jp와 text_pron이 "/"로 적절히 나뉘어 있는가?**
-- [ ] Intro에 narration이 있는가? (3개 국어)
-- [ ] **나레이션-대사가 최소 2회 교차**하는가?
-- [ ] Outro에 narration 또는 여운 대사가 있는가?
-- [ ] **viralTitle이 3개 국어(kr, jp, pron)로 생성되었는가?**
-- [ ] **thumbnailText가 3개 대안으로 생성되었는가? (각각 2줄, 일본어+발음)**
-- [ ] **나레이션이 자연스러운 구어체 톤**인가? ("~는데", "~였죠", "~하네요")
-- [ ] Intro/Outro가 대사가 아닌 **나레이션**인가?
+**Transcript Data:**
+${segmentsText.substring(0, 25000)} // Limit to fit context
 `;
 
-            const response = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
-                { text: prompt }
-            ]);
+            const highlights = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-1.5-pro', [{ text: prompt }]);
 
-            console.log(`[Director Mode] ✅ Plan created with ${response.directorPlan?.length || 0} scenes`);
-
-            // ═══════════════════════════════════════════════════════════
-            // Step 2.1: Refine Timestamps (Fix AI Hallucination)
-            // ═══════════════════════════════════════════════════════════
-            if (response.directorPlan && transcript && transcript.segments) {
-                try {
-                    console.log('[Director Mode] 🔧 Refining timestamps using original transcript...');
-                    response.directorPlan = refineTimestampsUsingTranscript(response.directorPlan, transcript.segments);
-                } catch (refineError) {
-                    console.error('[Director Mode] ⚠️ Timestamp refinement failed:', refineError);
-                }
-            }
-
-            // ═══════════════════════════════════════════════════════════
-            // Backend Validation: Enforce 5-second max segment length
-            // ═══════════════════════════════════════════════════════════
-            const MAX_SEGMENT_DURATION = 5.0; // Copyright safety limit
-            const MIN_TOTAL_DURATION = 30;
-            const MAX_TOTAL_DURATION = 70;
-
-            let validatedPlan = [];
-            let warnings = [];
-
-            if (response.directorPlan && Array.isArray(response.directorPlan)) {
-                for (const scene of response.directorPlan) {
-                    const duration = scene.end - scene.start;
-
-                    if (duration > MAX_SEGMENT_DURATION) {
-                        warnings.push({
-                            stage: scene.stage,
-                            duration: duration.toFixed(2),
-                            reason: `Scene exceeds 5-second limit (${duration.toFixed(2)}s). This may trigger copyright detection.`
-                        });
-                        console.warn(`[Validation] ⚠️ Scene "${scene.stage}" (${duration.toFixed(2)}s) exceeds 5s limit`);
-                    }
-
-                    // Include all scenes but flag warnings
-                    validatedPlan.push(scene);
-                }
-
-                // Calculate total duration
-                const totalDuration = validatedPlan.reduce((sum, scene) => sum + (scene.end - scene.start), 0);
-
-                if (totalDuration < MIN_TOTAL_DURATION || totalDuration > MAX_TOTAL_DURATION) {
-                    warnings.push({
-                        type: 'total_duration',
-                        duration: totalDuration.toFixed(2),
-                        reason: `Total duration (${totalDuration.toFixed(2)}s) is outside recommended range (30-70s)`
-                    });
-                    console.warn(`[Validation] ⚠️ Total duration ${totalDuration.toFixed(2)}s outside 30-70s range`);
-                }
-
-                console.log(`[Validation] Total scenes: ${validatedPlan.length}, Total duration: ${totalDuration.toFixed(2)}s, Warnings: ${warnings.length}`);
-            }
+            // Optimize timestamps (find silent split points)
+            // Ideally we would do this, but for now we trust Gemini's timestamps or use specific helper
+            // We can add refinement step here later
 
             res.json({
                 success: true,
-                directorPlan: validatedPlan,
-                warnings: warnings.length > 0 ? warnings : undefined,
-
-                // Titles
-                viralTitle: response.viralTitle, // Legacy
-                viralTitle_kr: response.viralTitle_kr,
-                viralTitle_jp: response.viralTitle_jp,
-                viralTitle_pron: response.viralTitle_pron,
-
-                // Metadata
-                thumbnailText: response.thumbnailText,
-                loopStrategy: response.loopStrategy,
-                sourceInfo: response.sourceInfo,
-
-                estimatedDuration: response.estimatedDuration
+                highlights
             });
 
         } catch (error) {
-            console.error('[Highlights] Error:', error);
+            console.error('[Highlights Error]', error);
             res.status(500).json({ error: error.message });
-        }
-    });
-
-    // API: Generate Japanese Animal Channel Script (For viral content adaptation)
-    // ENHANCED: 2-step process with ASR transcript extraction
-    app.post('/api/guidelines/generate-animal-script', videoUpload.single('video'), async (req, res) => {
-        let videoPath = null;
-        let uploadedFile = null;
-
-        try {
-            const { sourceTitle, targetChannel, narrationStyle } = req.body;
-
-            if (!req.file) {
-                return res.status(400).json({ error: 'No video file uploaded' });
-            }
-
-            videoPath = req.file.path;
-            console.log('[Animal Script] 🎬 Starting 2-step process for:', targetChannel);
-
-            // ═══════════════════════════════════════════════════════════
-            // STEP 1: Extract original transcript with timestamps (ASR)
-            // ═══════════════════════════════════════════════════════════
-            console.log('[Animal Script] 🎙️ Step 1/2: Extracting original transcript with ASR...');
-
-            const { extractTranscriptWithTimestamps } = require('./server/utils/phi3_asr.util');
-
-            let originalTranscript = null;
-            try {
-                // For ASR we still need to read the file locally (or stream it)
-                const videoData = fs.readFileSync(videoPath);
-
-                originalTranscript = await extractTranscriptWithTimestamps(videoData, {
-                    language: 'auto',
-                    model: 'whisper'
-                });
-                console.log('[Animal Script] ✅ Transcript extracted:', {
-                    duration: originalTranscript.duration,
-                    segments: originalTranscript.segments?.length,
-                    hasTimestamps: originalTranscript.hasTimestamps
-                });
-            } catch (asrError) {
-                console.warn('[Animal Script] ⚠️ ASR failed, continuing without transcript:', asrError.message);
-            }
-
-            // ═══════════════════════════════════════════════════════════
-            // STEP 2: Generate Japanese script with transcript context
-            // ═══════════════════════════════════════════════════════════
-            console.log('[Animal Script] 🤖 Step 2/2: Generating Japanese script with Gemini...');
-
-            // Upload to Gemini File API for the vision analysis
-            console.log('[Animal Script] Uploading to Gemini File API...');
-            uploadedFile = await uploadFileToGemini(videoPath, req.file.mimetype, GEMINI_API_KEY);
-
-            const script = await generateAnimalChannelScript({
-                fileData: {
-                    fileUri: uploadedFile.uri,
-                    mimeType: uploadedFile.mimeType
-                }
-            }, {
-                sourceTitle: sourceTitle || '',
-                targetChannel: targetChannel || 'japanese-animal-channel',
-                narrationStyle: narrationStyle || 'educational-exciting',
-                originalTranscript: originalTranscript // 🔥 KEY: Pass transcript context
-            }, GEMINI_API_KEY);
-
-            res.json({
-                success: true,
-                script,
-                originalTranscript: originalTranscript
-            });
-
-        } catch (error) {
-            console.error('[Animal Script] Error:', error);
-            res.status(500).json({ error: error.message });
-        } finally {
-            if (videoPath && fs.existsSync(videoPath)) {
-                fs.unlinkSync(videoPath);
-            }
-            if (uploadedFile) {
-                deleteFileFromGemini(GEMINI_API_KEY, uploadedFile.name).catch(e => console.error(e));
-            }
         }
     });
 
 };
 
-// Analyze video with Gemini Vision API
-async function analyzeVideoWithGemini(file, metadata, GEMINI_API_KEY) {
-    const prompt = `당신은 YouTube 가이드라인 전문가입니다.
-이 비디오가 YouTube 정책을 위반하는지 분석해주세요.
-
-제목: ${metadata.title}
-설명: ${metadata.description}
-
-비디오를 보면서 다음을 분석해주세요:
-1. 영상 내용 (폭력성, 선정성, 위험한 행위, 혐오 표현)
-2. 음성 내용 (욕설, 혐오 발언, 거짓 정보, 스팸)
-3. 시각적 요소 (부적절한 이미지, 타인 저작물 도용)
-4. Shorts 정책 준수 (60초 이하, 세로 영상 등)
-5. 배경음악(BGM) 분석
-   - 저작권이 있을 가능성 (유명 음원, 상업적 음악 감지 여부)
-   - 음악의 분위기가 영상 내용과 조화를 이루는지
-   - 음량과 품질이 적절한지
-
-타임스탬프와 함께 구체적인 문제점을 지적해주세요.
-
-JSON 형식으로만 응답:
-{
-  "overallStatus": "safe" | "warning" | "danger",
-  "score": 85,
-  "violations": [
-    {
-      "timestamp": "00:15",
-      "category": "community_guidelines",
-      "severity": "medium",
-      "issue": "부적절한 언어 사용",
-      "recommendation": "해당 표현을 순화"
-    }
-  ],
-  "summary": "전반적인 평가",
-  "videoExplanation": "영상에 대한 상세한 한국어 설명 (어떤 내용인지, 분위기는 어떤지, 주요 장면은 무엇인지 등)",
-  "bgmAnalysis": {
-    "hasCopyrightRisk": true,
-    "copyrightRiskLevel": "low",
-    "atmosphereMatch": "잘 어울림",
-    "volumeQuality": "적절함",
-    "recommendation": "BGM 관련 권장사항"
-  }
-}`;
-
-    try {
-        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
-            file,
-            { text: prompt }
-        ]);
-
-        console.log('[Gemini Vision] Analysis complete');
-        return analysis;
-
-    } catch (error) {
-        console.error('[Analyze Video] Error:', error);
-        throw error;
-    }
-}
-
-// Generate Shorts titles with Gemini Vision API
-async function generateShortsTitle(file, metadata, GEMINI_API_KEY) {
-    const prompt = `당신은 YouTube Shorts 전문 콘텐츠 크리에이터입니다.
-이 영상을 분석하여 Shorts에 최적화된 임팩트 있는 제목을 만들어주세요.
-
-${metadata.title ? `참고 제목: ${metadata.title}` : ''}
-${metadata.description ? `참고 설명: ${metadata.description}` : ''}
-
-영상의 핵심 내용, 감정, 분위기를 파악하여 다음 조건에 맞는 제목을 생성해주세요:
-
-**제목 생성 규칙:**
-- 짧고 임팩트 있게 (10-20자 권장)
-- 호기심을 유발하는 표현 사용
-- 감정을 자극하는 단어 포함
-- Shorts 특성에 맞는 직관적 표현
-
-**출력 형식 (JSON):**
-{
-  "korean": [
-    "한국어 제목 1",
-    "한국어 제목 2",
-    "한국어 제목 3"
-  ],
-  "japanese": [
-    "日本語タイトル1",
-    "日本語タイトル2",
-    "日本語タイトル3"
-  ],
-  "japanesePronunciation": [
-    "니혼고 타이토루 1 (한글 발음)",
-    "니혼고 타이토루 2 (한글 발음)",
-    "니혼고 타이토루 3 (한글 발음)"
-  ],
-  "videoInterpretation": "영상을 어떻게 해석했는지 간단히 설명 (핵심 내용, 분위기, 메시지 등)"
-}`;
-
-    try {
-        const titles = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
-            file,
-            { text: prompt }
-        ]);
-
-        console.log('[Title Generation] Titles generated');
-        return titles;
-
-    } catch (error) {
-        console.error('[Generate Titles] Error:', error);
-        throw error;
-    }
-}
-
-// Generate Japanese Animal Channel Script with Gemini Vision API
-// ENHANCED: Now uses original transcript for context and timing
-async function generateAnimalChannelScript(file, metadata, GEMINI_API_KEY) {
-    // Build transcript context string
-    let transcriptContext = '';
-    if (metadata.originalTranscript && metadata.originalTranscript.segments) {
-        transcriptContext = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 **原音声の文字起こし (タイムスタンプ付き):**
-
-このデータは元の動画の音声から抽出されました。
-重要: ナレーターが話している時間帯 = 注目すべき瞬間！
-      感嘆詞や強調表現 = 緊張感やクライマックス！
-
-言語: ${metadata.originalTranscript.language}
-総時間: ${metadata.originalTranscript.duration}秒
-${metadata.originalTranscript.isSimulated ? '⚠️ シミュレーション データ' : '✅ 実際の抽出データ'}
-
-【タイムスタンプ付き原文】
-${metadata.originalTranscript.segments.map((seg, i) =>
-            `[${formatTimestamp(seg.start)} → ${formatTimestamp(seg.end)}] ${seg.text}${seg.emotion ? ` (感情: ${seg.emotion})` : ''}`
-        ).join('\n')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**この情報の活用方法:**
-1. 原文で話されているタイミングを参考に、日本語ナレーションのタイミングを調整
-2. 感嘆詞 ("Look!", "Oh!", "Wow!") がある時間 = 驚きの瞬間
-3. 質問形式 ("Who will win?") = 緊張感を煽る場面
-4. 長い間隔 = 視覚的に重要な瞬間（ナレーション不要の可能性）
-5. 感情マーカーを活用して適切な tonality を設定
-`;
-    } else {
-        transcriptContext = '\n※ 原音声の文字起こしは利用できません。映像のみから分析します。\n';
-    }
-
-    const prompt = `あなたは日本の人気動物チャンネルのナレーションライターです。
-この動画を分析して、日本のYouTube Shortsに最適化された魅力的なナレーションスクリプトを作成してください。
-
-元のタイトル: ${metadata.sourceTitle}
-ターゲットチャンネル: ${metadata.targetChannel}
-ナレーションスタイル: ${metadata.narrationStyle}
-${transcriptContext}
-
-**スクリプト作成ルール:**
-1. **トーン**: 好奇心をそそり、教育的でありながらエキサイティング
-2. **長さ**: 30-60秒のShorts向け (150-250文字)
-3. **構成**:
-   - 冒頭: 注目を引くフック (驚き、疑問、衝撃)
-   - 中盤: 状況説明と動物行動の解説
-   - 終盤: 感情を揺さぶる結末または教訓
-4. **スタイル**:
-   - シンプルで聞き取りやすい日本語
-   - 擬音語・擬態語を効果的に使用 (ドキドキ、ザワザワ等)
-   - 視聴者に語りかける親しみやすい口調
-   - 緊張感や驚きを表現する間の取り方を指示
-5. **タイミング最適化** (🔥 重要):
-   - 上記の原文タイムスタンプを参考に、日本語ナレーションのタイミングを調整
-   - 原文で話されている瞬間 = 重要な場面を示唆
-   - 感情表現 (excitement, tension, surprise) がある箇所は特に強調
-   - 沈黙の間を効果的に活用
-
-**出力形式 (JSON):**
-{
-  "title": {
-    "japanese": "日本語タイトル (衝撃的で短い)",
-    "english": "English Translation"
-  },
-  "description": {
-    "japanese": "動画説明文 (100-150文字、SEO最適化)",
-    "english": "English Translation"
-  },
-  "narrationScript": {
-    "scenes": [
-      {
-        "timestamp": "00:00-00:05",
-        "visual": "映像の説明",
-        "narration": "ナレーション音声テキスト",
-        "narrationKoreanPronunciation": "한글 발음 (일본어 음성 확인용)",
-        "emotion": "驚き/緊張/安心 等",
-        "pause": "間の長さ (秒)",
-        "originalContext": "この時間帯の原音声で何が言われていたか（参考情報）"
-      }
-    ],
-    "totalDuration": "00:45",
-    "wordCount": 180
-  },
-  "hashtags": {
-    "japanese": ["#動物", "#野生動物", "#衝撃映像"],
-    "english": ["#animals", "#wildlife", "#shocking"]
-  },
-  "targetAudience": "動物好きな日本の視聴者層 (10-40代)",
-  "viralPotential": {
-    "score": 8.5,
-    "reason": "バイラル可能性の理由",
-    "improvementTips": ["改善提案1", "改善提案2"]
-  },
-  "voicevoxSettings": {
-    "speaker": 2,
-    "speakerName": "四国めたん (ノーマル)",
-    "speedScale": 1.0,
-    "pitchScale": 0.0,
-    "intonationScale": 1.0,
-    "volumeScale": 1.0,
-    "reason": "このキャラクターを選んだ理由"
-  }
-}
-
-**重要**: 
-- 実際の動画内容を正確に分析してください
-- 動物の種類、行動、感情を具体的に描写
-- 自然環境や状況を詳しく説明
-- 日本の視聴者が共感できる表現を使用
-- 教育的価値とエンターテインメント性のバランス
-- 🔥 原音声のタイムスタンプを活用して、感情のピークを逃さない！`;
-
-    try {
-        const script = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
-            file,
-            { text: prompt }
-        ]);
-
-        console.log('[Animal Script] Script generated successfully');
-        return script;
-
-    } catch (error) {
-        console.error('[Generate Animal Script] Error:', error);
-        throw error;
-    }
-}
-
-// Helper: Format seconds to MM:SS
-function formatTimestamp(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-// Helper: Translate transcript segments to Korean using Gemini
-async function translateSegmentsToKorean(segments, sourceLanguage, GEMINI_API_KEY) {
-    const textsToTranslate = segments.map(s => s.text).join('\n');
-
-    const prompt = `다음은 ${sourceLanguage} 언어로 된 영상 대본입니다. 각 줄을 **한국어 원어민이 말하는 것처럼 자연스러운 구어체(더빙 톤)**로 번역해주세요.
-    
-**번역 가이드라인 (중요):**
-1. **직역 금지**: "좋은 하루 보내시게 해드릴게요" (X) -> "오늘 하루 망치기 싫으면..." 또는 "좋게 말할 때 가시죠" (O) 상황에 맞게 의역하세요.
-2. **구어체 사용**: 문어체나 딱딱한 말투를 피하고, 실제 대화처럼 생생하게 번역하세요.
-3. **감정 반영**: 타임스탬프와 감정 태그를 참고하여, 화자의 기분(화남, 비꼼, 차분함)이 묻어나게 하세요.
-
-원문:
-${textsToTranslate}
-
-JSON 형식으로 응답해주세요:
-{
-  "translations": [
-    "자연스러운 번역문1",
-    "자연스러운 번역문2",
-    ...
-  ]
-}
-
-중요: 
-1. 원문의 줄 수(${segments.length}줄)와 **정확히 동일한 개수**의 번역문을 배열에 담아주세요.
-2. 번역이 불필요하면 원문 그대로 두세요. 절대 개수를 줄이지 마세요.`;
-
-    try {
-        const response = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
-            { text: prompt }
-        ]);
-
-        if (response.translations && Array.isArray(response.translations)) {
-            return response.translations;
-        } else {
-            throw new Error('Invalid translation response format');
-        }
-    } catch (error) {
-        console.error('[Translation] Error:', error);
-        throw error;
-    }
-}
-
-// Helper: Get language display name
-function getLanguageName(languageCode) {
-    const languageMap = {
+// Helper: Get Language Name
+function getLanguageName(code) {
+    const map = {
         'en': 'English',
-        'english': 'English',
-        'ko': '한국어',
-        'korean': '한국어',
-        'ja': '日本語',
-        'japanese': '日本語',
-        'zh': '中文',
-        'chinese': '中文',
-        'es': 'Español',
-        'spanish': 'Español',
-        'fr': 'Français',
-        'french': 'Français',
-        'de': 'Deutsch',
-        'german': 'Deutsch'
+        'ko': 'Korean',
+        'ja': 'Japanese',
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German',
+        'zh': 'Chinese'
     };
+    return map[code] || code;
+}
 
-    return languageMap[languageCode.toLowerCase()] || languageCode;
+// Helper: Format Timestamp
+function formatTimestamp(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
 }

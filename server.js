@@ -441,11 +441,19 @@ app.post('/api/analyze-viral-video', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 app.get('/api/reddit/viral', async (req, res) => {
     try {
-        const { subreddit = 'all', sort = 'hot', limit = 25, time = 'day' } = req.query;
-        console.log(`[Reddit API] Fetching r/${subreddit} (${sort}, ${time})`);
+        const { subreddit = 'all', sort = 'hot', limit = 25, time = 'day', mode = 'subreddit' } = req.query;
+        console.log(`[Reddit API] ${mode === 'search' ? 'Searching' : 'Fetching r/'}${subreddit} (${sort}, ${time})`);
 
-        // Reddit JSON API URL
-        const redditUrl = `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}&t=${time}`;
+        let redditUrl;
+        if (mode === 'search') {
+            // Global Search - Optimized for Media (Video/Images) to mimic "Media" tab
+            // We append domain filters to the query to ensure we get video content
+            const mediaQuery = `${subreddit} (site:v.redd.it OR site:youtube.com OR site:youtu.be OR site:tiktok.com OR site:instagram.com OR site:facebook.com OR site:streamable.com OR site:twitter.com OR site:x.com)`;
+            redditUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(mediaQuery)}&sort=${sort}&limit=${limit}&t=${time}&type=link&include_over_18=on`;
+        } else {
+            // Subreddit Browse
+            redditUrl = `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}&t=${time}&include_over_18=on`;
+        }
 
         const response = await fetch(redditUrl, {
             headers: {
@@ -473,8 +481,17 @@ app.get('/api/reddit/viral', async (req, res) => {
         const posts = data.data.children
             .map(child => child.data)
             .filter(post => {
-                // Must be video or have rich media
-                return post.is_video || post.url.includes('youtu') || post.url.includes('v.redd.it') || post.domain === 'v.redd.it';
+                // Must be video or have rich media or be a known social video link
+                return post.is_video ||
+                    post.url.includes('youtu') ||
+                    post.url.includes('v.redd.it') ||
+                    post.domain === 'v.redd.it' ||
+                    post.url.includes('tiktok.com') ||
+                    post.url.includes('instagram.com') ||
+                    post.url.includes('facebook.com') ||
+                    post.url.includes('streamable.com') ||
+                    post.url.includes('twitter.com') ||
+                    post.url.includes('x.com');
             })
             .map(post => ({
                 id: post.id,
@@ -517,11 +534,27 @@ app.get('/api/reddit/comments', async (req, res) => {
         //           https://v.redd.it/POST_ID
         let postUrl = url;
 
-        // If it's a v.redd.it URL, we need the full reddit.com URL
+        // If it's a v.redd.it URL, resolve it to the full reddit.com URL
         if (url.includes('v.redd.it')) {
-            return res.status(400).json({
-                error: 'Please provide the full Reddit post URL (reddit.com/r/.../comments/...), not the video URL'
-            });
+            try {
+                const headResponse = await fetch(url, {
+                    method: 'HEAD',
+                    redirect: 'follow',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                });
+
+                if (headResponse.url && headResponse.url.includes('reddit.com/r/')) {
+                    console.log(`[Reddit Comments] Resolved v.redd.it to: ${headResponse.url}`);
+                    postUrl = headResponse.url;
+                } else {
+                    console.warn(`[Reddit Comments] Could not resolve v.redd.it to a post URL. Using original.`);
+                }
+            } catch (e) {
+                console.warn(`[Reddit Comments] Error resolving v.redd.it: ${e.message}`);
+                // Continue with original URL, though it might fail if not a post URL
+            }
         }
 
         // Ensure URL ends with .json

@@ -92,6 +92,17 @@
             <h2 class="text-2xl font-bold text-white mb-6">📤 비디오 업로드</h2>
 
             <form id="uploadForm" enctype="multipart/form-data">
+                <!-- Video URL Input (New) -->
+                <div class="mb-6 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                    <label class="block text-slate-300 font-bold mb-2">🌐 URL로 분석 (유튜브/레딧)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="videoUrlInput"
+                            class="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none font-mono text-sm"
+                            placeholder="https://www.youtube.com/watch?v=... 또는 Reddit 비디오 URL">
+                    </div>
+                    <p class="text-slate-500 text-xs mt-2">파일 업로드 대신 URL을 입력하면 자동으로 다운로드하여 분석합니다.</p>
+                </div>
+
                 <!-- File Upload Zone -->
                 <div class="upload-zone rounded-xl p-12 text-center mb-6" id="uploadZone">
                     <div id="uploadPlaceholder">
@@ -640,6 +651,107 @@
         <script src="voicevox-ui-enhanced.js"></script>
 
         <script>
+            // Function to fetch comments
+            async function fetchComments(url) {
+                const commentInput = document.getElementById('viralComments');
+                const fetchBtn = document.getElementById('fetchCommentsBtn');
+
+                if (!commentInput) return;
+
+                // Visual feedback
+                commentInput.placeholder = "💬 Reddit/YouTube 댓글을 가져오는 중입니다...";
+                if (fetchBtn) {
+                    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 가져오는 중...';
+                    fetchBtn.disabled = true;
+                }
+
+                try {
+                    const response = await fetch('/api/guidelines/scrape-comments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success && data.comments && data.comments.length > 0) {
+                        commentInput.value = data.comments.join('\n');
+                        // Show success toast or message? For now just populate
+                        if (fetchBtn) fetchBtn.innerHTML = '<i class="fas fa-check"></i> 가져오기 성공!';
+                    } else {
+                        commentInput.placeholder = "댓글을 찾을 수 없습니다. 직접 입력해주세요.";
+                        if (fetchBtn) fetchBtn.innerHTML = '🌐 댓글 가져오기';
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch comments:', e);
+                    commentInput.placeholder = "댓글 가져오기 실패. URL을 확인해주세요.";
+                    if (fetchBtn) fetchBtn.innerHTML = '🌐 댓글 가져오기';
+                } finally {
+                    if (fetchBtn) {
+                        setTimeout(() => {
+                            fetchBtn.disabled = false;
+                            if (fetchBtn.innerHTML.includes('성공')) {
+                                setTimeout(() => fetchBtn.innerHTML = '🌐 댓글 가져오기', 2000);
+                            }
+                        }, 500);
+                    }
+                }
+            }
+
+            // Auto-load from URL params
+            window.addEventListener('DOMContentLoaded', () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const autoUrl = urlParams.get('url') || urlParams.get('videoUrl'); // Handle both params
+                const autoTitle = urlParams.get('title');
+                const autoStart = urlParams.get('autoStart'); // Optional flag
+                const styleIdParam = urlParams.get('styleId'); // NEW: Style ID from Finder
+
+                // Store globally for Production Modal to use later
+                if (styleIdParam) {
+                    window.preSelectedStyleId = styleIdParam;
+                    console.log('✅ Pre-selected Style ID:', styleIdParam);
+                }
+
+                if (autoUrl) {
+                    const urlInput = document.getElementById('videoUrlInput');
+                    if (urlInput) {
+                        urlInput.value = autoUrl;
+                        // Visual highlight
+                        urlInput.focus();
+                        urlInput.parentElement.parentElement.classList.add('ring-2', 'ring-blue-500');
+
+                        // Auto-fetch comments!
+                        fetchComments(autoUrl);
+                    }
+
+                    if (autoTitle) {
+                        const titleInput = document.getElementById('videoTitle');
+                        if (titleInput) titleInput.value = autoTitle;
+                    }
+
+                    // If specifically requested to auto-start
+                    if (autoStart === 'true') {
+                        // Small delay to ensure UI is ready
+                        setTimeout(() => {
+                            const form = document.getElementById('uploadForm');
+                            if (form) form.dispatchEvent(new Event('submit'));
+                        }, 500);
+                    }
+                }
+
+                // Add explicit listener for manual input
+                const urlInput = document.getElementById('videoUrlInput');
+                if (urlInput) {
+                    urlInput.addEventListener('change', (e) => {
+                        if (e.target.value && e.target.value.length > 10) {
+                            fetchComments(e.target.value);
+                        }
+                    });
+                }
+            });
+        </script>
+
+        <script>
             const uploadZone = document.getElementById('uploadZone');
             const uploadPlaceholder = document.getElementById('uploadPlaceholder');
             const uploadInfo = document.getElementById('uploadInfo');
@@ -702,8 +814,10 @@
             uploadForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
-                if (!selectedFile) {
-                    alert('비디오 파일을 선택해주세요.');
+                const videoUrl = document.getElementById('videoUrlInput').value.trim();
+
+                if (!selectedFile && !videoUrl) {
+                    alert('비디오 파일을 선택하거나 URL을 입력해주세요.');
                     return;
                 }
 
@@ -714,17 +828,36 @@
                 loadingSection.classList.remove('hidden');
                 resultSection.classList.add('hidden');
 
-                // Prepare form data
-                const formData = new FormData();
-                formData.append('video', selectedFile);
-                formData.append('title', title);
-                formData.append('description', description);
+                // Reset previous results
+                document.getElementById('violationsContainer').innerHTML = '';
+                document.getElementById('bgmSection').innerHTML = '';
 
                 try {
-                    const response = await fetch('http://localhost:4000/api/guidelines/check-video', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    let response;
+
+                    if (selectedFile) {
+                        // File Upload scenarios
+                        const formData = new FormData();
+                        formData.append('video', selectedFile);
+                        formData.append('title', title);
+                        formData.append('description', description);
+
+                        response = await fetch('http://localhost:4000/api/guidelines/check-video', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    } else {
+                        // URL Scenario
+                        response = await fetch('http://localhost:4000/api/guidelines/check-video-url', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                url: videoUrl,
+                                title: title,
+                                description: description
+                            })
+                        });
+                    }
 
                     const data = await response.json();
 
@@ -734,7 +867,17 @@
 
                     // Hide loading, show result
                     loadingSection.classList.add('hidden');
-                    displayResult(data.analysis);
+
+                    if (data.analysis) {
+                        displayResult(data.analysis);
+                    } else {
+                        throw new Error('분석 결과가 없습니다.');
+                    }
+
+                    // If URL mode, maybe auto-fill title if returned?
+                    if (data.title && !title) {
+                        document.getElementById('videoTitle').value = data.title;
+                    }
 
                 } catch (error) {
                     console.error('Analysis error:', error);
@@ -776,13 +919,87 @@
 
                 if (analysis.videoExplanation) {
                     explanationContainer.innerHTML = `
-                        <div class="flex items-start gap-3">
-                            <div class="text-2xl">📝</div>
-                            <div>
-                                <h3 class="text-blue-400 font-bold mb-2">영상 상세 설명</h3>
-                                <p class="text-slate-300 leading-relaxed">${renderColorTags(analysis.videoExplanation)}</p>
+                        <div class="mb-6">
+                            <div class="flex items-start gap-3 bg-blue-600/10 border border-blue-500/20 rounded-xl p-6">
+                                <div class="text-2xl">📝</div>
+                                <div>
+                                    <h3 class="text-blue-400 font-bold mb-2">영상 상세 설명</h3>
+                                    <p class="text-slate-300 leading-relaxed">${renderColorTags(analysis.videoExplanation)}</p>
+                                </div>
                             </div>
                         </div>
+
+                        ${analysis.viralScore ? `
+                        <!-- Viral Insights Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div class="bg-gradient-to-br from-pink-600/20 to-purple-600/20 border border-pink-500/30 rounded-xl p-6">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <span class="text-2xl">🔥</span>
+                                    <h3 class="text-pink-400 font-bold text-lg">바이럴 가능성</h3>
+                                    <span class="ml-auto text-3xl font-black text-white">${analysis.viralScore} / 100</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div>
+                                        <p class="text-slate-400 text-xs uppercase tracking-wider mb-1">바이럴 예측 요인</p>
+                                        <p class="text-slate-200 text-sm leading-relaxed">${analysis.viralReason || '제공된 분석 없음'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-slate-400 text-xs uppercase tracking-wider mb-1">주요 타겟층</p>
+                                        <p class="text-slate-200 text-sm leading-relaxed">${analysis.targetAudience || '제공된 분석 없음'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-6">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <span class="text-2xl">✂️</span>
+                                    <h3 class="text-blue-400 font-bold text-lg">핵심 모먼트</h3>
+                                </div>
+                                <div class="space-y-2">
+                                    ${analysis.keyMoments ? analysis.keyMoments.map(m => `
+                                        <div class="flex items-start gap-2 bg-slate-900/50 p-2 rounded text-sm text-slate-300">
+                                            <span class="text-blue-500">•</span>
+                                            <span>${m}</span>
+                                        </div>
+                                    `).join('') : '<p class="text-slate-500 italic">추천 장면 없음</p>'}
+                                </div>
+                                ${analysis.timelineAnalysis ? `
+                                <div class="mt-4 pt-4 border-t border-slate-700">
+                                    <p class="text-slate-400 text-xs uppercase tracking-wider mb-1">타임라인 흐름</p>
+                                    <p class="text-slate-300 text-xs">${analysis.timelineAnalysis}</p>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Suggested Titles Section -->
+                        ${analysis.suggestedTitles ? `
+                        <div class="mb-6 bg-slate-800/80 border border-slate-700/50 rounded-xl p-6">
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="text-2xl">💡</span>
+                                <h3 class="text-white font-bold text-lg">추천 바이럴 제목 (Gemini 2.0 Flash)</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                ${analysis.suggestedTitles.map((t, i) => `
+                                    <div class="bg-slate-900/50 p-4 rounded-lg border border-slate-700 hover:border-blue-500 transition-all cursor-pointer group"
+                                         onclick="copyToClipboard('${t.korean}', '한국어 제목')">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-xs text-slate-500 font-mono">TITLE #${i + 1}</span>
+                                            <span class="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 복사</span>
+                                        </div>
+                                        <p class="text-white font-bold mb-1">${t.korean}</p>
+                                        <p class="text-slate-400 text-xs italic">${t.english}</p>
+                                        <div class="mt-2 text-slate-500 text-[10px] flex items-center gap-2">
+                                            <span>🇯🇵 ${t.japanese}</span>
+                                            <span class="text-slate-600">|</span>
+                                            <span>🗣️ ${t.japanese_pronunciation}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
                     `;
                     explanationContainer.classList.remove('hidden');
                 } else {
@@ -2441,6 +2658,26 @@
                         availableStyles = data.styles;
                         renderStyleCategories(data.styles);
                         renderStyleChannels(getAllChannels(data.styles));
+
+                        // AUTO-SELECT STYLE IF PASSED FROM FINDER
+                        if (window.preSelectedStyleId) {
+                            const all = getAllChannels(data.styles);
+                            const target = all.find(c => c.id == window.preSelectedStyleId);
+                            if (target) {
+                                console.log('🎯 Auto-selecting Style:', target.name);
+                                // Wait a tick for DOM
+                                setTimeout(() => {
+                                    // Find card and trigger click
+                                    // We need to find the specific card element to visual highlight
+                                    // But selectStyle function handles visual update if we pass element
+                                    // Let's just call selectStyle logic directly
+                                    selectStyle(target, null);
+
+                                    // Also maybe filter category? (Optional)
+                                    // For now just select it.
+                                }, 100);
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error('Failed to load styles:', error);
@@ -2519,6 +2756,7 @@
 
                 channels.forEach(ch => {
                     const card = document.createElement('div');
+                    card.dataset.id = ch.id; // Store ID for auto-selection
                     card.className = 'bg-slate-800 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-orange-500 transition-all group style-card flex flex-col h-full'; // Added flex/h-full
                     card.onclick = (e) => selectStyle(ch, e.currentTarget);
 
@@ -2599,9 +2837,17 @@
             function selectStyle(channel, element) {
                 selectedStyleId = channel.id;
 
+                // Find element if not passed (Auto-selection)
+                if (!element) {
+                    element = document.querySelector(`.style-card[data-id="${channel.id}"]`);
+                }
+
                 // Visual Update
                 document.querySelectorAll('.style-card').forEach(c => c.classList.remove('ring-2', 'ring-orange-500'));
-                if (element) element.classList.add('ring-2', 'ring-orange-500');
+                if (element) {
+                    element.classList.add('ring-2', 'ring-orange-500');
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Auto-scroll to selection
+                }
 
                 document.getElementById('selectedStyleName').textContent = channel.name;
                 document.getElementById('selectedStylePreview').style.backgroundImage = `url(${channel.thumbnail})`;
@@ -2824,6 +3070,19 @@
                                 Close
                             </button>
                         </div>
+
+                        <!-- Viral Logic Section -->
+                        ${result.data.viral_logic ? `
+                        <div class="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 rounded-xl p-5 mb-8 border-l-4 border-purple-500">
+                            <div class="flex items-start gap-3">
+                                <span class="text-2xl">🧠</span>
+                                <div>
+                                    <h3 class="text-white font-bold text-sm mb-1 uppercase tracking-wider text-purple-300">Viral Strategy Logic</h3>
+                                    <p class="text-slate-200 text-sm leading-relaxed">${result.data.viral_logic}</p>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
 
                         ${titlesHTML}
                         ${thumbnailsHTML}

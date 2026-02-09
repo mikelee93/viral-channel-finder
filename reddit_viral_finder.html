@@ -29,10 +29,12 @@
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
 
         ::-webkit-scrollbar-track {
             background: #1e293b;
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -77,79 +79,319 @@
         </div>
 
         <!-- Toolbar -->
-        <div class="glass-panel p-6 rounded-2xl mb-8 sticky top-4 z-50 shadow-xl">
-            <div class="flex flex-wrap gap-4 items-center">
-                <!-- Subreddit Select -->
-                <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">r/</span>
+        <div id="mainToolbar"
+            class="glass-panel p-6 rounded-2xl mb-8 sticky top-4 z-50 shadow-xl transition-all duration-300">
+            <!-- Top Row: Input & Controls -->
+            <div id="topRow"
+                class="flex flex-col md:flex-row gap-4 justify-between items-center mb-6 pb-6 border-b border-slate-700/50 transition-all duration-300">
+                <!-- Input Group -->
+                <div class="relative w-full md:w-auto flex-1 max-w-2xl">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg font-bold">r/</span>
                     <input type="text" id="subredditInput" value="PublicFreakout"
-                        class="bg-slate-900 border border-slate-700 text-white pl-8 pr-4 py-3 rounded-xl focus:outline-none focus:border-orange-500 w-48 font-bold"
-                        placeholder="Subreddit">
+                        class="w-full bg-slate-900/80 border border-slate-600 text-white pl-10 pr-4 py-4 rounded-2xl focus:outline-none focus:border-orange-500 font-bold text-lg shadow-inner transition-all hover:bg-slate-900"
+                        placeholder="Enter Subreddit...">
                 </div>
 
-                <!-- Presets -->
-                <div class="flex gap-2 overflow-x-auto pb-1 max-w-xl custom-scrollbar">
-                    <button onclick="setSubreddit('PublicFreakout')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-orange-600/20 hover:text-orange-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">🤬
-                        PublicFreakout</button>
-                    <button onclick="setSubreddit('BodyCam')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">👮
-                        BodyCam</button>
-                    <button onclick="setSubreddit('NextFuckingLevel')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">🚀
-                        NextLevel</button>
-                    <button onclick="setSubreddit('Damnthatsinteresting')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-yellow-600/20 hover:text-yellow-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">🤔
-                        Interesting</button>
-                    <button onclick="setSubreddit('Unexpected')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">👻
-                        Unexpected</button>
-                    <button onclick="setSubreddit('MadeMeSmile')"
-                        class="px-3 py-1.5 bg-slate-800 hover:bg-green-600/20 hover:text-green-400 rounded-lg text-sm transition-colors border border-slate-700 whitespace-nowrap">😊
-                        Smile</button>
+                <!-- Action Group -->
+                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <select id="styleSelect" onchange="applyStyleFilter()"
+                        class="bg-slate-800 border border-slate-600 text-white px-4 py-3.5 rounded-xl focus:outline-none focus:border-orange-500 font-bold cursor-pointer hover:bg-slate-700 transition-colors">
+                        <option value="">🎨 Style Filter</option>
+                        <!-- Styles injected via JS -->
+                    </select>
+
+                    <div id="matchFilterContainer"
+                        class="hidden flex items-center gap-2 bg-pink-900/30 px-3 py-2 rounded-xl border border-pink-500/30">
+                        <input type="checkbox" id="filterMatchesToggle" onchange="applyStyleFilter()"
+                            class="w-4 h-4 text-pink-500 rounded focus:ring-pink-500 flex-shrink-0 cursor-pointer">
+                        <label for="filterMatchesToggle"
+                            class="text-sm font-bold text-pink-300 cursor-pointer whitespace-nowrap select-none">Matches
+                            Only</label>
+                    </div>
+
+                    <select id="sortSelect"
+                        class="bg-slate-800 border border-slate-600 text-white px-4 py-3.5 rounded-xl focus:outline-none focus:border-orange-500 font-bold cursor-pointer hover:bg-slate-700 transition-colors">
+                        <option value="hot">🔥 Hot</option>
+                        <option value="top">🏆 Top</option>
+                        <option value="new">🆕 New</option>
+                    </select>
+                    <select id="timeSelect"
+                        class="bg-slate-800 border border-slate-600 text-white px-4 py-3.5 rounded-xl focus:outline-none focus:border-orange-500 font-bold cursor-pointer hover:bg-slate-700 transition-colors hidden">
+                        <option value="day">📅 Today</option>
+                        <option value="week">📅 Week</option>
+                        <option value="month">📅 Month</option>
+                        <option value="all">📅 All Time</option>
+                    </select>
+
+                    <div class="flex items-center gap-2 mr-2 bg-slate-800 px-3 py-2 rounded-xl border border-slate-600">
+                        <input type="checkbox" id="searchModeToggle" checked
+                            class="w-4 h-4 text-orange-500 rounded focus:ring-orange-500 flex-shrink-0 cursor-pointer">
+                        <label for="searchModeToggle"
+                            class="text-sm font-bold text-slate-300 cursor-pointer whitespace-nowrap select-none">Global
+                            Search</label>
+                    </div>
+
+                    <button id="searchBtn" onclick="fetchPosts()"
+                        class="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-8 py-3.5 rounded-xl font-bold text-lg transition-all active:scale-95 shadow-lg shadow-orange-900/40 flex items-center gap-2 whitespace-nowrap hover:shadow-orange-500/20">
+                        <span>🔍</span> 수집하기
+                    </button>
+
+                    <!-- Toggle Minimize Button (Only visible when scrolled) -->
+                    <button id="toggleToolbarBtn" onclick="toggleToolbar()"
+                        class="hidden ml-2 text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-slate-800"
+                        title="Expand Toolbar">
+                        🔽
+                    </button>
+                </div>
+            </div>
+
+            <!-- Categories Grid -->
+            <div id="categoryPanel"
+                class="space-y-4 overflow-hidden transition-all duration-500 max-h-[500px] opacity-100">
+
+                <!-- Row 0: Trending / Mix (New) -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-red-400 font-bold border-r border-slate-700 pr-4 group-hover:text-red-300 transition-colors">
+                        <span class="text-xl">🔥</span> Trending
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('popular', 'search')"
+                            class="px-3 py-1.5 bg-red-900/40 hover:bg-red-600/30 hover:text-red-300 hover:border-red-500 rounded-lg text-sm border border-red-800 transition-all whitespace-nowrap font-bold ring-1 ring-red-500/30">
+                            🌍 Popular</button>
+                        <button onclick="setSubreddit('viral', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-orange-500/20 hover:text-orange-300 hover:border-orange-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            📈 Viral (Search)</button>
+                        <button onclick="setSubreddit('funny', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-yellow-500/20 hover:text-yellow-300 hover:border-yellow-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            😂 Funny</button>
+                        <button onclick="setSubreddit('TikTokCringe', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-pink-500/20 hover:text-pink-300 hover:border-pink-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            📱 TikTokBest</button>
+                        <button onclick="setSubreddit('videos', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-500/20 hover:text-slate-300 hover:border-slate-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            📹 Videos</button>
+                    </div>
                 </div>
 
-                <div class="h-8 w-[1px] bg-slate-700 mx-2"></div>
+                <!-- Row 1: Visual -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-slate-300 font-bold border-r border-slate-700 pr-4 group-hover:text-white transition-colors">
+                        <span class="text-xl">👁️</span> Visual
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('NextFuckingLevel', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-purple-500/20 hover:text-purple-300 hover:border-purple-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            🚀 NextLevel</button>
+                        <button onclick="setSubreddit('Damnthatsinteresting', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-yellow-500/20 hover:text-yellow-300 hover:border-yellow-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            🤔 Interesting</button>
+                        <button onclick="setSubreddit('Unexpected', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-pink-500/20 hover:text-pink-300 hover:border-pink-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            👻 Unexpected</button>
+                        <button onclick="setSubreddit('BeAmazed', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-300 hover:border-cyan-500/50 rounded-lg text-sm border border-slate-700 transition-all whitespace-nowrap">
+                            😲 BeAmazed</button>
+                    </div>
+                </div>
 
-                <!-- Filters -->
-                <select id="sortSelect"
-                    class="bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-orange-500">
-                    <option value="hot">🔥 Hot</option>
-                    <option value="top">🏆 Top</option>
-                    <option value="new">🆕 New</option>
-                </select>
+                <!-- Row 2: 🏛️ Legal & Court (Justice) -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-slate-400 font-bold border-r border-slate-700 pr-4 group-hover:text-slate-300 transition-colors">
+                        <span class="text-xl">🏛️</span> Legal
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('CourtCam', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-500/20 hover:text-white hover:border-slate-400 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ⚖️ CourtCam</button>
+                        <button onclick="setSubreddit('Sovereigncitizen', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-500/20 hover:text-white hover:border-slate-400 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🤡 Sovereign</button>
+                        <button onclick="setSubreddit('PoliceActivity', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-500/20 hover:text-white hover:border-slate-400 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🚓 Activity</button>
+                        <button onclick="setSubreddit('Bad_Cop_No_Donut', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            👮 BadCop</button>
+                    </div>
+                </div>
 
-                <select id="timeSelect"
-                    class="bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-orange-500 hidden">
-                    <option value="day">오늘 (Day)</option>
-                    <option value="week">이번 주 (Week)</option>
-                    <option value="month">이번 달 (Month)</option>
-                    <option value="all">전체 (All Time)</option>
-                </select>
+                <!-- Row 3: 👮 Street Justice -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-red-500 font-bold border-r border-slate-700 pr-4 group-hover:text-red-400 transition-colors">
+                        <span class="text-xl">👮</span> Street
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('PublicFreakout', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-orange-900/30 text-orange-200/70 hover:bg-orange-600/20 hover:text-orange-300 hover:border-orange-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🤬 Public</button>
+                        <button onclick="setSubreddit('ActualPublicFreakouts', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🔞 Actual</button>
+                        <button onclick="setSubreddit('JusticeServed', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-blue-900/30 text-blue-200/70 hover:bg-blue-600/20 hover:text-blue-300 hover:border-blue-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ⚖️ Served</button>
+                        <button onclick="setSubreddit('BodyCam', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-blue-900/30 text-blue-200/70 hover:bg-blue-600/20 hover:text-blue-300 hover:border-blue-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            📹 BodyCam</button>
+                        <button onclick="setSubreddit('ConvenienceStore', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-yellow-900/30 text-yellow-200/70 hover:bg-yellow-600/20 hover:text-yellow-300 hover:border-yellow-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🏪 Store</button>
+                    </div>
+                </div>
 
-                <button id="searchBtn"
-                    class="ml-auto bg-orange-600 hover:bg-orange-500 text-white px-8 py-3 rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-orange-600/20 flex items-center gap-2">
-                    <span>🔍</span> 수집하기 (Collect)
-                </button>
+                <!-- Row 4: 🚗 Traffic & Chaos -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-orange-400 font-bold border-r border-slate-700 pr-4 group-hover:text-orange-300 transition-colors">
+                        <span class="text-xl">🚗</span> Traffic
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('IdiotsInCars', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🚗 Idiots</button>
+                        <button onclick="setSubreddit('Dashcam', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-600/30 hover:text-white hover:border-slate-500 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            📹 Dashcam</button>
+                        <button onclick="setSubreddit('Roadcam', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-600/30 hover:text-white hover:border-slate-500 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🛣️ Roadcam</button>
+                        <button onclick="setSubreddit('AbruptChaos', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-orange-900/30 text-orange-200/70 hover:bg-orange-600/20 hover:text-orange-300 hover:border-orange-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            💥 Chaos</button>
+                    </div>
+                </div>
+
+                <!-- Row 5: ⚽ Major Sports -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-blue-400 font-bold border-r border-slate-700 pr-4 group-hover:text-blue-300 transition-colors">
+                        <span class="text-xl">⚽</span> Major
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('soccer', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-blue-900/30 text-blue-200/70 hover:bg-blue-600/20 hover:text-blue-300 hover:border-blue-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ⚽ Soccer</button>
+                        <button onclick="setSubreddit('NBA', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-orange-900/30 text-orange-200/70 hover:bg-orange-600/20 hover:text-orange-300 hover:border-orange-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🏀 NBA</button>
+                        <button onclick="setSubreddit('NFL', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🏈 NFL</button>
+                        <button onclick="setSubreddit('baseball', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-white/30 text-white/70 hover:bg-white/20 hover:text-white hover:border-white/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ⚾ MLB</button>
+                        <button onclick="setSubreddit('tennis', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-yellow-900/30 text-yellow-200/70 hover:bg-yellow-600/20 hover:text-yellow-300 hover:border-yellow-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🎾 Tennis</button>
+                        <button onclick="setSubreddit('golf', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-green-900/30 text-green-200/70 hover:bg-green-600/20 hover:text-green-300 hover:border-green-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ⛳ Golf</button>
+                    </div>
+                </div>
+
+                <!-- Row 6: 🥊 Combat & Speed -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-red-600 font-bold border-r border-slate-700 pr-4 group-hover:text-red-500 transition-colors">
+                        <span class="text-xl">🥊</span> Action
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('MMA', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🥊 MMA</button>
+                        <button onclick="setSubreddit('UFC', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🥋 UFC</button>
+                        <button onclick="setSubreddit('Boxing', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🥊 Boxing</button>
+                        <button onclick="setSubreddit('formula1', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🏎️ F1</button>
+                        <button onclick="setSubreddit('racing', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-600/30 hover:text-white hover:border-slate-500 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🏁 Racing</button>
+                    </div>
+                </div>
+
+                <!-- Row 3: Insight -->
+                <div class="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 transition-colors group">
+                    <div
+                        class="w-24 flex-shrink-0 flex items-center gap-2 text-green-400 font-bold border-r border-slate-700 pr-4 group-hover:text-green-300 transition-colors">
+                        <span class="text-xl">🧠</span> Insight
+                    </div>
+                    <div class="flex flex-wrap gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <button onclick="setSubreddit('Interview', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-green-900/30 text-green-200/70 hover:bg-green-600/20 hover:text-green-300 hover:border-green-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🎤 Interview</button>
+                        <button onclick="setSubreddit('PopCultureChat', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-pink-900/30 text-pink-200/70 hover:bg-pink-600/20 hover:text-pink-300 hover:border-pink-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            🌟 Celeb</button>
+                        <button onclick="setSubreddit('GetMotivated', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-blue-900/30 text-blue-200/70 hover:bg-blue-600/20 hover:text-blue-300 hover:border-blue-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            💪 Motivate</button>
+                        <button onclick="setSubreddit('MadeMeSmile', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-emerald-900/30 text-emerald-200/70 hover:bg-emerald-600/20 hover:text-emerald-300 hover:border-emerald-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            😊 Smile</button>
+                        <button onclick="setSubreddit('HumansBeingBros', 'search')"
+                            class="px-3 py-1.5 bg-slate-800 border border-teal-900/30 text-teal-200/70 hover:bg-teal-600/20 hover:text-teal-300 hover:border-teal-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                            ❤️ Bros</button>
+                    </div>
+                </div>
+
+                class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-600/30
+                hover:text-white hover:border-slate-500 rounded-lg text-sm transition-all whitespace-nowrap
+                font-medium">
+                🏁 Racing</button>
+                <button onclick="setSubreddit('MMA')"
+                    class="px-3 py-1.5 bg-slate-800 border border-red-900/30 text-red-200/70 hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/50 rounded-lg text-sm transition-all whitespace-nowrap font-medium">
+                    🥊 MMA</button>
             </div>
         </div>
 
-        <!-- Results Grid -->
-        <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- Items -> JS Injected -->
-            <div class="col-span-full text-center py-20 opacity-50">
-                <div class="text-6xl mb-4">🛸</div>
-                <p class="text-xl">서브레딧을 선택하고 '수집하기'를 눌러주세요.</p>
-            </div>
+    </div>
+    </div>
+
+    <!-- Results Grid -->
+    <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Items -> JS Injected -->
+        <div class="col-span-full text-center py-20 opacity-50">
+            <div class="text-6xl mb-4">🛸</div>
+            <p class="text-xl">서브레딧을 선택하고 '수집하기'를 눌러주세요.</p>
         </div>
+    </div>
 
     </div>
 
     <script>
         // Preset Handler
-        function setSubreddit(name) {
+        function setSubreddit(name, mode = 'subreddit') {
             document.getElementById('subredditInput').value = name;
+            // Set Toggle State
+            const toggle = document.getElementById('searchModeToggle');
+            toggle.checked = (mode === 'search');
+            updatePlaceholder();
             fetchPosts();
+        }
+
+        // Toggle Placeholder and Hint
+        const searchModeToggle = document.getElementById('searchModeToggle');
+        searchModeToggle.addEventListener('change', updatePlaceholder);
+
+        function updatePlaceholder() {
+            const input = document.getElementById('subredditInput');
+            const toggle = document.getElementById('searchModeToggle');
+            if (toggle.checked) {
+                input.placeholder = "Enter Search Keyword...";
+                document.querySelector('.absolute.left-4').innerText = '🔍';
+            } else {
+                input.placeholder = "Enter Subreddit...";
+                document.querySelector('.absolute.left-4').innerText = 'r/';
+            }
         }
 
         // Toggle Time Select based on Sort
@@ -167,14 +409,80 @@
             if (e.key === 'Enter') fetchPosts();
         });
 
+        // Scroll Logic for Toolbar
+        const toolbar = document.getElementById('mainToolbar');
+        const categoryPanel = document.getElementById('categoryPanel');
+        const topRow = document.getElementById('topRow');
+        const toggleBtn = document.getElementById('toggleToolbarBtn');
+        let isManuallyExpanded = false;
+
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50 && !isManuallyExpanded) {
+                // Minimize Triggered
+                categoryPanel.classList.add('max-h-0', 'opacity-0', 'py-0');
+                categoryPanel.classList.remove('max-h-[500px]', 'opacity-100');
+
+                // Toolbar Styling
+                toolbar.classList.replace('p-6', 'p-3');
+                toolbar.classList.add('bg-opacity-90', 'backdrop-blur-xl');
+
+                // Top Row Styling
+                topRow.classList.remove('mb-6', 'pb-6', 'border-b');
+                topRow.classList.add('mb-0', 'pb-0', 'border-none');
+
+                // Show Toggle for Manual Expand
+                toggleBtn.classList.remove('hidden');
+                toggleBtn.innerText = '🔼';
+            } else if (window.scrollY <= 50) {
+                // Restore Full View
+                categoryPanel.classList.remove('max-h-0', 'opacity-0', 'py-0');
+                categoryPanel.classList.add('max-h-[500px]', 'opacity-100');
+
+                toolbar.classList.replace('p-3', 'p-6');
+                toolbar.classList.remove('bg-opacity-90', 'backdrop-blur-xl');
+
+                topRow.classList.add('mb-6', 'pb-6', 'border-b');
+                topRow.classList.remove('mb-0', 'pb-0', 'border-none');
+
+                toggleBtn.classList.add('hidden');
+                isManuallyExpanded = false; // Reset manual override
+            }
+        });
+
+        function toggleToolbar() {
+            if (categoryPanel.classList.contains('max-h-0')) {
+                // Manually Expand
+                isManuallyExpanded = true;
+                categoryPanel.classList.remove('max-h-0', 'opacity-0', 'py-0');
+                categoryPanel.classList.add('max-h-[500px]', 'opacity-100');
+                toggleBtn.innerText = '🔽';
+
+                // Restore top row styling for better look when expanded mid-scroll
+                topRow.classList.add('mb-6', 'pb-6', 'border-b');
+                topRow.classList.remove('mb-0', 'pb-0', 'border-none');
+
+            } else {
+                // Manually Collapse
+                isManuallyExpanded = false;
+                categoryPanel.classList.add('max-h-0', 'opacity-0', 'py-0');
+                categoryPanel.classList.remove('max-h-[500px]', 'opacity-100');
+                toggleBtn.innerText = '🔼';
+
+                // Re-apply compact styling
+                topRow.classList.remove('mb-6', 'pb-6', 'border-b');
+                topRow.classList.add('mb-0', 'pb-0', 'border-none');
+            }
+        }
+
         async function fetchPosts() {
             const subreddit = document.getElementById('subredditInput').value;
             const sort = document.getElementById('sortSelect').value;
             const time = document.getElementById('timeSelect').value;
             const grid = document.getElementById('resultsGrid');
             const btn = document.getElementById('searchBtn');
+            const isSearchMode = document.getElementById('searchModeToggle').checked;
 
-            if (!subreddit) return alert('서브레딧 이름을 입력하세요');
+            if (!subreddit) return alert('검색어 또는 서브레딧 이름을 입력하세요');
 
             // Loading UI
             btn.disabled = true;
@@ -184,7 +492,9 @@
             `).join('');
 
             try {
-                const response = await fetch(`http://localhost:4000/api/reddit/viral?subreddit=${subreddit}&sort=${sort}&time=${time}&limit=50`);
+                // Pass mode parameter
+                const modeParam = isSearchMode ? 'search' : 'subreddit';
+                const response = await fetch(`http://localhost:4000/api/reddit/viral?subreddit=${subreddit}&sort=${sort}&time=${time}&limit=50&mode=${modeParam}`);
                 const data = await response.json();
 
                 if (!data.success) throw new Error(data.error);
@@ -195,25 +505,140 @@
                 grid.innerHTML = `<div class="col-span-full text-center text-red-500 py-10">❌ 오류 발생: ${error.message}</div>`;
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<span>🔍</span> 수집하기 (Collect)';
+                btn.innerHTML = '<span>🔍</span> 수집하기';
             }
         }
 
+        let currentPosts = []; // Global store for posts
+        let allStyles = [];   // Global store for styles
+
+        // Load Styles on Init
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadStyles();
+        });
+
+        async function loadStyles() {
+            try {
+                const res = await fetch('/api/channels/list');
+                const json = await res.json();
+                if (json.success) {
+                    allStyles = json.data;
+                    const select = document.getElementById('styleSelect');
+                    allStyles.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.text = `🎨 ${s.name}`;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (e) { console.error('Failed to load styles', e); }
+        }
+
+        function applyStyleFilter() {
+            if (currentPosts.length > 0) renderPosts(currentPosts);
+        }
+
+        function calculateMatchScore(post, style) {
+            // BACKEND DATA STRUCTURE: style.analysis
+            if (!style || !style.analysis) return 0;
+            let score = 0;
+            const title = (post.title || '').toLowerCase();
+            const analysis = style.analysis;
+
+            // 1. Vocabulary Match (Heavy Weight)
+            // Flatten vocabulary from patterns object
+            let vocabList = [];
+            if (analysis.vocabulary_patterns) {
+                const vp = analysis.vocabulary_patterns;
+                if (Array.isArray(vp.adjectives)) vocabList.push(...vp.adjectives);
+                if (Array.isArray(vp.verbs)) vocabList.push(...vp.verbs);
+                if (Array.isArray(vp.signature_expressions)) vocabList.push(...vp.signature_expressions);
+
+                // Also add catchphrases if available
+                if (analysis.catchphrases && Array.isArray(analysis.catchphrases)) {
+                    vocabList.push(...analysis.catchphrases);
+                }
+            }
+
+            vocabList.forEach(word => {
+                // Determine matches (simple includes)
+                // Note: If words are Korean and title is English, this won't match much, 
+                // but we rely on engagement score for cross-language 'viral' potential.
+                if (word && title.includes(word.toLowerCase())) score += 15;
+            });
+
+            // 2. High Engagement Bonus
+            // Ensure post.score is treated as number
+            const postScore = parseInt(post.score) || 0;
+            if (postScore > 3000) score += 40; // Increased base weight to ensure viral videos always show up
+            if (postScore > 10000) score += 20;
+
+            // 3. Video Bonus
+            if (post.is_video) score += 10;
+
+            // 4. Comment Velocity Bonus (Proxy)
+            if (post.num_comments > 100) score += 10;
+
+            return Math.min(score, 100); // Cap at 100
+        }
+
         function renderPosts(posts) {
+            currentPosts = posts; // Update global
             const grid = document.getElementById('resultsGrid');
             grid.innerHTML = '';
 
-            if (posts.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center text-slate-500 py-20">검색 결과가 없습니다.</div>';
+            // Style Matching Logic
+            const selectedStyleId = document.getElementById('styleSelect').value;
+            const selectedStyle = allStyles.find(s => s.id == selectedStyleId);
+            const filterContainer = document.getElementById('matchFilterContainer');
+            const showMatchesOnly = document.getElementById('filterMatchesToggle').checked;
+
+            let displayPosts = [...posts];
+
+            if (selectedStyle) {
+                // Show Filter Toggle
+                filterContainer.classList.remove('hidden');
+
+                // Calculate scores
+                displayPosts.forEach(p => {
+                    p.matchScore = calculateMatchScore(p, selectedStyle);
+                });
+                // Sort by match score desc
+                displayPosts.sort((a, b) => b.matchScore - a.matchScore);
+
+                // Filter if toggled
+                if (showMatchesOnly) {
+                    displayPosts = displayPosts.filter(p => p.matchScore > 0);
+                }
+            } else {
+                // Hide Filter Toggle
+                filterContainer.classList.add('hidden');
+            }
+
+            if (displayPosts.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-slate-500 py-20">검색 결과가 없습니다. (매칭되는 영상이 없습니다)</div>';
                 return;
             }
 
-            posts.forEach(post => {
+            displayPosts.forEach(post => {
                 const isVideo = post.is_video || (post.video_url && post.video_url.includes('.mp4')) || post.url.includes('youtu');
                 const score = post.score > 1000 ? (post.score / 1000).toFixed(1) + 'k' : post.score;
 
+                // Match Badge
+                let matchBadge = '';
+                let cardBorderClass = 'border-slate-700/50';
+
+                if (selectedStyle && post.matchScore > 0) {
+                    matchBadge = `
+                        <div class="absolute top-2 left-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg z-20 border border-white/20 flex items-center gap-1">
+                            <span>💖</span> Match: ${post.matchScore}%
+                        </div>
+                    `;
+                    cardBorderClass = 'border-pink-500/50 ring-1 ring-pink-500/30';
+                }
+
                 const card = document.createElement('div');
-                card.className = 'glass-panel rounded-xl overflow-hidden video-card transition-all duration-300 border border-slate-700/50 flex flex-col h-full group';
+                card.className = `glass-panel rounded-xl overflow-hidden video-card transition-all duration-300 border ${cardBorderClass} flex flex-col h-full group`;
 
                 // Media Container
                 let mediaHtml = '';
@@ -221,6 +646,7 @@
                     // Reddit Video
                     mediaHtml = `
                         <div class="aspect-video bg-black relative">
+                            ${matchBadge}
                             ${post.hls_url ? `
                                 <!-- HLS Player -->
                                 <video id="video-${post.id}" class="w-full h-full object-contain" controls preload="none" poster="${post.thumbnail !== 'default' ? post.thumbnail : ''}"></video>
@@ -244,30 +670,61 @@
                                 <!-- Standard MP4 Fallback -->
                                 <video src="${post.video_url}" class="w-full h-full object-contain" controls preload="none" poster="${post.thumbnail !== 'default' ? post.thumbnail : ''}"></video>
                             `}
-    <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1 z-10">
-        <span>${post.hls_url ? '🔊 Audio' : '🔇 No Audio'}</span>
-    </div>
-    </div>
-    `;
+                            <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1 z-10">
+                                <span>${post.hls_url ? '🔊 Audio' : '🔇 No Audio'}</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (post.url.includes('streamable.com') || post.url.includes('twitter.com') || post.url.includes('x.com')) {
+                    // External Video (Streamable, Twitter, X)
+                    const thumb = (post.thumbnail && post.thumbnail.startsWith('http')) ? post.thumbnail : 'https://placehold.co/600x400/1e293b/ffffff?text=External+Video';
+                    const sourceName = post.url.includes('streamable') ? 'Streamable' : 'Twitter/X';
+
+                    mediaHtml = `
+                        <div class="aspect-video bg-black relative group cursor-pointer overflow-hidden" onclick="window.open('${post.url}', '_blank')">
+                            ${matchBadge}
+                            <img src="${thumb}" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" onerror="this.src='https://placehold.co/600x400/1e293b/ffffff?text=No+Thumbnail'">
+                            
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="bg-red-600/90 hover:bg-red-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all duration-300 backdrop-blur-sm">
+                                    <span class="text-2xl ml-1">▶️</span>
+                                </div>
+                            </div>
+                            
+                            <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-xs font-bold text-white px-2 py-1 rounded border border-white/10" style="top: ${selectedStyle && post.matchScore > 0 ? '2.5rem' : '0.5rem'}"> <!-- Adjust position if match badge exists -->
+                                🔗 ${sourceName}
+                            </div>
+                            
+                            <div class="aspect-video bg-black relative group cursor-pointer" onclick="analyzeVideo('${(post.url.includes('v.redd.it') || post.url.includes('i.redd.it')) ? post.permalink : post.url}', '${post.title.replace(/'/g, "\\'")}')">
+                                ${matchBadge}
+                                <div class="absolute inset-0 flex items-center justify-center bg-transparent group-hover:bg-black/20 transition-colors">
+                                    <div class="bg-orange-500/90 text-white rounded-full p-4 transform group-hover:scale-110 transition-transform shadow-lg backdrop-blur-sm">
+                                        <span class="text-2xl">🤖</span>
+                                    </div>
+                                </div>
+                    `;
                 } else if (post.thumbnail && post.thumbnail.startsWith('http')) {
                     // Thumbnail / Link
                     mediaHtml = `
-    <div class="aspect-video bg-slate-800 relative group cursor-pointer" onclick="window.open('${post.url}', '_blank')">
-        <img src="${post.thumbnail}"
-            class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">
-        <div
-            class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <span class="bg-black/50 p-3 rounded-full text-2xl">🔗</span>
-        </div>
-    </div>
-    `;
+                    <div class="aspect-video bg-black relative group cursor-pointer" onclick="analyzeVideo('${(post.url.includes('v.redd.it') || post.url.includes('i.redd.it')) ? post.permalink : post.url}', '${post.title.replace(/'/g, "\\'")}')">
+                        ${matchBadge}
+                        <img src="${post.thumbnail}"
+                            class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div class="absolute inset-0 flex items-center justify-center bg-transparent group-hover:bg-black/20 transition-colors">
+                            <div class="bg-orange-500/90 text-white rounded-full p-4 transform group-hover:scale-110 transition-transform shadow-lg backdrop-blur-sm">
+                                <span class="text-2xl">🤖</span>
+                            </div>
+                        </div>
+                    </div>
+                    `;
                 } else {
                     // Text/No Image
                     mediaHtml = `
-    <div class="aspect-video bg-slate-800 flex items-center justify-center text-slate-500">
-        📝 No Preview
-    </div>
-    `;
+                    <div class="aspect-video bg-slate-800 flex items-center justify-center text-slate-500 relative">
+                        ${matchBadge}
+                        📝 No Preview
+                    </div>
+                    `;
                 }
 
                 card.innerHTML = `
@@ -281,10 +738,11 @@
             </h3>
         </div>
 
-        <div class="text-xs text-slate-500 mb-4 flex items-center gap-2">
-            <span class="text-orange-400 font-bold">⬆️ ${score}</span>
-            <span>💬 ${post.comments}</span>
-            <span>👤 ${post.author}</span>
+        <div class="text-xs text-slate-500 mb-4 flex items-center flex-wrap gap-3">
+            <span class="text-orange-400 font-bold flex items-center gap-1">⬆️ ${score}</span>
+            <span class="flex items-center gap-1">💬 ${post.comments}</span>
+            <span class="flex items-center gap-1">📅 ${new Date(post.created_utc * 1000).toLocaleDateString()}</span>
+            <span class="flex items-center gap-1">👤 ${post.author}</span>
         </div>
 
         <div class="mt-auto grid grid-cols-2 gap-2">
@@ -292,9 +750,9 @@
                 class="bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 rounded-lg text-sm font-bold transition-colors">
                 🔗 URL 복사
             </button>
-            <button onclick="analyzeVideo('${post.url}')"
-                class="bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-indigo-500/20">
-                🚀 분석하기
+            <button onclick="analyzeVideo('${post.url}', '${post.title.replace(/'/g, "\\'")}')"
+                class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-1">
+                <span>🤖</span> 분석하기
             </button>
         </div>
     </div>
@@ -306,15 +764,16 @@
 
         function copyUrl(url) {
             navigator.clipboard.writeText(url);
-            alert('URL이 복사되었습니다: ' + url);
+            // Optional: visual feedback
         }
 
-        function analyzeVideo(url) {
-            // Copy URL and alert user to go to main page
-            const confirmMove = confirm('분석을 위해 메인 페이지로 이동하시겠습니까? (URL은 클립보드에 복사됩니다)');
+        function analyzeVideo(url, title = '') {
+            const confirmMove = confirm('🤖 AI 가이드라인 분석 연구소로 이동하시겠습니까?\n\n(새 탭에서 분석이 시작됩니다)');
             if (confirmMove) {
-                copyUrl(url); // Auto copy
-                window.location.href = 'youtube_guidelines.html';
+                // Encode Params
+                const styleId = document.getElementById('styleSelect').value || '';
+                const target = `youtube_guidelines.html?videoUrl=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&autoStart=true&styleId=${styleId}`;
+                window.open(target, '_blank');
             }
         }
     </script>
