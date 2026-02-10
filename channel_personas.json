@@ -93,7 +93,7 @@
     "id": "1770506628505",
     "name": "바디캠온",
     "url": "https://www.youtube.com/channel/UChMMd8NQczLL51eAISmuSGQ",
-    "category": "entertainment",
+    "category": "general",
     "analysis": {
       "tone": "High-Tension, Confrontational (고도의 긴장감, 대립적)",
       "hook_style": "Starts with immediate conflict or urgent situation (즉각적인 갈등 또는 긴급한 상황으로 시작)",
@@ -173,7 +173,8 @@
       "prompt_instruction": "Write a scene involving a confrontation with a police officer, using strong language and short, declarative sentences. Focus on the character's defiance and refusal to back down."
     },
     "sourceCount": 15,
-    "createdAt": "2026-02-07T23:23:48.505Z"
+    "createdAt": "2026-02-07T23:23:48.505Z",
+    "updatedAt": "2026-02-10T16:39:42.673Z"
   },
   {
     "id": "1770693602627",
