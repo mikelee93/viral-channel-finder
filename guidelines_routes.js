@@ -309,8 +309,8 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
             // 4. Analyze with Gemini Vision
             console.log('[Guidelines URL] Starting Gemini Vision analysis...');
 
-            // Execute Guidelines Analysis and Title Generation in parallel
-            const analysisPromise = analyzeVideoWithGemini({
+            // Execute Guidelines Analysis
+            const analysis = await analyzeVideoWithGemini({
                 fileUri: uploadedFile.uri,
                 mimeType: uploadedFile.mimeType
             }, {
@@ -319,21 +319,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
                 comments: redditComments
             }, GEMINI_API_KEY);
 
-            const titlesPromise = generateShortsTitle({
-                fileUri: uploadedFile.uri,
-                mimeType: uploadedFile.mimeType
-            }, {
-                title: title,
-                description: description
-            }, GEMINI_API_KEY);
-
-            // Wait for both to complete
-            const [analysis, suggestedTitles] = await Promise.all([analysisPromise, titlesPromise]);
-
-            // Attach titles to analysis object for frontend
-            analysis.suggestedTitles = suggestedTitles;
-
-            console.log('[Guidelines URL] Analysis and Title Generation complete');
+            console.log('[Guidelines URL] Analysis complete');
 
             // 5. Save to database
             let checkId = null;
@@ -527,15 +513,44 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
     // API: Extract Bilingual Transcript (Step 1)
     app.post('/api/guidelines/extract-transcript', videoUpload.single('video'), async (req, res) => {
         let videoPath = null;
+        let isTempDownload = false;
 
         try {
-            if (!req.file) {
-                return res.status(400).json({ error: 'No video file uploaded' });
+            const { provider, url } = req.body; // 'openai' or 'huggingface', and optional 'url'
+
+            if (url) {
+                console.log('[Transcript Extract] 📥 Downloading video from URL:', url);
+                const timestamp = Date.now();
+                const outputTemplate = path.join(__dirname, 'uploads/temp', `transcript_dl_${timestamp}.%(ext)s`);
+
+                await ytDlp(url, {
+                    output: outputTemplate,
+                    format: 'bestaudio/best', // Audio is enough for transcript
+                    noPlaylist: true,
+                    maxFilesize: '100m',
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+                });
+
+                // Find downloaded file
+                const dir = path.join(__dirname, 'uploads/temp');
+                const files = fs.readdirSync(dir);
+                const found = files.find(f => f.startsWith(`transcript_dl_${timestamp}`));
+
+                if (found) {
+                    videoPath = path.join(dir, found);
+                    isTempDownload = true;
+                    console.log('[Transcript Extract] ✅ Downloaded:', videoPath);
+                } else {
+                    throw new Error('Download for transcript failed');
+                }
+
+            } else if (req.file) {
+                videoPath = req.file.path;
+            } else {
+                return res.status(400).json({ error: 'No video file uploaded or URL provided' });
             }
 
-            const { provider } = req.body; // 'openai' or 'huggingface'
-            videoPath = req.file.path;
-            console.log('[Transcript Extract] 📝 Starting transcript extraction...');
+            console.log('[Transcript Extract] 📝 Starting transcript extraction from:', videoPath);
             console.log('[Transcript Extract] 🔧 Provider:', provider || 'openai (default)');
 
             // Read video file

@@ -750,7 +750,7 @@
                 class="bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 rounded-lg text-sm font-bold transition-colors">
                 🔗 URL 복사
             </button>
-            <button onclick="analyzeVideo('${post.url}', '${post.title.replace(/'/g, "\\'")}')"
+            <button onclick="analyzeVideo('${(post.url.includes('v.redd.it')) ? post.permalink : post.url}', '${post.title.replace(/'/g, "\\'")}')"
                 class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-1">
                 <span>🤖</span> 분석하기
             </button>
@@ -772,7 +772,7 @@
             if (confirmMove) {
                 // Encode Params
                 const styleId = document.getElementById('styleSelect').value || '';
-                const target = `youtube_guidelines.html?videoUrl=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&autoStart=true&styleId=${styleId}`;
+                const target = `youtube_guidelines.html?videoUrl=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&autoStart=false&styleId=${styleId}`;
                 window.open(target, '_blank');
             }
         }

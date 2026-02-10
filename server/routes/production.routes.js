@@ -138,14 +138,18 @@ router.get('/styles', async (req, res) => {
  * Generates AI Script based on Source Video and Selected Style
  */
 router.post('/generate', async (req, res) => {
+    console.log('[Production] Request Body Keys:', Object.keys(req.body));
     try {
-        const { sourceUrl, styleId, transcriptText, transcriptSegments } = req.body;
+        const { sourceUrl, styleId, styleIds, isHybrid, categoryName, transcriptText, transcriptSegments, videoExplanation, keyMoments, timelineAnalysis } = req.body;
 
-        if ((!sourceUrl && !transcriptText) || !styleId) {
-            return res.status(400).json({ error: 'Source URL (or Transcript) and Style ID are required' });
+        // Validation: Require either styleId OR (isHybrid + styleIds)
+        const hasStyle = styleId || (isHybrid && styleIds && styleIds.length > 0);
+
+        if ((!sourceUrl && !transcriptText && !videoExplanation) || !hasStyle) {
+            return res.status(400).json({ error: 'Source URL, Transcript, or Visual Explanation, and Valid Style Selection are required' });
         }
 
-        console.log(`[Production] Generating script using style ${styleId}`);
+        console.log(`[Production] Generating script using ${isHybrid ? `Hybrid Style (${categoryName})` : `Style ID: ${styleId}`}`);
 
         // 1. Get Source Transcript
         let finalTranscript = '';
@@ -182,46 +186,90 @@ router.post('/generate', async (req, res) => {
             }
         }
 
-        // 2. Fetch Selected Style Data
-        let styleChannel = await HotChannel.findOne({ channelId: styleId }).lean();
+        // 2. Fetch Selected Style Data (Handling Hybrid & Single)
+        let styleChannel = null;
 
-        // Fallback: Check Style Lab JSON (channel_personas.json)
-        if (!styleChannel) {
-            try {
-                const fs = require('fs');
-                const path = require('path');
-                const DB_PATH = path.join(__dirname, '../../channel_personas.json');
+        if (isHybrid && styleIds && Array.isArray(styleIds)) {
+            // === HYBRID MODE ===
+            console.log(`[Production] Generating Hybrid Style for ${styleIds.length} channels...`);
 
-                if (fs.existsSync(DB_PATH)) {
-                    const data = fs.readFileSync(DB_PATH, 'utf8');
-                    const personas = JSON.parse(data);
-                    const found = personas.find(p => p.id === styleId);
+            // Fetch all channels
+            const channels = await HotChannel.find({ channelId: { $in: styleIds } }).lean();
 
-                    if (found) {
-                        console.log(`[Production] Found style in Style Lab File: ${found.name}`);
-                        // Map JSON to MongoDB structure expected below
-                        styleChannel = {
-                            channelTitle: found.name,
-                            thumbnail: null, // Fallback
-                            aiAnalysis: {
-                                strategy: {
-                                    persona: found.analysis.prompt_instruction, // Map 'prompt_instruction' to 'persona'
-                                    tone: found.analysis.tone,
-                                    hooks: found.analysis.hook_style,
-                                    director_rules: found.analysis.director_rules,
-                                    structure_template: found.analysis.structure_template
-                                }
-                            }
-                        };
+            if (channels.length > 0) {
+                // Merge DNA
+                const names = channels.map(c => c.channelTitle).join(', ');
+                const tones = [...new Set(channels.map(c => c.aiAnalysis?.strategy?.tone).filter(Boolean))].join(' + ');
+                const personas = channels.map(c => c.aiAnalysis?.strategy?.persona).filter(Boolean).join(' | ');
+                const hooks = channels.map(c => c.aiAnalysis?.strategy?.hooks).filter(Boolean).join(' OR ');
+
+                // Merge Arrays (Director Rules, Catchphrases, Transition Phrases)
+                const allRules = channels.flatMap(c => c.aiAnalysis?.strategy?.director_rules || []);
+                const allCatchphrases = channels.flatMap(c => c.aiAnalysis?.strategy?.catchphrases || []);
+                const allTransitions = channels.flatMap(c => c.aiAnalysis?.strategy?.transition_phrases || []);
+                const allStructure = channels[0]?.aiAnalysis?.strategy?.structure_template || []; // Use first channel's structure as base for now
+
+                styleChannel = {
+                    channelTitle: `Hybrid ${categoryName || 'Mix'} (${names})`,
+                    aiAnalysis: {
+                        strategy: {
+                            persona: `HYBRID PERSONA Mixing traits of: ${names}. Combine these styles: ${personas}`,
+                            tone: `Composite Tone: ${tones}`,
+                            hooks: `Mix of hooks: ${hooks}`,
+                            director_rules: [...new Set(allRules)], // Remove duplicates
+                            structure_template: allStructure,
+                            catchphrases: [...new Set(allCatchphrases)],
+                            vocabulary_patterns: { note: "Mix vocabulary patterns from all source channels" },
+                            transition_phrases: [...new Set(allTransitions)],
+                            sentence_structure: "Dynamic hybrid structure matching the most engaging elements of each style."
+                        }
                     }
+                };
+            }
+        }
+
+        if (!styleChannel && styleId) {
+            // === SINGLE MODE ===
+            styleChannel = await HotChannel.findOne({ channelId: styleId }).lean();
+
+            // Fallback: Check Style Lab JSON (channel_personas.json)
+            if (!styleChannel) {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const DB_PATH = path.join(__dirname, '../../channel_personas.json');
+
+                    if (fs.existsSync(DB_PATH)) {
+                        const data = fs.readFileSync(DB_PATH, 'utf8');
+                        const personas = JSON.parse(data);
+                        const found = personas.find(p => p.id === styleId);
+
+                        if (found) {
+                            console.log(`[Production] Found style in Style Lab File: ${found.name}`);
+                            // Map JSON to MongoDB structure expected below
+                            styleChannel = {
+                                channelTitle: found.name,
+                                thumbnail: null, // Fallback
+                                aiAnalysis: {
+                                    strategy: {
+                                        persona: found.analysis.prompt_instruction, // Map 'prompt_instruction' to 'persona'
+                                        tone: found.analysis.tone,
+                                        hooks: found.analysis.hook_style,
+                                        director_rules: found.analysis.director_rules,
+                                        structure_template: found.analysis.structure_template
+                                    }
+                                }
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.error('[Production] Error checking Style Lab file:', e);
                 }
-            } catch (e) {
-                console.error('[Production] Error checking Style Lab file:', e);
             }
         }
 
         if (!styleChannel) {
-            return res.status(404).json({ error: 'Style Channel not found' });
+            return res.status(404).json({ error: 'Style Channel(s) not found' });
         }
 
         // 3. Construct Gemini Prompt with STRONG DNA ENFORCEMENT
@@ -314,6 +362,11 @@ router.post('/generate', async (req, res) => {
 
         Source Video Timeline (with original dialogue):
         ${timelineData || finalTranscript.slice(0, 6000)}
+
+        VISUAL CONTEXT (Use this to create Narration when dialogue is missing):
+        ${videoExplanation ? `Video Explanation: ${videoExplanation}` : ''}
+        ${keyMoments ? `Key Moments: ${JSON.stringify(keyMoments)}` : ''}
+        ${timelineAnalysis ? `Timeline Analysis: ${timelineAnalysis}` : ''}
         
         
         **🚨 CRITICAL: STRUCTURE TEMPLATE COMPLIANCE (MANDATORY)**
@@ -350,7 +403,10 @@ router.post('/generate', async (req, res) => {
         
         **INSTRUCTIONS FOR TIMELINE MAPPING:**
         - For **Dialogue** segments: Use the EXACT timestamps from the source timeline above
-        - For **Narration** segments: Insert between dialogue segments where appropriate
+        - For **Narration** segments: 
+          - **CRITICAL**: If 'Key Moments' are provided, you MUST use their timestamps to anchor your narration.
+          - Example: If Key Moment is "00:03 - Ball hit", start your Hook/Reaction narration at "00:03".
+          - Narration should "bridge" the gaps between Key Moments and Dialogue.
         - **CRITICAL**: ALL segments (both Narration and Dialogue) MUST include:
           - "time": Display time in MM:SS format (e.g., "00:15")
           - "start_time": Start timestamp in MM:SS format (e.g., "00:15")
@@ -389,6 +445,8 @@ router.post('/generate', async (req, res) => {
               **MANDATORY**: Apply SAME color tags as text_jp to corresponding words
               Example: "죠-시키하즈레노 / <color=#B794F6>코-도-</color>니, / <color=#FF6B6B>이카리</color>와 / 츠노루 바카리 데스가..."
             - "text_kr": Korean Translation using DNA vocabulary
+            - "original_text": **CRITICAL** For 'Dialogue' type, include the EXACT original original language text from the transcript. For 'Narration', keep empty string "".
+              **DO NOT** fabricate original text. If unknown, leave empty.
             - "emphasis": { "words": ["word1", "word2"], "color": "#FF6B6B", "reason": "emotion/key point" }
             - "sfx": Specific sound effect cue
             - "visual_cue": Camera direction
@@ -462,6 +520,7 @@ router.post('/generate', async (req, res) => {
               "text_jp": "スキー場で / 起きた / <color=#FF6B6B>衝撃的な</color> / 状況！",
               "text_pron": "스키-죠-데 / 오키타 / <color=#FF6B6B>쇼-게키테키나</color> / 죠-쿄-!",
               "text_kr": "스키장에서 벌어진 충격적인 상황!",
+              "original_text": "", 
               "emphasis": { "words": ["衝撃的な"], "color": "#FF6B6B", "reason": "shock emotion" },
               "sfx": "Boom",
               "visual_cue": "Close up"
@@ -476,6 +535,7 @@ router.post('/generate', async (req, res) => {
               "text_jp": "もっと / <color=#FFD93D>速く</color> / 滑ってみたら / <color=#6BCF7F>どうだ</color>？",
               "text_pron": "못토 / <color=#FFD93D>하야쿠</color> / 스베테 미타라 / <color=#6BCF7F>도-다</color>?",
               "text_kr": "좀 더 빨리 타보지 그래?",
+              "original_text": "Tu pourrais essayer d'aller plus vite",
               "emphasis": { "words": ["速く", "どうだ"], "color": "#FFD93D, #6BCF7F", "reason": "speed emphasis, question" },
               "original_text": "Tu pourrais essayer d'aller plus vite",
               "sfx": "None",

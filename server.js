@@ -537,23 +537,29 @@ app.get('/api/reddit/comments', async (req, res) => {
         // If it's a v.redd.it URL, resolve it to the full reddit.com URL
         if (url.includes('v.redd.it')) {
             try {
-                const headResponse = await fetch(url, {
-                    method: 'HEAD',
-                    redirect: 'follow',
+                // Use GET instead of HEAD as some servers block HEAD or handle it differently
+                const response = await fetch(url, {
+                    method: 'GET',
+                    redirect: 'follow', // Follow redirects
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
                     }
                 });
 
-                if (headResponse.url && headResponse.url.includes('reddit.com/r/')) {
-                    console.log(`[Reddit Comments] Resolved v.redd.it to: ${headResponse.url}`);
-                    postUrl = headResponse.url;
+                if (response.url && response.url.includes('reddit.com/r/')) {
+                    console.log(`[Reddit Comments] Resolved v.redd.it to: ${response.url}`);
+                    postUrl = response.url;
                 } else {
-                    console.warn(`[Reddit Comments] Could not resolve v.redd.it to a post URL. Using original.`);
+                    console.warn(`[Reddit Comments] Could not resolve v.redd.it to a post URL. final URL: ${response.url}`);
+                    return res.status(400).json({
+                        error: 'Cannot resolve v.redd.it link to a Reddit post. Please use the full Reddit post URL (e.g., https://www.reddit.com/r/...).'
+                    });
                 }
             } catch (e) {
                 console.warn(`[Reddit Comments] Error resolving v.redd.it: ${e.message}`);
-                // Continue with original URL, though it might fail if not a post URL
+                return res.status(400).json({
+                    error: `Error resolving video URL: ${e.message}. Please use the full Reddit post URL.`
+                });
             }
         }
 
@@ -564,7 +570,7 @@ app.get('/api/reddit/comments', async (req, res) => {
 
         const response = await fetch(postUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
                 'Accept': 'application/json',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
