@@ -348,5 +348,86 @@
     },
     "sourceCount": "all",
     "createdAt": "2026-02-10T18:31:33.823Z"
+  },
+  {
+    "id": "1770748552278",
+    "name": "一分一秒",
+    "url": "https://www.youtube.com/channel/UCLiPbjTEuGto_iRasBrfu7w",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "Surprised, Neutral, Informative",
+      "hook_style": "Starts with a surprising or intriguing event/question",
+      "catchphrases": [],
+      "vocabulary_patterns": {
+        "adjectives": [
+          "呆れた (aghast)",
+          "面白い (interesting)",
+          "怖い (scary)",
+          "大切な (important)",
+          "成功した (successful)",
+          "赤い (red)"
+        ],
+        "verbs": [
+          "渡る (to cross)",
+          "吐く (to spew/utter)",
+          "買う (to buy)",
+          "始める (to start)",
+          "飲み込む (to swallow)",
+          "見せる (to show)",
+          "譲る (to yield)"
+        ],
+        "signature_expressions": [
+          "～様子 (…yousu - the state/appearance of)",
+          "～しまう (…shimau - to end up doing, to complete)",
+          "～結局 (…kekkyoku - in the end, eventually)"
+        ]
+      },
+      "sentence_structure": "Mix of short and longer sentences, primarily short punchy sentences to highlight the key moments of each story. Longer sentences are used to provide context or explanations, creating a dynamic pacing.",
+      "transition_phrases": [
+        "すると (suruto - then)",
+        "実は (jitsuwa - actually)",
+        "ところが (tokoroga - however)",
+        "しかし (shikashi - but)",
+        "結局 (kekkyoku - eventually)"
+      ],
+      "pacing": "Dynamic (alternating between fast-paced descriptions of events and slower contextual explanations)",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Introduce an intriguing or unusual event to grab attention. (注意を引くために、興味深いまたは珍しいイベントを紹介します。)"
+        },
+        {
+          "time": "5-15s",
+          "type": "Context/Background",
+          "description": "Provide background information or context for the event. (イベントの背景情報またはコンテキストを提供します。)"
+        },
+        {
+          "time": "15-30s",
+          "type": "Development/Rising Action",
+          "description": "Describe the event's development and increasing tension. (イベントの展開と高まる緊張感を説明します。)"
+        },
+        {
+          "time": "30s-End",
+          "type": "Resolution/Twist",
+          "description": "Provide a resolution or surprising twist to the event. (イベントに解決策または驚くべき展開を提供します。)"
+        }
+      ],
+      "director_rules": [
+        "Focus on shocking or unexpected situations (衝撃的または予期しない状況に焦点を当てる)",
+        "Keep sentences relatively short and easy to understand (文は比較的短く、理解しやすいようにする)",
+        "Emphasize the unexpected twist or outcome of each story (各ストーリーの予期せぬ展開や結果を強調する)"
+      ],
+      "humor_code": "Situational irony and unexpected outcomes are frequently used to create humor.",
+      "audio_style": {
+        "bgm": "Energetic",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "This persona presents shocking or unbelievable events with a neutral tone, highlighting the unexpected twists and turns in each story. (このペルソナは、衝撃的または信じられないような出来事をニュートラルなトーンで提示し、各ストーリーの予期せぬ展開を強調します。)",
+      "prompt_instruction": "Mimic a neutral narrator describing unbelievable news events with surprising twists, focusing on unexpected outcomes and situational irony."
+    },
+    "sourceCount": 15,
+    "createdAt": "2026-02-10T18:35:52.278Z"
   }
 ]
