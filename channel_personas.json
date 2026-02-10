@@ -183,81 +183,88 @@
     "url": "https://www.youtube.com/channel/UCzPJLIRDZCGAGyVDkCnlTcQ",
     "category": "entertainment",
     "analysis": {
-      "tone": "Intrigued, Suspenseful, Informative (興味深い、サスペンスフル、有益な)",
-      "hook_style": "Start with a surprising or intriguing scene. (驚くべきまたは興味深いシーンから始まる)",
+      "tone": "Intrigued, Suspenseful, Slightly Sarcastic (호기심을 자극하는, 긴장감 넘치는, 약간 빈정거리는)",
+      "hook_style": "Starts with a shocking or intriguing event/statement. (충격적이거나 흥미로운 사건/진술로 시작합니다.)",
       "catchphrases": [
-        "その時、(Sono toki, At that moment)",
-        "ところが (Tokoroga, However)",
-        "〜が問題になりました (ga mondai ni narimashita, ~ became a problem)"
+        "〇〇な理由",
+        "〇〇してしまいます",
+        "その時",
+        "ところが"
       ],
       "vocabulary_patterns": {
         "adjectives": [
-          "衝撃的な (shogeki-teki na, shocking)",
-          "辛そうな (tsura-sō na, painful)",
-          "豪華な (gōka na, luxurious)",
-          "悲惨な (hisan na, miserable)"
+          "衝撃的な (shōgeki-teki na - shocking)",
+          "優しい (yasashii - kind)",
+          "悲惨な (hisan'na - miserable)",
+          "豪華な (gōkana - luxurious)"
         ],
         "verbs": [
-          "現れる (arawareru, to appear)",
-          "取り出す (toridasu, to take out)",
-          "からかう (karakau, to tease)",
-          "確認する (kakunin suru, to confirm)",
-          "気付く (kidzuku, to notice)"
+          "見て (mite - see)",
+          "気づきます (kizukimasu - notice)",
+          "終わらせます (owarasemasu - finish)",
+          "逃げます (nigemasu - escape)"
         ],
         "signature_expressions": [
-          "〜様子を見ていた (〜yōsu o miteita, was watching the situation)",
-          "〜に違和感を覚えた (～ni iwakan o oboeta, felt something was off about~)",
-          "〜に大歓声 (～ni dai kansei, Huge cheers for~)"
+          "〇〇と思いきや (〇〇 to omoikiya - Contrary to what one might think)",
+          "〇〇に違和感を覚えた (〇〇 ni iwakan o oboeta - Felt a sense of incongruity/discomfort with 〇〇)",
+          "〇〇はこんなに危険なものだったんですね (〇〇 wa kon'nani kiken'na mono datta ndesu ne - So 〇〇 was this dangerous)",
+          "〇〇を羨ましく思いました (〇〇 o urayamashiku omoimashita - I envied 〇〇)"
         ]
       },
-      "sentence_structure": "Mostly short, punchy sentences to build suspense, with occasional longer sentences for explanations. (サスペンスを高めるために、ほとんどが短く、パンチの効いた文章で、説明のために時々長い文章を使用)",
+      "sentence_structure": "Predominantly short, declarative sentences, creating a punchy and easily digestible narrative. Interspersed with longer sentences to build suspense and provide context. (주로 짧고 단정적인 문장으로 구성되어 있어, 흥미롭고 소화하기 쉬운 이야기를 만들어냅니다. 긴장감을 조성하고 상황을 설명하기 위해 더 긴 문장들이 섞여 있습니다.)",
       "transition_phrases": [
-        "しかし (shikashi, However)",
-        "そして (soshite, And)",
-        "その時 (sono toki, At that time)",
-        "ところが (tokoroga, However)",
-        "結局 (kekkyoku, in the end)"
+        "しかし (shikashi - However)",
+        "その時 (sono toki - At that time)",
+        "そして (soshite - And)",
+        "ところが (tokoroga - However/But)",
+        "実は (jitsu wa - In fact)"
       ],
-      "pacing": "Dynamic, alternates between fast-paced action and slower, descriptive moments. (ダイナミックで、ペースの速いアクションと、より遅い、説明的な瞬間が交互に繰り返される)",
+      "pacing": "Dynamic. Starts fast with the initial hook and slows down to provide context and explanation, then speeds up again to deliver the punchline or twist. (역동적입니다. 초반 훅으로 빠르게 시작하고, 상황 설명 및 배경 정보를 제공하기 위해 속도가 느려진 다음, 반전이나 결말을 전달하기 위해 다시 속도가 빨라집니다.)",
       "structure_template": [
         {
-          "time": "0-10s",
+          "time": "0-3s",
           "type": "Hook",
-          "description": "Introduce a surprising or intriguing situation to grab the viewer's attention. (視聴者の注意を引くために、驚くべきまたは興味深い状況を紹介する)"
+          "description": "Start with a surprising or intriguing statement related to the story. (이야기와 관련된 놀랍거나 흥미로운 진술로 시작합니다.)"
         },
         {
-          "time": "10-30s",
+          "time": "3-15s",
+          "type": "Context/Setup",
+          "description": "Provide background information and set the scene for the main event. (배경 정보를 제공하고 주요 사건에 대한 장면을 설정합니다.)"
+        },
+        {
+          "time": "15-30s",
           "type": "Development",
-          "description": "Develop the situation, introduce characters, and build suspense. (状況を展開し、キャラクターを紹介し、サスペンスを高める)"
+          "description": "Develop the narrative, building suspense or intrigue. (이야기를 전개하고, 긴장감이나 호기심을 고조시킵니다.)"
         },
         {
-          "time": "30-50s",
-          "type": "Climax/Twist",
-          "description": "Reveal a twist or climax of the story. (ストーリーの展開やクライマックスを明らかにする)"
+          "time": "30-45s",
+          "type": "Twist/Resolution",
+          "description": "Reveal a twist or the resolution of the story, often with a slightly sarcastic or ironic tone. (이야기의 반전이나 해결을 밝히며, 종종 약간 빈정거리는 어조를 사용합니다.)"
         },
         {
-          "time": "50s-End",
-          "type": "Resolution/Moral",
-          "description": "Offer a resolution, moral, or concluding thought. (解決策、道徳、または結論の考えを提供する)"
+          "time": "45-59s",
+          "type": "Concluding Remark",
+          "description": "End with a brief, often reflective statement about the situation. (상황에 대한 짧고 종종 사색적인 진술로 마무리합니다.)"
         }
       ],
       "director_rules": [
-        "Always start with a captivating hook. (常に魅力的なフックから始める)",
-        "Maintain a balance between action and explanation. (アクションと説明のバランスを保つ)",
-        "End with a thought-provoking conclusion. (考えさせられるような結論で終わらせる)"
+        "Always begin with an intriguing hook to grab the viewer's attention. (항상 시청자의 관심을 사로잡기 위해 흥미로운 훅으로 시작하십시오.)",
+        "Use short, declarative sentences to keep the pacing quick and engaging. (빠르고 매력적인 흐름을 유지하기 위해 짧고 단정적인 문장을 사용하십시오.)",
+        "Incorporate a twist or surprising element to make the story memorable. (이야기를 기억에 남도록 반전이나 놀라운 요소를 통합하십시오.)",
+        "Maintain a slightly sarcastic or ironic tone to add humor and wit. (유머와 재치를 더하기 위해 약간 빈정거리는 어조를 유지하십시오.)"
       ],
-      "humor_code": "Situational irony and unexpected twists. (状況の皮肉と予想外の展開)",
+      "humor_code": "Situational irony and unexpected twists. Often highlights the absurdity of everyday situations. (상황의 아이러니와 예상치 못한 반전. 종종 일상적인 상황의 부조리함을 강조합니다.)",
       "audio_style": {
-        "bgm": "Energetic, slightly dramatic to amplify the narrative. (ナレーションを増幅するために、エネルギッシュで、ややドラマチック)",
+        "bgm": "Not Analyzed (Inferred: Tends to be dramatic and suspenseful, aligning with the video's tone. (영상 분위기에 맞춰 극적이고 긴장감 넘치는 경향이 있습니다.))",
         "sfx": "Not Analyzed",
         "density": "Not Analyzed"
       },
-      "summary": "The 一分オタク persona presents intriguing short stories and unexpected events to entertain and provoke thought in Japanese viewers. (一分オタクのペルソナは、興味深い短編小説や予想外の出来事を提示して、日本の視聴者を楽しませ、思考を刺激します。)",
-      "prompt_instruction": "Create a script for a short YouTube video in Japanese, presenting a surprising or ironic situation with a concise and engaging narrative, ending with a thought-provoking question."
+      "summary": "This persona presents intriguing and often ironic stories with a fast-paced narration and a slightly sarcastic tone, designed to capture attention and deliver a memorable twist. (이 페르소나는 빠르고 약간 빈정거리는 어조의 흥미롭고 종종 아이러니한 이야기를 제시하여, 시선을 사로잡고 기억에 남는 반전을 전달하도록 설계되었습니다.) (I pesona-neun ppareugo yakgan binjeonggeorineun eojoui heungmiroupgo jongjong aironihan iyagireul 제시하여, siseon-eul sajapgo gieok-e namneun banjeon-eul 전달하도록 설계되었습니다.)",
+      "prompt_instruction": "Create a short video script in Japanese explaining a bizarre situation, starting with a shocking statement and ending with a slightly sarcastic remark, using short, punchy sentences. Use phrases like 'その時' and 'ところが' to transition between ideas."
     },
-    "sourceCount": 15,
+    "sourceCount": "all",
     "createdAt": "2026-02-10T03:20:02.627Z",
-    "updatedAt": "2026-02-10T16:53:48.392Z",
+    "updatedAt": "2026-02-10T18:32:48.623Z",
     "country": "JP"
   },
   {
