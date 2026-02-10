@@ -93,7 +93,7 @@
     "id": "1770506628505",
     "name": "바디캠온",
     "url": "https://www.youtube.com/channel/UChMMd8NQczLL51eAISmuSGQ",
-    "category": "entertainment",
+    "category": "general",
     "analysis": {
       "tone": "High-Tension, Confrontational (고도의 긴장감, 대립적)",
       "hook_style": "Starts with immediate conflict or urgent situation (즉각적인 갈등 또는 긴급한 상황으로 시작)",
@@ -174,7 +174,8 @@
     },
     "sourceCount": 15,
     "createdAt": "2026-02-07T23:23:48.505Z",
-    "updatedAt": "2026-02-10T16:42:59.839Z"
+    "updatedAt": "2026-02-10T16:47:34.752Z",
+    "country": "KR"
   },
   {
     "id": "1770693602627",
@@ -255,6 +256,90 @@
       "prompt_instruction": "Create a script for a short YouTube video in Japanese, presenting a surprising or ironic situation with a concise and engaging narrative, ending with a thought-provoking question."
     },
     "sourceCount": 15,
-    "createdAt": "2026-02-10T03:20:02.627Z"
+    "createdAt": "2026-02-10T03:20:02.627Z",
+    "updatedAt": "2026-02-10T16:53:48.392Z",
+    "country": "JP"
+  },
+  {
+    "id": "1770748293823",
+    "name": "1分動画",
+    "url": "https://www.youtube.com/channel/UCuP7Oceo9kOQ_tyUWadNmJA",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "Intrigued and slightly sensationalist. Presents events in a dramatic, matter-of-fact way. (흥미롭고 약간 선정적. 사건을 극적으로, 사실적으로 제시)",
+      "hook_style": "Begins with a shocking or intriguing statement or question related to the video's main subject. (비디오의 주요 주제와 관련된 충격적이거나 흥미로운 진술 또는 질문으로 시작)",
+      "catchphrases": [
+        "~そうです (~soudesu - 'I heard that' or 'it seems that')",
+        "しかし (shikashi - However)",
+        "〜でした (deshita - was)"
+      ],
+      "vocabulary_patterns": {
+        "adjectives": [
+          "怪しい (ayashii - suspicious)",
+          "冷静 (reisei - calm)",
+          "奇妙 (kimyou - strange)",
+          "怒った (okotta - angry)"
+        ],
+        "verbs": [
+          "警護する (keigo suru - to guard)",
+          "溶かす (tokasu - to melt)",
+          "脅す (odosu - to threaten)",
+          "譲る (yuzuru - to give up)"
+        ],
+        "signature_expressions": [
+          "末路 (matsuro - end, পরিণতি)",
+          "〜に備えて (ni sonaete - in preparation for)",
+          "〜にさらされる (ni sarasareru - to be exposed to)"
+        ]
+      },
+      "sentence_structure": "Mix of short, declarative sentences to quickly establish the scenario, followed by slightly longer sentences to explain the context and consequences. (상황을 빠르게 설정하기 위한 짧고 단정적인 문장과, 맥락과 결과를 설명하기 위한 약간 더 긴 문장의 조합)",
+      "transition_phrases": [
+        "そして (soshite - and then)",
+        "しかし (shikashi - however)",
+        "その時 (sono toki - at that time)",
+        "結局 (kekkyoku - in the end)",
+        "〜が (ga - but/however)"
+      ],
+      "pacing": "Fast. Rapidly presents information with minimal pauses or drawn-out explanations. (빠름. 최소한의 중단이나 장황한 설명 없이 빠르게 정보를 제공)",
+      "structure_template": [
+        {
+          "time": "0-5s",
+          "type": "Hook",
+          "description": "Start with a shocking or intriguing statement that grabs attention. (관심을 끄는 충격적이거나 흥미로운 진술로 시작) "
+        },
+        {
+          "time": "5-15s",
+          "type": "Context/Setup",
+          "description": "Provide background information and set the scene. (배경 정보를 제공하고 장면을 설정)"
+        },
+        {
+          "time": "15-45s",
+          "type": "Development/Action",
+          "description": "Show the main event or conflict unfolding. (주요 사건 또는 갈등이 전개되는 모습을 보여줌)"
+        },
+        {
+          "time": "45-60s",
+          "type": "Consequence/Resolution",
+          "description": "Explain the results or aftermath of the situation. (상황의 결과 또는 여파를 설명)"
+        }
+      ],
+      "director_rules": [
+        "Start with a shocking or intriguing hook to grab attention immediately. (즉시 관심을 끌기 위해 충격적이거나 흥미로운 시작으로 시작)",
+        "Maintain a fast pace to keep viewers engaged. (시청자의 참여를 유지하기 위해 빠른 속도를 유지)",
+        "Focus on extraordinary or unexpected events that have clear consequences. (명확한 결과를 가져오는 특별하거나 예상치 못한 사건에 집중)",
+        "Use simple language and avoid complex explanations. (간단한 언어를 사용하고 복잡한 설명을 피하십시오)",
+        "Conclude with a brief remark summarizing the overall implication or feeling. (전반적인 의미나 느낌을 요약하는 간략한 말로 마무리)"
+      ],
+      "humor_code": "Situational irony and schadenfreude. Relies on the unexpected or unfortunate events happening to others. (상황적 아이러니와 샤덴프로이데. 다른 사람에게 일어나는 예상치 못한 또는 불행한 사건에 의존)",
+      "audio_style": {
+        "bgm": "Energetic (Inferred from the fast pacing and sensationalist tone) (빠른 속도와 선정적인 어조로 보아 활기찬 것으로 추정)",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "Presents intriguing and often unbelievable events in a fast-paced, matter-of-fact way, focusing on the unusual consequences. (흥미롭고 종종 믿을 수 없는 사건을 빠른 속도로, 사실적으로 제시하며 특이한 결과에 초점을 맞춥니다.)",
+      "prompt_instruction": "Write a short YouTube script in Japanese describing an unbelievable scenario and its unusual consequences in a matter-of-fact tone, starting with a shocking statement. (충격적인 진술로 시작하여 믿을 수 없는 시나리오와 그 특이한 결과를 사실적인 어조로 설명하는 짧은 YouTube 스크립트를 일본어로 작성하십시오.)"
+    },
+    "sourceCount": "all",
+    "createdAt": "2026-02-10T18:31:33.823Z"
   }
 ]
