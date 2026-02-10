@@ -174,5 +174,86 @@
     },
     "sourceCount": 15,
     "createdAt": "2026-02-07T23:23:48.505Z"
+  },
+  {
+    "id": "1770693602627",
+    "name": "一分オタク",
+    "url": "https://www.youtube.com/channel/UCzPJLIRDZCGAGyVDkCnlTcQ",
+    "category": "entertainment",
+    "analysis": {
+      "tone": "Intrigued, Suspenseful, Informative (興味深い、サスペンスフル、有益な)",
+      "hook_style": "Start with a surprising or intriguing scene. (驚くべきまたは興味深いシーンから始まる)",
+      "catchphrases": [
+        "その時、(Sono toki, At that moment)",
+        "ところが (Tokoroga, However)",
+        "〜が問題になりました (ga mondai ni narimashita, ~ became a problem)"
+      ],
+      "vocabulary_patterns": {
+        "adjectives": [
+          "衝撃的な (shogeki-teki na, shocking)",
+          "辛そうな (tsura-sō na, painful)",
+          "豪華な (gōka na, luxurious)",
+          "悲惨な (hisan na, miserable)"
+        ],
+        "verbs": [
+          "現れる (arawareru, to appear)",
+          "取り出す (toridasu, to take out)",
+          "からかう (karakau, to tease)",
+          "確認する (kakunin suru, to confirm)",
+          "気付く (kidzuku, to notice)"
+        ],
+        "signature_expressions": [
+          "〜様子を見ていた (〜yōsu o miteita, was watching the situation)",
+          "〜に違和感を覚えた (～ni iwakan o oboeta, felt something was off about~)",
+          "〜に大歓声 (～ni dai kansei, Huge cheers for~)"
+        ]
+      },
+      "sentence_structure": "Mostly short, punchy sentences to build suspense, with occasional longer sentences for explanations. (サスペンスを高めるために、ほとんどが短く、パンチの効いた文章で、説明のために時々長い文章を使用)",
+      "transition_phrases": [
+        "しかし (shikashi, However)",
+        "そして (soshite, And)",
+        "その時 (sono toki, At that time)",
+        "ところが (tokoroga, However)",
+        "結局 (kekkyoku, in the end)"
+      ],
+      "pacing": "Dynamic, alternates between fast-paced action and slower, descriptive moments. (ダイナミックで、ペースの速いアクションと、より遅い、説明的な瞬間が交互に繰り返される)",
+      "structure_template": [
+        {
+          "time": "0-10s",
+          "type": "Hook",
+          "description": "Introduce a surprising or intriguing situation to grab the viewer's attention. (視聴者の注意を引くために、驚くべきまたは興味深い状況を紹介する)"
+        },
+        {
+          "time": "10-30s",
+          "type": "Development",
+          "description": "Develop the situation, introduce characters, and build suspense. (状況を展開し、キャラクターを紹介し、サスペンスを高める)"
+        },
+        {
+          "time": "30-50s",
+          "type": "Climax/Twist",
+          "description": "Reveal a twist or climax of the story. (ストーリーの展開やクライマックスを明らかにする)"
+        },
+        {
+          "time": "50s-End",
+          "type": "Resolution/Moral",
+          "description": "Offer a resolution, moral, or concluding thought. (解決策、道徳、または結論の考えを提供する)"
+        }
+      ],
+      "director_rules": [
+        "Always start with a captivating hook. (常に魅力的なフックから始める)",
+        "Maintain a balance between action and explanation. (アクションと説明のバランスを保つ)",
+        "End with a thought-provoking conclusion. (考えさせられるような結論で終わらせる)"
+      ],
+      "humor_code": "Situational irony and unexpected twists. (状況の皮肉と予想外の展開)",
+      "audio_style": {
+        "bgm": "Energetic, slightly dramatic to amplify the narrative. (ナレーションを増幅するために、エネルギッシュで、ややドラマチック)",
+        "sfx": "Not Analyzed",
+        "density": "Not Analyzed"
+      },
+      "summary": "The 一分オタク persona presents intriguing short stories and unexpected events to entertain and provoke thought in Japanese viewers. (一分オタクのペルソナは、興味深い短編小説や予想外の出来事を提示して、日本の視聴者を楽しませ、思考を刺激します。)",
+      "prompt_instruction": "Create a script for a short YouTube video in Japanese, presenting a surprising or ironic situation with a concise and engaging narrative, ending with a thought-provoking question."
+    },
+    "sourceCount": 15,
+    "createdAt": "2026-02-10T03:20:02.627Z"
   }
 ]
