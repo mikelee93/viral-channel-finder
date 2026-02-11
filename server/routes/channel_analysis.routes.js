@@ -714,7 +714,7 @@ router.post('/analyze', async (req, res) => {
         }
         `;
 
-        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash', [{ text: promptText }]);
+        const analysis = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [{ text: promptText }]);
 
         res.json({ success: true, analysis });
 
@@ -774,13 +774,160 @@ router.post('/save', (req, res) => {
 router.post('/delete', (req, res) => {
     const { id } = req.body;
     let personas = getPersonas();
-    const initialLen = personas.length;
-    personas = personas.filter(p => p.id !== id);
+    const personaToDelete = personas.find(p => p.id === id);
 
-    if (personas.length === initialLen) return res.status(404).json({ error: 'Not found' });
+    if (!personaToDelete) return res.status(404).json({ error: 'Not found' });
+
+    const channelName = personaToDelete.name;
+    const category = personaToDelete.category || 'General';
+    const safeName = sanitizeFilename(channelName);
+    const safeCategory = sanitizeFilename(category);
+
+    // 1. Determine Country & Locate Folder
+    let country = personaToDelete.country || (personaToDelete.analysis ? personaToDelete.analysis.country : 'KR');
+    if (!country) country = 'KR';
+
+    const baseDir = path.join(__dirname, '../../transcripts');
+    let folderPath = path.join(baseDir, country, safeCategory, safeName);
+    let folderExists = fs.existsSync(folderPath);
+
+    if (!folderExists) {
+        // Fallback: Search in other countries
+        const countries = ['KR', 'JP', 'US', 'EN'];
+        for (const c of countries) {
+            const testPath = path.join(baseDir, c, safeCategory, safeName);
+            if (fs.existsSync(testPath)) {
+                folderPath = testPath;
+                country = c;
+                folderExists = true;
+                break;
+            }
+        }
+    }
+
+    // 2. Delete Folder (if exists)
+    if (folderExists) {
+        try {
+            // Using rmSync for absolute safety in node 14.14+
+            // If older, we'd need a recursive implementation, but assuming environment supports it.
+            fs.rmSync(folderPath, { recursive: true, force: true });
+            console.log(`[Delete Persona] Deleted folder: ${folderPath}`);
+
+            // 3. Queue Git Command for Folder Deletion
+            const gitCmd = `git add "transcripts" && git commit -m "Archive: Remove transcripts for deleted channel ${channelName}" && git push origin master`;
+            queueGitCommand(gitCmd);
+        } catch (e) {
+            console.error(`[Delete Persona] Failed to delete folder ${folderPath}:`, e.message);
+        }
+    }
+
+    // 4. Update DB
+    personas = personas.filter(p => p.id !== id);
+    savePersonas(personas);
+
+    // Sync DB change
+    const dbGitCmd = `git add "channel_personas.json" && git commit -m "[Persona Lab] Delete persona: ${channelName}" && git push origin master`;
+    queueGitCommand(dbGitCmd);
+
+    res.json({ success: true, folderDeleted: folderExists });
+});
+
+// Added: POST /update-category - Move Persona to another category
+// Added: POST /update-category - Move Persona to another category
+router.post('/update-category', (req, res) => {
+    const { id, newCategory } = req.body;
+
+    if (!id || !newCategory) return res.status(400).json({ error: 'Missing id or newCategory' });
+
+    let personas = getPersonas();
+    const index = personas.findIndex(p => p.id === id);
+
+    if (index === -1) return res.status(404).json({ error: 'Persona not found' });
+
+    const persona = personas[index];
+    const oldCategory = persona.category || 'General'; // Fallback if missing
+    const channelName = persona.name || 'Unknown Channel'; // Fallback
+    const safeName = sanitizeFilename(channelName); // Folder name is sanitized
+
+    // 1. Determine Country & Locate Folder
+    // Priority: persona.country -> persona.analysis.country -> Search filesystem
+    let country = persona.country || (persona.analysis ? persona.analysis.country : 'KR');
+    if (!country) country = 'KR'; // Ensure string
+
+    const baseDir = path.join(__dirname, '../../transcripts');
+    let oldPath = path.join(baseDir, country, sanitizeFilename(oldCategory), safeName);
+    let folderFound = false;
+
+    if (fs.existsSync(oldPath)) {
+        folderFound = true;
+    } else {
+        // Fallback: Search in other known countries
+        console.log(`[Move Category] Folder not found at default path: ${oldPath}. Searching...`);
+        const countries = ['KR', 'JP', 'US', 'EN'];
+        for (const c of countries) {
+            const testPath = path.join(baseDir, c, sanitizeFilename(oldCategory), safeName);
+            if (fs.existsSync(testPath)) {
+                oldPath = testPath;
+                country = c; // Update country to match found location
+                folderFound = true;
+                break;
+            }
+        }
+    }
+
+    // 2. Move Folder (if exists)
+    if (folderFound) {
+        const safeNewCategory = sanitizeFilename(newCategory);
+        const newPath = path.join(baseDir, country, safeNewCategory, safeName);
+        const newParentDir = path.dirname(newPath);
+
+        try {
+            if (!fs.existsSync(newParentDir)) {
+                fs.mkdirSync(newParentDir, { recursive: true });
+            }
+
+            fs.renameSync(oldPath, newPath);
+            console.log(`[Move Category] Success: ${oldPath} -> ${newPath}`);
+
+            // 3. Queue Git Command
+            // Use 'git add .' to verify the move (Git usually handles rename detection automatically)
+            // But explicitly adding the new spot and old spot (as deleted) is safer if 'git mv' isn't used.
+            // Since we used fs.rename, git sees a delete and additional.
+            // "git add -A" inside the transcripts folder or root is best.
+            // We'll execute from root context (process.cwd() is likely project root)
+            // Path relative to root: transcripts/...
+
+            const relativeOldPath = `transcripts/${country}/${sanitizeFilename(oldCategory)}/${safeName}`;
+            const relativeNewPath = `transcripts/${country}/${safeNewCategory}/${safeName}`;
+
+            // Note: Since we ALREADY moved the folder via fs, we just need to 'git add' the changes.
+            // git add -A transcripts/ will pick up the deletion and the addition.
+            const gitCmd = `git add "transcripts" && git commit -m "Refactor: Move ${safeName} from ${oldCategory} to ${newCategory}" && git push origin master`;
+            queueGitCommand(gitCmd);
+
+        } catch (e) {
+            console.error(`[Move Category] Failed to move folder:`, e);
+            // Don't return error, just log it. We still update the DB.
+        }
+    } else {
+        console.warn(`[Move Category] No physical folder found for ${channelName}. Updating DB only.`);
+    }
+
+    // 4. Update DB
+    personas[index].category = newCategory;
+    personas[index].updatedAt = new Date().toISOString();
+    // Also update country if we found it was different? Maybe not needed for DB consistency if DB didn't have it.
+    // But good to keep it consistent if meaningful.
+    if (!personas[index].country) personas[index].country = country;
 
     savePersonas(personas);
-    res.json({ success: true });
+
+    // Sync DB change to git as well (separate commit or same? queue handles sequence)
+    const dbGitCmd = `git add "channel_personas.json" && git commit -m "[Persona Lab] Update category for ${channelName}" && git push origin master`;
+    queueGitCommand(dbGitCmd);
+
+    console.log(`[Persona Update] Moved persona ${channelName} to ${newCategory}`);
+    res.json({ success: true, folderMoved: folderFound });
 });
 
 // 6. POST /director/generate - Generate Script using DNA

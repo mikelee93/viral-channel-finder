@@ -11,7 +11,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * Unified Gemini Generate Content Function with Exponential Backoff Retry Logic
  * 
  * @param {string} apiKey - Gemini API Key
- * @param {string} modelName - Model name (e.g., 'gemini-2.0-flash')
+ * @param {string} modelName - Model name (e.g., 'gemini-2.5-flash')
  * @param {Array|Object} contents - The contents to generate from (SDK format or raw parts)
  * @param {Object} options - Additional options (maxRetries, initialDelay)
  * @returns {Promise<Object>} - The parsed JSON or text response
@@ -68,7 +68,7 @@ async function geminiGenerateContent(apiKey, modelName, contents, options = {}) 
 }
 
 /**
- * Specialized helper for JSON responses
+ * Specialized helper for JSON responses with robust error handling
  */
 async function geminiGenerateJSON(apiKey, modelName, contents, options = {}) {
     const text = await geminiGenerateContent(apiKey, modelName, contents, {
@@ -77,20 +77,70 @@ async function geminiGenerateJSON(apiKey, modelName, contents, options = {}) {
     });
 
     try {
-        // Clean up markdown code blocks if the model returned them despite responseMimeType
+        // Step 1: Remove markdown code blocks
         let cleanedText = text.trim();
         const jsonMatch = cleanedText.match(/```json\s*\n([\s\S]*?)\n```/);
         if (jsonMatch) {
             cleanedText = jsonMatch[1];
         } else if (cleanedText.startsWith('```')) {
-            cleanedText = cleanedText.replace(/^```\n?/, '').replace(/\n?```$/, '');
+            cleanedText = cleanedText.replace(/^```json\n?/i, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
         }
 
-        return JSON.parse(cleanedText);
+        // Step 2: Find JSON boundaries (first { to last })
+        const firstBrace = cleanedText.indexOf('{');
+        const lastBrace = cleanedText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleanedText = cleanedText.substring(firstBrace, lastBrace + 1);
+        }
+
+        // Step 3: Escape control characters inside strings only
+        let sanitized = '';
+        let inString = false;
+        let escaped = false;
+
+        for (let i = 0; i < cleanedText.length; i++) {
+            const char = cleanedText[i];
+
+            if (char === '"' && !escaped) {
+                inString = !inString;
+                sanitized += char;
+            } else if (inString) {
+                // Inside a string - escape control characters
+                if (char === '\n') sanitized += '\\n';
+                else if (char === '\r') sanitized += '\\r';
+                else if (char === '\t') sanitized += '\\t';
+                else if (char === '\\' && !escaped) {
+                    escaped = true;
+                    sanitized += char;
+                    continue;
+                } else {
+                    sanitized += char;
+                }
+            } else {
+                // Outside string - keep as is
+                sanitized += char;
+            }
+            escaped = false;
+        }
+
+        return JSON.parse(sanitized);
     } catch (e) {
-        console.error('[Gemini Util] Failed to parse JSON response:', e);
-        console.error('[Gemini Util] Raw text:', text);
-        throw new Error('Failed to parse AI response as JSON');
+        console.error('[Gemini Util] Failed to parse JSON response:', e.message);
+        console.error('[Gemini Util] Raw text (first 500 chars):', text.substring(0, 500));
+        console.error('[Gemini Util] Raw text (last 500 chars):', text.substring(Math.max(0, text.length - 500)));
+
+        // Try one more time with a more aggressive cleanup
+        try {
+            const stripped = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const match = stripped.match(/\{[\s\S]*\}/);
+            if (match) {
+                return JSON.parse(match[0]);
+            }
+        } catch (fallbackError) {
+            console.error('[Gemini Util] Fallback parsing also failed');
+        }
+
+        throw new Error(`Failed to parse AI response as JSON: ${e.message}`);
     }
 }
 
@@ -209,7 +259,7 @@ ${comments && comments.length > 0 ? comments.join('\n') : '(제공된 댓글 없
         }
     ];
 
-    return await geminiGenerateJSON(apiKey, 'gemini-2.0-flash', contents);
+    return await geminiGenerateJSON(apiKey, 'gemini-2.5-flash', contents);
 }
 
 /**
@@ -263,7 +313,7 @@ async function generateShortsTitle(fileData, metadata, apiKey) {
         }
     ];
 
-    return await geminiGenerateJSON(apiKey, 'gemini-2.0-flash', contents);
+    return await geminiGenerateJSON(apiKey, 'gemini-2.5-flash', contents);
 }
 
 module.exports = {

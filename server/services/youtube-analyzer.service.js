@@ -13,11 +13,14 @@ async function analyzeYouTubeVideo(url) {
     fetchMetadata(videoId)
   ]);
 
+  const transcriptData = transcriptResult.status === 'fulfilled' ? transcriptResult.value : { text: null, segments: [] };
+
   return {
     platform: 'youtube',
     videoId,
     videoUrl: url,
-    transcript: transcriptResult.status === 'fulfilled' ? transcriptResult.value : null,
+    transcript: transcriptData.text,
+    segments: transcriptData.segments,
     metadata: metadataResult.status === 'fulfilled' ? metadataResult.value : {},
     comments: [], // 댓글은 기존 API 사용
     errors: collectErrors({ transcriptResult, metadataResult })
@@ -39,8 +42,20 @@ function extractYouTubeId(url) {
 
 async function fetchTranscript(videoId) {
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    return transcript.map(segment => segment.text).join(' ');
+    const segments = await YoutubeTranscript.fetchTranscript(videoId);
+    // Map to normalized structure: { start: seconds, end: seconds, text: string }
+    const mappedSegments = segments.map(s => ({
+      start: s.offset || 0,
+      end: (s.offset || 0) + (s.duration || 0),
+      text: s.text
+    }));
+    // Note: youtube-transcript package handles offset/duration in milliseconds or seconds depending on version.
+    // Usually it's in seconds for the web version. Let's double check or just use s.offset directly if it's already s.
+
+    return {
+      text: segments.map(segment => segment.text).join(' '),
+      segments: mappedSegments
+    };
   } catch (error) {
     console.error(`[YouTube Transcript] Failed for ${videoId}:`, error.message);
     throw new Error('자막을 가져올 수 없습니다. 자막이 없는 영상일 수 있습니다.');

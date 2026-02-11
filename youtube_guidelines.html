@@ -342,6 +342,10 @@
                             <div>
                                 <p class="text-slate-400 text-xs">선택된 스타일</p>
                                 <p id="selectedStyleName" class="font-bold text-white text-lg">선택해주세요</p>
+                                <!-- Fix for Hybrid Style Selection Error -->
+                                <div id="appliedStyleResult"
+                                    class="hidden mt-1 p-2 bg-pink-500/10 border border-pink-500/30 rounded text-sm">
+                                </div>
                             </div>
                         </div>
                         <button id="startProductionBtn" disabled
@@ -654,8 +658,12 @@
                         <h3 class="text-xl font-bold text-white mb-4">🎉 음성 생성 완료!</h3>
                         <audio id="generatedAudio" controls class="w-full mb-4"></audio>
                         <button id="downloadAudioBtn"
-                            class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg">
+                            class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg mb-2 transition-all">
                             ⬇️ WAV 파일 다운로드
+                        </button>
+                        <button id="downloadNarratorSrtBtn"
+                            class="w-full bg-slate-700 hover:bg-slate-600 text-blue-400 font-bold py-3 rounded-lg transition-all hidden">
+                            📜 나레이터 SRT 자막 다운로드
                         </button>
                     </div>
                 </div>
@@ -1038,7 +1046,7 @@
                 const violationsContainer = document.getElementById('violationsContainer');
                 if (violations && violations.length > 0) {
                     violationsContainer.innerHTML = `
-                    < h3 class="text-xl font-bold text-white mb-4" > 발견된 문제점</h3 >
+                    <h3 class="text-xl font-bold text-white mb-4">발견된 문제점</h3>
                         ${violations.map(v => `
                         <div class="bg-slate-800/50 rounded-xl p-6 mb-4">
                             <div class="flex items-start gap-4">
@@ -1060,10 +1068,10 @@
                 `;
                 } else {
                     violationsContainer.innerHTML = `
-                    < div class="bg-green-500/10 rounded-xl p-6 text-center" >
+                    <div class="bg-green-500/10 rounded-xl p-6 text-center">
                         <div class="text-4xl mb-2">🎉</div>
                         <p class="text-green-400 font-bold">문제점이 발견되지 않았습니다!</p>
-                    </div >
+                    </div>
                     `;
                 }
 
@@ -1091,7 +1099,7 @@
                 };
 
                 bgmSection.innerHTML = `
-                    < p class="text-slate-400 text-sm mb-4" >🎵 배경음악(BGM) 분석</p >
+                    <p class="text-slate-400 text-sm mb-4">🎵 배경음악(BGM) 분석</p>
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
                                 <span class="text-slate-300">저작권 위험도</span>
@@ -1333,16 +1341,16 @@
 
                         // Use character image if available, otherwise fallback to emoji
                         const imageHtml = speaker.imageUrl
-                            ? `< img src = "${speaker.imageUrl}" alt = "${speaker.name}" class="w-16 h-16 mx-auto mb-2 rounded-full object-cover" onerror = "this.onerror=null; this.outerHTML='<div class=\\'text-4xl mb-2\\'>🎤</div>';" > `
+                            ? `<img src="${speaker.imageUrl}" alt="${speaker.name}" class="w-16 h-16 mx-auto mb-2 rounded-full object-cover" onerror="this.onerror=null; this.outerHTML='<div class=\\'text-4xl mb-2\\'>🎤</div>';">`
                             : '<div class="text-4xl mb-2">🎤</div>';
 
                         card.innerHTML = `
-                    < div class="text-center" >
+                    <div class="text-center">
                         ${imageHtml}
                             <p class="text-white font-bold text-sm mb-1">${speaker.nameKr || speaker.name}</p>
                             <p class="text-slate-400 text-xs">${style.nameKr || style.name}</p>
                             ${speaker.gender ? `<p class="text-slate-500 text-xs mt-1">${speaker.gender === 'female' ? '👧' : speaker.gender === 'male' ? '👦' : '🤖'}</p>` : ''}
-                        </div >
+                        </div>
                     `;
 
                         grid.appendChild(card);
@@ -1442,6 +1450,7 @@
                 let cleanText = '';
                 let srtContent = '';
                 let srtIndex = 1;
+                let estimatedTime = 0; // For auto-generating timestamps
 
                 // Helper to format srt time: seconds -> 00:00:00,000
                 const formatSRTTimestamp = (seconds) => {
@@ -1449,8 +1458,14 @@
                     date.setSeconds(seconds);
                     const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
                     const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-                    const ss = String(Math.floor(seconds % 60)).padStart(2, '0');
-                    return `${hh}:${mm}:${ss},000`;
+                    const ss = Math.floor(seconds % 60);
+                    const ms = Math.floor((seconds % 1) * 1000);
+                    return `${hh}:${mm}:${String(ss).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+                };
+
+                // Helper to estimate speech duration (rough: 5 chars per second for Japanese)
+                const estimateDuration = (text) => {
+                    return Math.max(2, text.length / 5); // Minimum 2 seconds
                 };
 
                 for (let i = 0; i < lines.length; i++) {
@@ -1461,6 +1476,7 @@
                     const timeMatch = line.match(/^\[(\d+)-(\d+)초\]\s*(.*)/);
 
                     if (timeMatch) {
+                        // Has explicit timestamp
                         const startSec = parseInt(timeMatch[1]);
                         const endSec = parseInt(timeMatch[2]);
                         const rawText = timeMatch[3];
@@ -1472,16 +1488,33 @@
                         const textForSRT = rawText.replace(/\//g, ' ').replace(/[\[\]]/g, '').trim();
 
                         // Append to SRT
-                        srtContent += `${srtIndex} \n`;
-                        srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)} \n`;
-                        srtContent += `${textForSRT} \n\n`;
+                        srtContent += `${srtIndex}\n`;
+                        srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)}\n`;
+                        srtContent += `${textForSRT}\n\n`;
                         srtIndex++;
 
                         // Append to Audio Text
                         cleanText += textForTTS + '\n';
+                        estimatedTime = endSec; // Update estimated time
                     } else {
-                        // No timestamp, just clean and append
+                        // No timestamp - auto-generate based on text length
                         const textForTTS = line.replace(/\//g, '、').replace(/[\[\]]/g, ' ');
+                        const textForSRT = line.replace(/\//g, ' ').replace(/[\[\]]/g, '').trim();
+
+                        if (textForSRT) {
+                            const duration = estimateDuration(textForSRT);
+                            const startSec = estimatedTime;
+                            const endSec = estimatedTime + duration;
+
+                            // Append to SRT
+                            srtContent += `${srtIndex}\n`;
+                            srtContent += `${formatSRTTimestamp(startSec)} --> ${formatSRTTimestamp(endSec)}\n`;
+                            srtContent += `${textForSRT}\n\n`;
+                            srtIndex++;
+
+                            estimatedTime = endSec;
+                        }
+
                         cleanText += textForTTS + '\n';
                     }
                 }
@@ -1489,6 +1522,7 @@
                 if (!cleanText.trim()) {
                     cleanText = scriptText; // Fallback if parsing failed
                 }
+
 
                 // -------------------------------------------------------------
                 // 2) Generate Audio
@@ -1526,53 +1560,54 @@
                     }
 
                     const audioBlob = await response.blob();
-                    const audioUrl = URL.createObjectURL(audioBlob);
 
-                    // Display generated audio
+                    // Store blob globally for manual download
+                    window.currentAudioBlob = audioBlob;
+                    window.currentAudioFilename = `voicevox_tts_${Date.now()}.wav`;
+
+                    // Store SRT content globally for button access
+                    window.currentNarratorSRT = srtContent;
+                    console.log('📜 Narrator SRT Content Length:', srtContent.length);
+                    console.log('📜 SRT Preview:', srtContent.substring(0, 200));
+
+                    // Display generated audio - Use data URL to prevent IDM interception
                     const audio = document.getElementById('generatedAudio');
-                    audio.src = audioUrl;
-                    document.getElementById('generatedAudioSection').classList.remove('hidden');
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        audio.src = e.target.result; // Data URL instead of blob URL
+                        document.getElementById('generatedAudioSection').classList.remove('hidden');
 
-                    // Setup manual download button
+                        // Scroll to audio section after loading
+                        setTimeout(() => {
+                            document.getElementById('generatedAudioSection').scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        }, 100);
+                    };
+                    reader.readAsDataURL(audioBlob);
+
+                    // Setup manual download buttons
                     document.getElementById('downloadAudioBtn').onclick = () => {
                         const a = document.createElement('a');
-                        a.href = audioUrl;
-                        a.download = `voicevox_tts_${Date.now()}.wav`;
+                        const url = URL.createObjectURL(window.currentAudioBlob);
+                        a.href = url;
+                        a.download = window.currentAudioFilename;
                         a.click();
-
-                        // Also download SRT if exists (re-trigger)
-                        if (srtContent) {
-                            downloadSRTMlob(srtContent);
-                        }
+                        URL.revokeObjectURL(url);
                     };
 
-                    // -------------------------------------------------------------
-                    // 3) Auto-Download Audio & SRT
-                    // -------------------------------------------------------------
-
-                    // Download Audio
-                    const a = document.createElement('a');
-                    a.href = audioUrl;
-                    a.download = `voicevox_tts_${Date.now()}.wav`;
-                    a.click();
-
-                    // Download SRT
-                    if (srtContent) {
-                        downloadSRTMlob(srtContent);
+                    const narratorSrtBtn = document.getElementById('downloadNarratorSrtBtn');
+                    if (window.currentNarratorSRT && window.currentNarratorSRT.trim()) {
+                        console.log('✅ Showing Narrator SRT button');
+                        narratorSrtBtn.classList.remove('hidden');
+                        narratorSrtBtn.onclick = () => {
+                            downloadSRTMlob(window.currentNarratorSRT, `narrator_jp_${Date.now()}.srt`);
+                        };
+                    } else {
+                        console.log('❌ Hiding Narrator SRT button (no content)');
+                        narratorSrtBtn.classList.add('hidden');
                     }
-
-                    // Notify user
-                    const toast = document.createElement('div');
-                    toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
-                    toast.innerHTML = '✅ <b>오디오 & SRT 자막</b> 다운로드 완료!';
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 3000);
-
-                    // Scroll to audio section
-                    document.getElementById('generatedAudioSection').scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
 
                 } catch (error) {
                     alert('오류: ' + error.message);
@@ -1582,12 +1617,12 @@
                 }
             });
 
-            function downloadSRTMlob(content) {
+            function downloadSRTMlob(content, filename = `narrator_${Date.now()}.srt`) {
                 const blob = new Blob([content], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `voicevox_subtitle_${Date.now()}.srt`;
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -1711,14 +1746,14 @@
 
                 const providerName = selectedWhisperProvider === 'openai' ? 'OpenAI (유료)' : 'HuggingFace (무료)';
                 document.getElementById('bilingualTranscript').innerHTML = `
-                    < div class="flex items-center justify-center p-12" >
+                    <div class="flex items-center justify-center p-12">
                         <div class="text-center">
                             <div class="loader w-12 h-12 border-4 border-t-purple-500 mx-auto mb-4"></div>
                             <p class="text-white font-bold text-lg">대본 추출 중...</p>
                             <p class="text-slate-400 text-sm mt-2">${providerName} Whisper ASR</p>
                             ${!selectedFile ? '<p class="text-xs text-blue-400 mt-1">URL 다운로드 중... (시간이 걸릴 수 있습니다)</p>' : ''}
                         </div>
-                    </div >
+                    </div>
                     `;
 
                 // Prepare form data with provider selection
@@ -1762,10 +1797,10 @@
                 } catch (error) {
                     console.error('Transcript extraction error:', error);
                     document.getElementById('bilingualTranscript').innerHTML = `
-                    < div class="p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center" >
+                    <div class="p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
                             <p class="text-red-400 font-bold mb-2">❌ 오류 발생</p>
                             <p class="text-slate-300 text-sm">${error.message}</p>
-                        </div >
+                        </div>
                     `;
                 }
             });
@@ -1804,13 +1839,13 @@
 
                 if (transcript.videoExplanation) {
                     transcriptExplanation.innerHTML = `
-                    < div class="flex items-start gap-3" >
+                    <div class="flex items-start gap-3">
                             <div class="text-2xl">💡</div>
                             <div>
                                 <h3 class="text-purple-400 font-bold mb-2">AI 영상 요약</h3>
                                 <p class="text-slate-300 leading-relaxed">${renderColorTags(transcript.videoExplanation)}</p>
                             </div>
-                        </div >
+                        </div>
                     `;
                     transcriptExplanation.classList.remove('hidden');
                 } else {
@@ -1827,7 +1862,7 @@
                     const showBilingual = transcript.hasTranslation;
 
                     return `
-                    < div class="bg-slate-800/50 rounded-xl p-4 border-l-4 ${emotionColor}" >
+                    <div class="bg-slate-800/50 rounded-xl p-4 border-l-4 ${emotionColor}">
                         <div class="flex items-center gap-2 mb-3">
                             <span class="text-xs font-mono text-purple-300">${formatTime(seg.start)} → ${formatTime(seg.end)}</span>
                             ${seg.emotion ? `<span class="text-xs bg-pink-500/30 px-2 py-0.5 rounded">${seg.emotion}</span>` : ''}
@@ -1846,7 +1881,7 @@
                             ` : `
                                 <p class="text-white">${seg.text}</p>
                             `}
-                        </div >
+                        </div>
                     `;
                 }).join('');
 
@@ -1893,13 +1928,13 @@
                 // Show section & loading
                 highlightsSection.classList.remove('hidden');
                 highlightsGrid.innerHTML = `
-                    < div class="col-span-full flex items-center justify-center p-12" >
+                    <div class="col-span-full flex items-center justify-center p-12">
                         <div class="text-center">
                             <div class="loader w-12 h-12 border-4 border-t-pink-500 mx-auto mb-4"></div>
                             <p class="text-white font-bold text-xl">AI가 바이럴 구간 분석 중...</p>
                             <p class="text-slate-400 text-sm mt-2">Hook, 감정선, 기승전결 분석</p>
                         </div>
-                    </div >
+                    </div>
                     `;
 
                 highlightsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1943,10 +1978,10 @@
                 } catch (error) {
                     console.error('Highlight extraction error:', error);
                     highlightsGrid.innerHTML = `
-                    < div class="col-span-full p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center" >
+                    <div class="col-span-full p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
                             <p class="text-red-400 font-bold mb-2">❌ 오류 발생</p>
                             <p class="text-slate-300 text-sm">${error.message}</p>
-                        </div >
+                        </div>
                     `;
                 }
             });
@@ -1959,7 +1994,7 @@
                 const titleCard = document.createElement('div');
                 titleCard.className = 'col-span-full bg-gradient-to-r from-purple-900/50 to-blue-900/50 p-6 rounded-xl border border-purple-500/30 mb-4';
                 titleCard.innerHTML = `
-                    < div class="flex justify-between items-start" >
+                    <div class="flex justify-between items-start">
                         <div class="flex-1">
                             <h3 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">
                                 🎬 AI Director's Cut 설계도
@@ -2029,13 +2064,13 @@
                             <p class="text-indigo-100 text-xs leading-tight">${loopStrategy}</p>
                         </div>` : ''
                     }
-                    </div >
+                    </div>
                     `;
                 grid.appendChild(titleCard);
 
                 // Add Download Buttons
                 grid.parentElement.insertAdjacentHTML('afterbegin', `
-                    < div class="flex gap-2 mb-4 justify-end flex-wrap" >
+                    <div class="flex gap-2 mb-4 justify-end flex-wrap">
                         <button onclick="downloadDirectorImage()" class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                             📸 설계도 이미지 저장 (.png)
                         </button>
@@ -2064,7 +2099,7 @@
                                 </button>
                             </div>
                         </div>
-                    </div >
+                    </div>
                     `);
 
                 // Add SRT dropdown toggle functionality
@@ -2089,17 +2124,30 @@
 
                 // Render Plan Items
                 plan.forEach((scene, index) => {
-                    const duration = (scene.end - scene.start).toFixed(1);
-                    const sceneCard = document.createElement('div');
-                    sceneCard.className = `col - span - full bg - slate - 800 / 50 border border - slate - 700 p - 5 rounded - xl hover: border - purple - 500 transition - colors group`;
+                    // Defensive check for null/undefined start/end
+                    const s = parseFloat(scene.start);
+                    const e = parseFloat(scene.end);
+                    const hasValidTime = !isNaN(s) && !isNaN(e) && e > s;
 
-                    const badgeColor = scene.stage.includes('Intro') ? 'bg-pink-600' :
-                        scene.stage.includes('Body') ? 'bg-blue-600' :
-                            scene.stage.includes('Climax') ? 'bg-orange-600' : 'bg-gray-600';
+                    const sceneStart = hasValidTime ? s : 0;
+                    const sceneEnd = hasValidTime ? e : 0;
+                    const duration = (sceneEnd - sceneStart).toFixed(1);
+
+                    const sceneCard = document.createElement('div');
+                    sceneCard.className = `col-span-full ${hasValidTime ? 'bg-slate-800/50 border-slate-700' : 'bg-red-900/20 border-red-500/50'} border p-5 rounded-xl hover:border-purple-500 transition-colors group`;
+
+                    if (!hasValidTime) {
+                        console.warn(`[Display] Scene ${index + 1} has invalid timestamps:`, { start: scene.start, end: scene.end });
+                    }
+
+                    const sceneStage = scene.stage || '';
+                    const badgeColor = sceneStage.includes('Intro') ? 'bg-pink-600' :
+                        sceneStage.includes('Body') ? 'bg-blue-600' :
+                            sceneStage.includes('Climax') ? 'bg-orange-600' : 'bg-gray-600';
 
                     // Prepare Narration & SFX HTML
                     const narrationHtml = (scene.narration_kr || scene.narration_jp) ? `
-                    < div class="mt-3 bg-gradient-to-r from-green-900/30 to-blue-900/30 p-4 rounded-lg border border-green-500/30" >
+                    <div class="mt-3 bg-gradient-to-r from-green-900/30 to-blue-900/30 p-4 rounded-lg border border-green-500/30">
                             <span class="text-[11px] text-green-400 font-bold tracking-wider uppercase block mb-2">🗣️ Narration (CapCut 자막용)</span>
                             <div class="space-y-2">
                                 ${scene.narration_kr ? `
@@ -2118,17 +2166,17 @@
                                     <p class="text-orange-300 text-sm font-mono">"${scene.narration_pron}"</p>
                                 </div>` : ''}
                             </div>
-                        </div > ` : '';
+                        </div> ` : '';
 
                     const sfxHtml = scene.sfx_suggestion ? `
-                    < div class="mt-2 flex items-center gap-2" >
+                    <div class="mt-2 flex items-center gap-2">
                             <span class="text-[10px] text-yellow-500/70 border border-yellow-500/30 px-1.5 py-0.5 rounded uppercase font-bold">🎵 SFX</span>
                             <span class="text-xs text-yellow-100/80">${scene.sfx_suggestion}</span>
-                        </div > ` : '';
+                        </div> ` : '';
 
                     // Enhanced Transcript HTML with 4 Languages (Ordered: Original → Korean → Japanese+Pron paired)
                     const transcriptHtml = (scene.original_transcript || scene.text_jp) ? `
-                    < details class="mt-3 group/details" open >
+                    <details class="mt-3 group/details" open>
                                     <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 select-none flex items-center gap-1 mb-2">
                                         <span class="group-open/details:rotate-90 transition-transform">▼</span> 🗣️ 4개 국어 대사 (편집용)
                                     </summary>
@@ -2158,17 +2206,23 @@
                                             </p>` : ''}
                                         </div>` : ''}
                                     </div>
-                                </details > ` : '';
+                                </details> ` : '';
 
                     sceneCard.innerHTML = `
-                    < !--Timeline at Top(like image)-- >
+                    <!--Timeline at Top(like image)-->
                         <div class="flex items-center justify-between bg-slate-900/50 -m-5 mb-4 p-3 rounded-t-xl border-b border-slate-700">
-                            <span class="${badgeColor} text-white text-xs font-bold px-3 py-1 rounded-full">${scene.stage}</span>
+                            <span class="${badgeColor} text-white text-xs font-bold px-3 py-1 rounded-full">${sceneStage || 'Clip'}</span>
                             <div class="flex items-center gap-2">
-                                <span class="text-purple-300 font-mono font-bold text-sm">${formatTime(scene.start)}</span>
-                                <div class="w-[1px] h-4 bg-slate-600"></div>
-                                <span class="text-purple-300 font-mono font-bold text-sm">${formatTime(scene.end)}</span>
-                                <span class="text-slate-500 text-xs">(${duration}s)</span>
+                                ${hasValidTime ? `
+                                    <span class="text-purple-300 font-mono font-bold text-sm">${formatTime(sceneStart)}</span>
+                                    <div class="w-[1px] h-4 bg-slate-600"></div>
+                                    <span class="text-purple-300 font-mono font-bold text-sm">${formatTime(sceneEnd)}</span>
+                                    <span class="text-slate-500 text-xs text-nowrap">(${duration}s)</span>
+                                ` : `
+                                    <span class="text-red-400 font-bold text-xs flex items-center gap-1">
+                                        <i class="fas fa-exclamation-triangle"></i> 시간 정보 없음 (편집 불가)
+                                    </span>
+                                `}
                             </div>
                         </div>
 
@@ -2182,7 +2236,7 @@
                         ${transcriptHtml}
 
                         <div class="mt-3 flex gap-2">
-                            <button onclick="navigator.clipboard.writeText('${scene.start.toFixed(2)}-${scene.end.toFixed(2)}')"
+                            <button onclick="navigator.clipboard.writeText('${sceneStart.toFixed(2)}-${sceneEnd.toFixed(2)}')"
                                 class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded transition-colors">
                                 ⏱️ 정밀 타임코드 복사
                             </button>
@@ -2210,7 +2264,9 @@
                     let accumulatedTime = 0;
 
                     plan.forEach(scene => {
-                        const duration = scene.end - scene.start;
+                        const sceneStart = scene.start ?? 0;
+                        const sceneEnd = scene.end ?? 0;
+                        const duration = sceneEnd - sceneStart;
                         const startTime = accumulatedTime;
                         const endTime = accumulatedTime + duration;
 
@@ -2220,7 +2276,7 @@
                         const text = scene.narration_jp || '';
 
                         if (text) {
-                            timelineScript += `[${Math.floor(startTime)} -${Math.ceil(endTime)}초] ${text} \n`;
+                            timelineScript += `${text}\n`;
                         }
 
                         accumulatedTime += duration;
@@ -2261,7 +2317,10 @@
                 content += `====================================\n\n`;
 
                 window.currentDirectorPlan.forEach((scene, i) => {
-                    content += `Scene ${i + 1}: ${scene.stage} (${formatTime(scene.start)} - ${formatTime(scene.end)})\n`;
+                    const sceneStart = scene.start ?? 0;
+                    const sceneEnd = scene.end ?? 0;
+                    const sceneStage = scene.stage || 'Clip';
+                    content += `Scene ${i + 1}: ${sceneStage} (${formatTime(sceneStart)} - ${formatTime(sceneEnd)})\n`;
                     content += `------------------------------------\n`;
                     content += `내용: ${scene.description}\n`;
                     if (scene.sfx_suggestion) content += `SFX: ${scene.sfx_suggestion}\n`;
@@ -2319,9 +2378,9 @@
 
                     switch (language) {
                         case 'en': text = scene.original_transcript || scene.description; break;
-                        case 'jp': text = scene.text_jp || scene.narration_jp || ''; break;
-                        case 'pron': text = scene.text_pron || scene.narration_pron || ''; break;
-                        case 'kr': text = scene.text_kr || scene.narration_kr || scene.description; break;
+                        case 'jp': text = scene.text_jp || ''; break;
+                        case 'pron': text = scene.text_pron || ''; break;
+                        case 'kr': text = scene.text_kr || scene.description; break;
                         default: text = scene.description;
                     }
 
@@ -2615,13 +2674,86 @@
                 cutBtn.innerHTML = '<span class="loader w-5 h-5 border-2 border-t-white mr-2"></span> 영상 편집 중... (최대 1-2분 소요)';
 
                 try {
-                    // Extract highlights array from director plan
-                    const highlights = window.currentDirectorPlan.map(scene => ({
-                        start: scene.start,
-                        end: scene.end
-                    }));
+                    // Log the raw director plan for debugging
+                    console.log('[Video Cut] Raw Director Plan:', window.currentDirectorPlan);
+                    console.log('[Video Cut] Total scenes in plan:', window.currentDirectorPlan.length);
 
-                    console.log('[Video Cut] Cutting highlights:', highlights);
+                    // Extract highlights array from director plan
+                    // ONLY include original_clip type (speaker dialogue), exclude all narration
+                    const invalidScenes = [];
+                    const narrationScenes = [];
+
+                    const highlights = window.currentDirectorPlan
+                        .filter((scene, index) => {
+                            // Skip narration scenes (user will add them manually)
+                            if (scene.type && scene.type.includes('narration')) {
+                                narrationScenes.push({
+                                    index: index + 1,
+                                    stage: scene.stage || 'Unknown',
+                                    type: scene.type,
+                                    start: scene.start,
+                                    end: scene.end,
+                                    description: scene.narration_kr || scene.description || 'Narration'
+                                });
+                                return false; // Skip narration scenes
+                            }
+
+                            // Ensure start and end are valid numbers
+                            const s = parseFloat(scene.start);
+                            const e = parseFloat(scene.end);
+                            const isValid = !isNaN(s) && !isNaN(e) && e > s;
+
+                            if (!isValid) {
+                                invalidScenes.push({
+                                    index: index + 1,
+                                    stage: scene.stage || 'Unknown',
+                                    type: scene.type || 'Unknown',
+                                    start: scene.start,
+                                    end: scene.end,
+                                    description: scene.description || scene.text_kr || 'No description'
+                                });
+                            }
+
+                            return isValid;
+                        })
+                        .map(scene => ({
+                            start: parseFloat(scene.start),
+                            end: parseFloat(scene.end)
+                        }));
+
+                    // Log filtering results
+                    if (narrationScenes.length > 0) {
+                        console.log(`[Video Cut] 📝 Skipped ${narrationScenes.length} narration scenes (you'll add these manually):`);
+                        narrationScenes.forEach(scene => {
+                            console.log(`  Scene ${scene.index} (${scene.type}): ${scene.start}s - ${scene.end}s - "${scene.description.substring(0, 50)}..."`);
+                        });
+                    }
+
+                    if (invalidScenes.length > 0) {
+                        console.warn('[Video Cut] ⚠️ Filtered out invalid scenes:', invalidScenes);
+                        console.warn('[Video Cut] Invalid scene details:');
+                        invalidScenes.forEach(scene => {
+                            console.warn(`  Scene ${scene.index} (${scene.stage}/${scene.type}): start=${scene.start}, end=${scene.end} - "${scene.description.substring(0, 50)}..."`);
+                        });
+                    }
+
+                    console.log(`[Video Cut] ✅ ${highlights.length} speaker clips to cut (excluding ${narrationScenes.length} narration scenes)`);
+
+                    if (highlights.length === 0) {
+                        const errorMsg = `편집할 수 있는 유효한 하이라이트 구간이 없습니다.\n\n` +
+                            `전체 씬: ${window.currentDirectorPlan.length}개\n` +
+                            `유효하지 않은 씬: ${invalidScenes.length}개\n\n` +
+                            `문제가 있는 씬:\n` +
+                            invalidScenes.map(s => `- Scene ${s.index} (${s.type}): start=${s.start}, end=${s.end}`).join('\n');
+
+                        alert(errorMsg);
+                        console.error('[Video Cut] All scenes have invalid timestamps. Check the AI response.');
+                        cutBtn.disabled = false;
+                        cutBtn.innerHTML = originalHTML;
+                        return;
+                    }
+
+                    console.log('[Video Cut] Cutting speaker clips:', highlights);
 
                     // Create form data
                     const formData = new FormData();
@@ -3054,13 +3186,13 @@
                     const borderColor = isDialogue ? 'border-blue-500/30' : 'border-orange-500/30';
                     const bgColor = isDialogue ? 'bg-slate-800/80' : 'bg-slate-800/60';
 
-                    // Timeline display for Dialogue (CapCut editing)
-                    const timelineInfo = (isDialogue && s.start_time && s.end_time)
+                    // Timeline display for (CapCut editing)
+                    const timelineInfo = (s.start_time && s.end_time)
                         ? `<span class="font-mono text-xs text-blue-300 ml-2">📹 ${s.start_time} → ${s.end_time}</span>`
                         : '';
 
                     return `
-                        <div class="mb-6 ${bgColor} rounded-xl overflow-hidden border ${borderColor} hover:border-indigo-500/30 transition-colors" >
+                        <div class="mb-6 ${bgColor} rounded-xl overflow-hidden border ${borderColor} hover:border-indigo-500/30 transition-colors">
                         <!--Header with Segment & Time-->
                         <div class="bg-slate-700/30 px-5 py-3 flex items-center justify-between border-b border-white/5">
                             <div class="flex items-center gap-3">
@@ -3178,7 +3310,7 @@
                 }
 
                 section.innerHTML = `
-                        <div class="max-w-4xl mx-auto py-8" >
+                        <div class="max-w-4xl mx-auto py-8">
                         <div class="flex items-center justify-between mb-8">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/20">🎬</div>
@@ -3195,7 +3327,7 @@
                             </button>
                         </div>
 
-                        <!-- Viral Logic Section -->
+                        <!-- Viral Strategy Logic -->
                         ${result.data.viral_logic ? `
                         <div class="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 rounded-xl p-5 mb-8 border-l-4 border-purple-500">
                             <div class="flex items-start gap-3">
@@ -3208,10 +3340,42 @@
                         </div>
                         ` : ''}
 
+                        <!-- Viral Potential Score -->
+                        ${result.data.viral_potential ? `
+                        <div class="bg-gradient-to-r from-pink-900/40 to-red-900/40 rounded-xl p-5 mb-8 border-l-4 border-pink-500">
+                            <div class="flex items-start gap-4">
+                                <div class="bg-pink-500/20 p-3 rounded-full">
+                                    <span class="text-3xl">🔥</span>
+                                </div>
+                                <div>
+                                    <h3 class="text-white font-bold text-sm mb-1 uppercase tracking-wider text-pink-300">Viral Potential Score: <span class="text-2xl text-white ml-2">${result.data.viral_potential.score}/100</span></h3>
+                                    <p class="text-slate-200 text-sm leading-relaxed">${result.data.viral_potential.reason}</p>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Key Moments -->
+                        ${result.data.key_moments && result.data.key_moments.length > 0 ? `
+                        <div class="bg-slate-800/50 rounded-xl p-5 mb-8 border border-slate-700">
+                            <h3 class="text-white font-bold text-sm mb-4 uppercase tracking-wider text-blue-300 flex items-center gap-2">
+                                <span>✂️</span> Key Moments
+                            </h3>
+                            <div class="space-y-3">
+                                ${result.data.key_moments.map(m => `
+                                    <div class="flex items-start gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                                        <span class="font-mono text-blue-400 font-bold text-sm bg-blue-900/30 px-2 py-1 rounded">${m.time}</span>
+                                        <p class="text-slate-300 text-sm">${m.description}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
                         ${titlesHTML}
                         ${thumbnailsHTML}
 
-                        <!-- Timeline Script Section (Integrated) -->
+                        <!-- Timeline Script Section(Integrated)-->
                         <div class="bg-slate-900/50 rounded-2xl p-6 mb-8 border border-orange-500/20">
                             <div class="flex items-center gap-3 mb-4">
                                 <span class="text-2xl">📝</span>
@@ -3226,8 +3390,8 @@
                                     class="w-full px-4 py-3 bg-slate-800 text-white rounded-lg border border-slate-700 focus:border-purple-500 focus:outline-none font-mono" 
                                     placeholder="예시:
 [0-3초] 皆さん、こんにちは！
-[3-10초] 今日は面白い動画を紹介します
-[10-15초] チャンネル登録お願いします！">${narrationJapaneseText}</textarea>
+[3-10초] 今日는 재미있는 영상을 소개합니다
+[10-15초] 구독 부탁드립니다!">${narrationJapaneseText}</textarea>
                                 <p class="text-slate-500 text-sm mt-2">
                                     💡 타임라인 형식으로 입력하거나, 일반 텍스트로 입력하세요
                                 </p>
@@ -3358,7 +3522,7 @@
                             const ms = ssPart.split('.')[1]
                                 ? ssPart.split('.')[1].padEnd(3, '0').substring(0, 3)
                                 : '000';
-                            return `00:${mm}:${ss},${ms}`;
+                            return `00:${mm}:${ss},${ms} `;
                         };
 
                         const srtStart = formatTime(startTime);
@@ -3371,7 +3535,7 @@
                             .replace(/\s+/g, '')
                             .trim();
 
-                        srtContent += `${index}\n${srtStart} --> ${srtEnd}\n${cleanText}\n\n`;
+                        srtContent += `${index} \n${srtStart} --> ${srtEnd} \n${cleanText} \n\n`;
                     });
 
                     // Download SRT file with UTF-8 BOM for compatibility

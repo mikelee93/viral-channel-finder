@@ -62,8 +62,12 @@ router.get('/styles', async (req, res) => {
             console.error('[Production] Error reading channel_personas.json', e);
         }
 
-        // 3. Merge & Deduplicate
-        const styles = [...mongoStyles, ...jsonStyles];
+        // 3. Merge & Deduplicate (Filter out MrBeast)
+        // 3. Merge & Deduplicate (Filter out MrBeast)
+        const styles = [...mongoStyles, ...jsonStyles].filter(s =>
+            s.channelId !== 'SAMPLE_MRBEAST' &&
+            (!s.channelTitle || !s.channelTitle.includes('MrBeast'))
+        );
 
         // Category Mapping (English -> Korean) matching Hot Channel functions
         const CATEGORY_MAPPING = {
@@ -153,7 +157,12 @@ router.post('/generate', async (req, res) => {
 
         // 1. Get Source Transcript
         let finalTranscript = '';
-        let sourceMetadata = {};
+        let sourceMetadata = {
+            title: 'Source Video',
+            timeline: [],
+            duration: 'Unknown',
+            key_moments: []
+        };
         let timelineData = ''; // NEW: Timeline with timestamps
 
         if (transcriptText) {
@@ -163,6 +172,7 @@ router.post('/generate', async (req, res) => {
 
             // NEW: Format timeline with timestamps if segments are provided
             if (transcriptSegments && Array.isArray(transcriptSegments)) {
+                sourceMetadata.timeline = transcriptSegments; // Store original segments
                 timelineData = transcriptSegments.map(seg => {
                     const start = formatTime(seg.start);
                     const end = formatTime(seg.end);
@@ -178,9 +188,16 @@ router.post('/generate', async (req, res) => {
                 }
                 finalTranscript = sourceAnalysis.transcript;
                 sourceMetadata = {
-                    title: sourceAnalysis.metadata?.title,
+                    ...sourceMetadata,
+                    title: sourceAnalysis.metadata?.title || 'YouTube Video',
                     thumbnail: 'https://img.youtube.com/vi/' + extractYouTubeId(sourceUrl) + '/maxresdefault.jpg'
                 };
+                // If sourceAnalysis provided segments, we could map them here. 
+                // Currently youtube-analyzer returns joined text. 
+                // We'll fallback to an empty timeline if segments aren't enriched.
+                if (sourceAnalysis.segments) {
+                    sourceMetadata.timeline = sourceAnalysis.segments;
+                }
             } catch (err) {
                 return res.status(400).json({ error: `Video Analysis Failed: ${err.message}` });
             }
@@ -194,7 +211,40 @@ router.post('/generate', async (req, res) => {
             console.log(`[Production] Generating Hybrid Style for ${styleIds.length} channels...`);
 
             // Fetch all channels
-            const channels = await HotChannel.find({ channelId: { $in: styleIds } }).lean();
+            // Fetch all channels
+            let channels = await HotChannel.find({ channelId: { $in: styleIds } }).lean();
+
+            // Fallback: Check for missing IDs in Style Lab JSON
+            const missingIds = styleIds.filter(id => !channels.find(c => c.channelId === id));
+
+            if (missingIds.length > 0) {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const DB_PATH = path.join(__dirname, '../../channel_personas.json');
+
+                    if (fs.existsSync(DB_PATH)) {
+                        const data = fs.readFileSync(DB_PATH, 'utf8');
+                        const personas = JSON.parse(data);
+
+                        missingIds.forEach(missingId => {
+                            const found = personas.find(p => p.id === missingId);
+                            if (found) {
+                                channels.push({
+                                    channelId: found.id,
+                                    channelTitle: found.name,
+                                    thumbnail: null,
+                                    aiAnalysis: {
+                                        strategy: found.analysis
+                                    }
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Production] Hybrid JSON Fallback Error:', e);
+                }
+            }
 
             if (channels.length > 0) {
                 // Merge DNA
@@ -330,225 +380,215 @@ router.post('/generate', async (req, res) => {
         Rewrite the following source video transcript into a new Viral Shorts Script that is INDISTINGUISHABLE from the original creator's style.
         
         **IMPORTANT: The source transcript may be in ANY language (English, French, Spanish, etc.). You MUST:**
-        1. Understand the content and context of the source transcript regardless of language
-        2. Translate and adapt it to **NATURAL, HIGH-QUALITY SPOKEN JAPANESE**
+        1. Understand the content and context of the source transcript regardless of language.
+        2. Translate and adapt it to **NATURAL, HIGH-QUALITY SPOKEN JAPANESE**.
            - **Style**: Use native-like phrasing, not robotic literal translation.
            - **Nuance**: Capture the exact emotion (anger, sarcasm, shock) of the original speaker.
-           - **Constraints**: Do NOT change key facts or meanings (e.g. "stain" -> "snow").
-        3. Apply the creator's DNA style to the translated content
-        4. Ensure text_pron accurately represents the natural Japanese pronunciation using Korean Hangul characters (use strong consonants for emphasis)
-        5. **USE THE ORIGINAL TIMELINE TIMESTAMPS** - Map your script to the exact timestamps from the source video
+           - **Constraints**: Do NOT change key facts or meanings.
+        3. Apply the creator's DNA style to the translated content.
+        4. Ensure text_pron accurately represents the natural Japanese pronunciation using Korean Hangul characters.
+        5. **CREATIVE LIBERTY - NON-LINEAR EDITING (DNA FIRST) ✂️**:
+           - **DO NOT simply follow the original video's linear timeline if it's boring**. 
+           - **COMPRESS and REARRANGE**: If a 45s video can be told more effectively in 40s by skipping boring parts, DO IT.
+           - **REORDER DIALOGUE**: You can swap the order of dialogue if it makes the "Hybrid Style" hook or twist stronger.
+           - **NARRATOR DOMINANCE**: The Narrator owns the story. Use Dialogue only as "Proof/Evidence" for the Narrator's claims.
         6. **DISTINGUISH BETWEEN:**
            - **"Narration"**: New voiceover you create to add context/style (type: "Narration")
-           - **"Dialogue"**: Original dialogue from the source video (type: "Dialogue", use original timestamps)
+           - **"Dialogue"**: Original dialogue from the source video (type: "Dialogue")
         
         7. 🚨 **CRITICAL - DIALOGUE TRANSLATION ACCURACY:**
-           - **DO NOT reinterpret or change the meaning of original dialogue**
-           - Translate dialogue LITERALLY and ACCURATELY
-           - Example: "je te met une tache" = "I'll put a stain on you" → "跡をつける" (leave a mark)
-           - **DO NOT** change threatening language into playful language
-           - **DO NOT** add context that isn't in the original (e.g., changing "stain" to "snow")
-           - Keep the original tone, emotion, and intent
+           - Translate dialogue LITERALLY and ACCURATELY.
+           - Keep the original tone, emotion, and intent.
         
         VALIDATION CHECKLIST (Check before finalizing):
-        ✓ Uses at least 3 catchphrases from the DNA
-        ✓ Sentence structure matches the creator's pattern
-        ✓ Transitions use the specified phrases
-        ✓ Tone is consistent throughout
-        ✓ Structure template timing is followed
-        ✓ All director rules are applied
-        ✓ **Timestamps match the original video timeline**
-        ✓ **Type is correctly set (Narration vs Dialogue)**
-
+        ✓ Uses at least 3 catchphrases from the DNA.
+        ✓ Sentence structure matches the creator's pattern.
+        ✓ Transitions use the specified phrases.
+        ✓ Tone is consistent throughout.
+        ✓ **STORY FLOW (DNA)** is more important than matching original timestamps 1:1.
+        ✓ **Type** is correctly set (Narration vs Dialogue).
+ 
         Source Video Timeline (with original dialogue):
-        ${timelineData || finalTranscript.slice(0, 6000)}
-
+        ${sourceMetadata.timeline.map(t => `- [${t.start} - ${t.end}] ${t.text}`).join('\n')}
+ 
+        **SOURCE VIDEO DURATION: ${sourceMetadata.duration || 'Unknown'}** (DO NOT EXCEED THIS TIME)
+ 
+        **KEY MOMENTS (Use these to anchor your Narration):**
+        ${sourceMetadata.key_moments ? sourceMetadata.key_moments.join('\n') : 'No key moments provided'}
+ 
         VISUAL CONTEXT (Use this to create Narration when dialogue is missing):
         ${videoExplanation ? `Video Explanation: ${videoExplanation}` : ''}
-        ${keyMoments ? `Key Moments: ${JSON.stringify(keyMoments)}` : ''}
         ${timelineAnalysis ? `Timeline Analysis: ${timelineAnalysis}` : ''}
         
-        
+        **INSTRUCTIONS FOR TIMELINE MAPPING (HYBRID STYLE):**
+        - **TIME COMPRESSION**: You may shorten the duration of Dialogue segments to increase pacing.
+        - **OVERLAP**: Narration can start right after (or slightly before) Dialogue ends for a "Machine Gun" pacing.
+        - **MM:SS FORMAT**: ALL segments (both Narration and Dialogue) MUST include "time", "start_time", and "end_time".
+          
         **🚨 CRITICAL: STRUCTURE TEMPLATE COMPLIANCE (MANDATORY)**
-        You MUST follow the creator's Viral Structure DNA template. Each section requires BOTH Narration and Dialogue:
+        You MUST follow the creator's Viral Structure DNA template: ${structureTemplate}
         
-        **🚨🚨🚨 CRITICAL: NARRATOR REQUIREMENTS - YOU WILL BE PENALIZED IF YOU SKIP THIS 🚨🚨🚨**
+        **🚨🚨🚨 CRITICAL: NARRATOR REQUIREMENTS - HYBRID STYLE DNA 🚨🚨🚨**
         
-        **MANDATORY NARRATOR COUNT (MINIMUM per section) - COUNT THEM BEFORE SUBMITTING:**
-        - **Hook (0-5s)**: Minimum 1 Narrator
-        - **Rising Action (5-20s)**: Minimum 2 Narrators
-        - **Climax/Twist (20-40s+)**: � **MINIMUM 3 NARRATORS - THIS IS NON-NEGOTIABLE** 🔴
-          * **RULE**: After every 2-3 dialogue segments, INSERT 1 narrator segment
-                    * **Example pattern**: NARRATOR → Dialogue → Dialogue → NARRATOR → Dialogue → Dialogue → NARRATOR → Dialogue → NARRATOR
-          * Narrator examples for Climax:
-            - "しかし、この男の主張は..." (But this man's claim...)
-            - "果たして、誰が正しいのか？" (Who is right?)
-            - "常識外れの行動に、怒りは募るばかりですが..." (This outrageous behavior only fuels anger...)
-        - **Resolution (40-55s+)**: Minimum 1-2 Narrators
-          * Wrap up with ironic commentary
-          * Ask audience question: "皆さんはどう思いますか？"
+        **MANDATORY NARRATOR COUNT (Minimums based on Style):**
+        - **Hook (0-7s)**: MUST start with a Narrator Hook. Never start with raw dialogue.
+        - **Body/Twist**: The Narrator MUST speak at least every 10 seconds.
+        - **Resolution**: Wrap up with the Narrator asking a question.
         
-        **VALIDATION CHECKLIST - CHECK BEFORE SUBMITTING:**
-        ✅ Hook section has at least 1 narrator? 
-        ✅ Rising Action has at least 2 narrators?
-        ✅ **Climax/Twist has at least 3 narrators?** ← MOST IMPORTANT
-        ✅ Resolution has at least 1 narrator?
-        ✅ Total narrator count is at least 7-8?
+        **HYBRID STYLE WORDS (MANDATORY)**:
+        - Use words like: "사실은(実は)", "경악(驚愕)", "더욱이나(さらに)", "말도 안 돼(ありえない)", "도대체(一体)".
         
-        **Narrator Style**: Use ${styleChannel.persona || 'INTRIGUED, SUSPENSEFUL'} tone:
-        - Add dramatic context between dialogue
-        - Build suspense and curiosity
-        - Highlight ironic or shocking elements
-        - **DO NOT just translate dialogue - ADD NEW NARRATIVE CONTEXT**
+        **Narrator Style**: Use ${styleChannel.persona || 'INTRIGUED, SUSPENSEFUL'} tone.
         
-        **INSTRUCTIONS FOR TIMELINE MAPPING:**
-        - For **Dialogue** segments: Use the EXACT timestamps from the source timeline above
-        - For **Narration** segments: 
-          - **CRITICAL**: If 'Key Moments' are provided, you MUST use their timestamps to anchor your narration.
-          - Example: If Key Moment is "00:03 - Ball hit", start your Hook/Reaction narration at "00:03".
-          - Narration should "bridge" the gaps between Key Moments and Dialogue.
-        - **CRITICAL**: ALL segments (both Narration and Dialogue) MUST include:
-          - "time": Display time in MM:SS format (e.g., "00:15")
-          - "start_time": Start timestamp in MM:SS format (e.g., "00:15")
-          - "end_time": End timestamp in MM:SS format (e.g., "00:18")
-        - Narration segments should have realistic durations (typically 3-5 seconds per sentence)
+        8. **VIRAL OPTIMIZATION OUTPUT (REQUIRED):**
+           - Analyze your OWN generated script and provide:
+             - "viral_potential": { "score": 0-100, "reason": "Why this script will go viral" }
+             - "key_moments": [ { "time": "00:04", "description": "Moment description" } ]
+        - Narration segments should have realistic durations (typically 2 - 4 seconds for Hybrid Pacing).
         
          Output Requirements:
-         1. **Titles**: Generate 3 viral title variations matching the high-impact style in the reference images.
-            - Patterns: [Specific Subject/Situation] + [Shocking Result/Emotion/Question]
+        1. ** Titles **: Generate 3 viral title variations matching the high - impact style in the reference images.
+            - Patterns: [Specific Subject / Situation] + [Shocking Result / Emotion / Question]
             - Example: "스키장에서 벌어진 충격적인 상황! 당신의 생각은?" or "고의로 사고를 낸 사기꾼들의 최후"
-            - Each title must include: Korean (kr), Japanese (jp), Japanese Pronunciation (pron)
-            - Title 1: Hook-focused (curiosity-driven, extreme situation)
-            - Title 2: Emotion-focused (shock/surprise/outrage)
-            - Title 3: Question-focused (user engagement/judgment)
-         2. **Thumbnail Texts**: Generate 3 thumbnail text variations (STRICTLY 2 lines, short and punchy)
+                - Each title must include: Korean(kr), Japanese(jp), Japanese Pronunciation(pron)
+                    - Title 1: Hook - focused(curiosity - driven, extreme situation)
+                        - Title 2: Emotion - focused(shock / surprise / outrage)
+                            - Title 3: Question - focused(user engagement / judgment)
+        2. ** Thumbnail Texts **: Generate 3 thumbnail text variations(STRICTLY 2 lines, short and punchy)
             - MUST use \\n to separate exactly two lines for design impact.
-            - Pattern: Top line (context/subject), Bottom line (main hook/result)
+            - Pattern: Top line(context / subject), Bottom line(main hook / result)
             - Thumbnail 1: Situation hook
-            - Thumbnail 2: Number hook (e.g., "3초만에\\n상황 반전!")
-            - Thumbnail 3: Mystery/Curiosity hook
-            - Each thumbnail must include: Korean (kr), Japanese (jp), Japanese Pronunciation in Hangul (pron)
-            - **CRITICAL**: Use \\n for ALL languages (kr, jp, pron) to split into exactly 2 lines.
-          3. **Timeline**: FULL DURATION of the story (60s+ allowed if necessary to cover the ending/twist)
-             - **DO NOT CUT OFF THE ENDING**
-             - If the source video is longer than 60s, compress dialogue or speed up pacing, but **INCLUDE THE RESOLUTION**.
-         4. **Script Content**:
-            - "section": Hook / Body / Twist / Conclusion / CTA (based on structure template)
-            - "type": Narration (Narrator) or Dialogue (Character)
-            - "time": Display time MM:SS
-            - "start_time": Start time MM:SS (REQUIRED for ALL segments)
-            - "end_time": End time MM:SS (REQUIRED for ALL segments)
-            - "text_jp": Japanese with "/" separators between words/phrases for Shorts subtitle timing
-              **MANDATORY**: Add CapCut color tags to 2-3 key words per sentence
-              Example: "常識外れの / <color=#B794F6>行動</color>に、/ <color=#FF6B6B>怒り</color>は / 募るばかりですが..."
-            - "text_pron": Hangul pronunciation with "/" matching text_jp separators exactly
-              **MANDATORY**: Apply SAME color tags as text_jp to corresponding words
-              Example: "죠-시키하즈레노 / <color=#B794F6>코-도-</color>니, / <color=#FF6B6B>이카리</color>와 / 츠노루 바카리 데스가..."
-            - "text_kr": Korean Translation using DNA vocabulary
-            - "original_text": **CRITICAL** For 'Dialogue' type, include the EXACT original original language text from the transcript. For 'Narration', keep empty string "".
-              **DO NOT** fabricate original text. If unknown, leave empty.
+                - Thumbnail 2: Number hook(e.g., "3초만에\\n상황 반전!")
+                    - Thumbnail 3: Mystery / Curiosity hook
+                        - Each thumbnail must include: Korean(kr), Japanese(jp), Japanese Pronunciation in Hangul(pron)
+                            - ** CRITICAL **: Use \\n for ALL languages(kr, jp, pron) to split into exactly 2 lines.
+          3. ** Timeline **: FULL DURATION of the story(60s + allowed if necessary to cover the ending / twist)
+    - ** DO NOT CUT OFF THE ENDING **
+        - If the source video is longer than 60s, compress dialogue or speed up pacing, but ** INCLUDE THE RESOLUTION **.
+         4. ** Script Content **:
+- "section": Hook / Body / Twist / Conclusion / CTA(based on structure template)
+    - "type": Narration(Narrator) or Dialogue(Character)
+        - "time": Display time MM: SS
+            - "start_time": Start time MM: SS(REQUIRED for ALL segments)
+    - "end_time": End time MM: SS(REQUIRED for ALL segments)
+    - "text_jp": Japanese with "/" separators between words / phrases for Shorts subtitle timing
+        ** MANDATORY **: Add CapCut color tags to 2 - 3 key words per sentence
+Example: "常識外れの / <color=#B794F6>行動</color>に、/ <color=#FF6B6B>怒り</color>は / 募るばかりですが..."
+    - "text_pron": Hangul pronunciation with "/" matching text_jp separators exactly
+        ** MANDATORY **: Apply SAME color tags as text_jp to corresponding words
+Example: "죠-시키하즈레노 / <color=#B794F6>코-도-</color>니, / <color=#FF6B6B>이카리</color>와 / 츠노루 바카리 데스가..."
+    - "text_kr": Korean Translation using DNA vocabulary
+- "original_text": ** CRITICAL ** For 'Dialogue' type, include the EXACT original original language text from the transcript.For 'Narration', keep empty string "".
+              ** DO NOT ** fabricate original text.If unknown, leave empty.
             - "emphasis": { "words": ["word1", "word2"], "color": "#FF6B6B", "reason": "emotion/key point" }
-            - "sfx": Specific sound effect cue
-            - "visual_cue": Camera direction
-         
-          - **🚨 CRITICAL: 전략적 컬러 강조 (CapCut 스타일) - MANDATORY FOR EVERY SEGMENT**
-            * EVERY script segment MUST have 2-3 color-tagged words in both text_jp and text_pron
-            * Use <color=#HEX>단어</color> format for key words:
-              - **#B794F6 (보라)**: 주인공, 핵심 명사, 깜짝 반전 요소, 충격, 미스터리
-              - **#FF6B6B (빨강)**: 위기, 강렬 감정(분노), 액션 키워드, 경고
-              - **#FFD93D (노랑)**: 숫자, 팩트, 꿀팁, 핵심 정보, 긍정 감정
-              - **#6BCF7F (초록)**: 질문, 궁금증 유발, 새로운 사실, 안정
-              - **#4DABF7 (파랑)**: 슬픔, 냉정, 이성적 판단, 차가움
+- "sfx": Specific sound effect cue
+    - "visual_cue": Camera direction
 
-        8. **VISUAL DIRECTION Rules 🎥**
-           - You act as the Video Editor. For every segment, provide a specific 'visual_cue'.
+        - **🚨 CRITICAL: 전략적 컬러 강조(CapCut 스타일) - MANDATORY FOR EVERY SEGMENT **
+            * EVERY script segment MUST have 2 - 3 color - tagged words in both text_jp and text_pron
+    * Use < color=#HEX > 단어</color > format for key words:
+              - ** #B794F6(보라) **: 주인공, 핵심 명사, 깜짝 반전 요소, 충격, 미스터리
+    - ** #FF6B6B(빨강) **: 위기, 강렬 감정(분노), 액션 키워드, 경고
+        - ** #FFD93D(노랑) **: 숫자, 팩트, 꿀팁, 핵심 정보, 긍정 감정
+            - **#6BCF7F(초록) **: 질문, 궁금증 유발, 새로운 사실, 안정
+                - **#4DABF7(파랑) **: 슬픔, 냉정, 이성적 판단, 차가움
+
+8. ** VISUAL DIRECTION Rules 🎥**
+    - You act as the Video Editor.For every segment, provide a specific 'visual_cue'.
            - Must match the 'director_rules' and pacing.
            - Examples: "Zoom In (Fast)", "Camera Shake", "Black & White Filter", "Slow Motion", "Split Screen", "Text Overlay: [Text]"
-           - **Hook Section**: Must be visually aggressive (e.g., "Rapid Zoom", "Flash Effect").
+    - ** Hook Section **: Must be visually aggressive(e.g., "Rapid Zoom", "Flash Effect").
 
-        9. **VIRAL REASONING 🧠**
-           - Explain WHY you chose this specific Hook and Title in a new field 'viral_logic'.
+        9. ** VIRAL REASONING 🧠**
+    - Explain WHY you chose this specific Hook and Title in a new field 'viral_logic'.
            - Connect it back to the Creator's Persona.
 
-        Output Format (JSON):
+        Output Format(JSON):
+{
+    "titles": [
         {
-          "titles": [
+            "kr": "🔥 스키장에서 벌어진 충격적인 상황! 당신의 생각은?",
+            "jp": "🔥 スキー場で起きた衝撃的な状況！皆さんの考えは？",
+            "pron": "🔥 스키-죠-데 오키타 쇼-게키테키나 죠-쿄-! 미나산노 칸가에와?"
+        },
+        {
+            "kr": "😱 블랙코스 한가운데서 멈춘 남자... 믿을 수 없는 주장!",
+            "jp": "😱 ブラックコースの真ん中で止まった男…信じられない主張！",
+            "pron": "😱 부랏쿠코-스노 만나카데 토맛타 오토코... 신지라레나이 슈쵸-!"
+        },
+        {
+            "kr": "❓ 이 상황, 누가 잘못한 걸까요?",
+            "jp": "❓ この状況、誰が悪いのでしょうか？",
+            "pron": "❓ 코노 죠-쿄-, 다레가 와루이노데쇼-카?"
+        }
+    ],
+        "thumbnails": [
             {
-              "kr": "🔥 스키장에서 벌어진 충격적인 상황! 당신의 생각은?",
-              "jp": "🔥 スキー場で起きた衝撃的な状況！皆さんの考えは？",
-              "pron": "🔥 스키-죠-데 오키타 쇼-게키테키나 죠-쿄-! 미나산노 칸가에와?"
+                "kr": "블랙코스 한가운데서\\n멈춘 남자",
+                "jp": "ブラックコースの\\n真ん中で止まった男",
+                "pron": "부랏쿠코-스노\\n만나카데 토맛타 오토코"
             },
             {
-              "kr": "😱 블랙코스 한가운데서 멈춘 남자... 믿을 수 없는 주장!",
-              "jp": "😱 ブラックコースの真ん中で止まった男…信じられない主張！",
-              "pron": "😱 부랏쿠코-스노 만나카데 토맛타 오토코... 신지라레나이 슈쵸-!"
+                "kr": "3초만에\\n상황 반전!",
+                "jp": "3秒で\\n状況が逆転！",
+                "pron": "산뵤-데\\n죠-쿄-가 갸쿠텐!"
             },
             {
-              "kr": "❓ 이 상황, 누가 잘못한 걸까요?",
-              "jp": "❓ この状況、誰が悪いのでしょうか？",
-              "pron": "❓ 코노 죠-쿄-, 다레가 와루이노데쇼-카?"
+                "kr": "충격적인 주장\\n과연 누가?",
+                "jp": "衝撃的な主張\\n果たして誰が？",
+                "pron": "쇼-게키테키나 슈쵸-\\n하타시테 다레가?"
             }
-          ],
-          "thumbnails": [
-            {
-              "kr": "블랙코스 한가운데서\\n멈춘 남자",
-              "jp": "ブラックコースの\\n真ん中で止まった男",
-              "pron": "부랏쿠코-스노\\n만나카데 토맛타 오토코"
+        ],
+            "viral_logic": "Hook uses 'Shocking Situation' strategy...",
+            "viral_potential": {
+                "score": 95,
+                "reason": "Why this script will go viral (e.g. strong hook, unexpected twist)"
             },
-            {
-              "kr": "3초만에\\n상황 반전!",
-              "jp": "3秒で\\n状況が逆転！",
-              "pron": "산뵤-데\\n죠-쿄-가 갸쿠텐!"
-            },
-            {
-              "kr": "충격적인 주장\\n과연 누가?",
-              "jp": "衝撃的な主張\\n果たして誰が？",
-              "pron": "쇼-게키테키나 슈쵸-\\n하타시테 다레가?"
-            }
-          ],
-          "viral_logic": "Hook uses 'Shocking Situation' strategy because the visual of stopping entirely in a black course creates immediate conflict. Title 1 focuses on the 'Mystery' element to drive clicks.",
-          "bgm_mood": "Mood description",
-          "keywords": ["#Shorts", "#Keyword"],
-          "script": [
-            {
-              "time": "00:00",
-              "start_time": "00:00",
-              "end_time": "00:04",
-              "section": "Hook",
-              "type": "Narration",
-              "speaker": "Narrator",
-              "text_jp": "スキー場で / 起きた / <color=#FF6B6B>衝撃的な</color> / 状況！",
-              "text_pron": "스키-죠-데 / 오키타 / <color=#FF6B6B>쇼-게키테키나</color> / 죠-쿄-!",
-              "text_kr": "스키장에서 벌어진 충격적인 상황!",
-              "original_text": "", 
-              "emphasis": { "words": ["衝撃的な"], "color": "#FF6B6B", "reason": "shock emotion" },
-              "sfx": "Boom",
-              "visual_cue": "Close up"
-            },
-            {
-              "time": "00:05",
-              "start_time": "00:05",
-              "end_time": "00:08",
-              "section": "Rising Action",
-              "type": "Dialogue",
-              "speaker": "Original Speaker",
-              "text_jp": "もっと / <color=#FFD93D>速く</color> / 滑ってみたら / <color=#6BCF7F>どうだ</color>？",
-              "text_pron": "못토 / <color=#FFD93D>하야쿠</color> / 스베테 미타라 / <color=#6BCF7F>도-다</color>?",
-              "text_kr": "좀 더 빨리 타보지 그래?",
-              "original_text": "Tu pourrais essayer d'aller plus vite",
-              "emphasis": { "words": ["速く", "どうだ"], "color": "#FFD93D, #6BCF7F", "reason": "speed emphasis, question" },
-              "original_text": "Tu pourrais essayer d'aller plus vite",
-              "sfx": "None",
-              "visual_cue": "Medium shot"
-            }
-          ]
+            "key_moments": [
+                { "time": "00:04", "description": "Moment description" },
+                { "time": "00:12", "description": "Another moment" }
+            ],
+            "bgm_mood": "Mood description",
+            "keywords": ["#Shorts", "#Keyword"],
+            "script": [
+                {
+                    "time": "00:00",
+                    "start_time": "00:00",
+                    "end_time": "00:04",
+                    "section": "Hook",
+                    "type": "Narration",
+                    "speaker": "Narrator",
+                    "text_jp": "スキー場で / 起きた / <color=#FF6B6B>衝撃的な</color> / 状況！",
+                    "text_pron": "스키-죠-데 / 오키타 / <color=#FF6B6B>쇼-게키테키나</color> / 죠-쿄-!",
+                    "text_kr": "스키장에서 벌어진 충격적인 상황!",
+                    "original_text": "",
+                    "emphasis": { "words": ["衝撃的な"], "color": "#FF6B6B", "reason": "shock emotion" },
+                    "sfx": "Boom",
+                    "visual_cue": "Close up"
+                },
+                {
+                    "time": "00:05",
+                    "start_time": "00:05",
+                    "end_time": "00:08",
+                    "section": "Rising Action",
+                    "type": "Dialogue",
+                    "speaker": "Original Speaker",
+                    "text_jp": "もっと / <color=#FFD93D>速く</color> / 滑ってみたら / <color=#6BCF7F>どうだ</color>？",
+                    "text_pron": "못토 / <color=#FFD93D>하야쿠</color> / 스베테 미타라 / <color=#6BCF7F>도-다</color>?",
+                    "text_kr": "좀 더 빨리 타보지 그래?",
+                    "original_text": "Tu pourrais essayer d'aller plus vite",
+                    "emphasis": { "words": ["速く", "どうだ"], "color": "#FFD93D, #6BCF7F", "reason": "speed emphasis, question" },
+                    "sfx": "None",
+                    "visual_cue": "Medium shot"
+                }
+            ]
         }
         `;
 
         // 4. Call Gemini (Direct Client with Stability Settings)
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             generationConfig: {
                 maxOutputTokens: 65536,
                 temperature: 0.7,

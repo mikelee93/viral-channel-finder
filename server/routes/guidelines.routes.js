@@ -121,28 +121,27 @@ router.post('/cut-highlights', upload.single('video'), async (req, res) => {
             });
         }
 
-        // Step 2: Merge all segments
+        // Step 2: Merge all segments using concat demuxer (more reliable)
         const finalOutputPath = path.join(outputDir, `highlights_merged_${Date.now()}.mp4`);
         tempFiles.push(finalOutputPath);
 
         console.log(`[Highlight Cutter] Merging ${segmentPaths.length} segments...`);
 
+        // Create a concat list file for FFmpeg
+        const concatListPath = path.join(outputDir, `concat_list_${Date.now()}.txt`);
+        const concatListContent = segmentPaths
+            .map(p => `file '${p.replace(/\\/g, '/')}'`)
+            .join('\n');
+
+        fs.writeFileSync(concatListPath, concatListContent, 'utf8');
+        tempFiles.push(concatListPath);
+
+        console.log(`[Highlight Cutter] Concat list created with ${segmentPaths.length} files`);
+
         await new Promise((resolve, reject) => {
-            const command = ffmpeg();
-
-            // Add all segments as inputs
-            segmentPaths.forEach(segmentPath => {
-                command.input(segmentPath);
-            });
-
-            // Build filter complex for concatenation
-            const filterComplex = segmentPaths
-                .map((_, i) => `[${i}:v][${i}:a]`)
-                .join('') + `concat=n=${segmentPaths.length}:v=1:a=1[outv][outa]`;
-
-            command
-                .complexFilter(filterComplex)
-                .outputOptions(['-map', '[outv]', '-map', '[outa]'])
+            ffmpeg()
+                .input(concatListPath)
+                .inputOptions(['-f', 'concat', '-safe', '0'])
                 .videoCodec('libx264')
                 .audioCodec('aac')
                 .outputOptions([
@@ -151,6 +150,9 @@ router.post('/cut-highlights', upload.single('video'), async (req, res) => {
                     '-movflags +faststart'
                 ])
                 .output(finalOutputPath)
+                .on('start', (commandLine) => {
+                    console.log('[Highlight Cutter] FFmpeg command:', commandLine);
+                })
                 .on('end', () => {
                     console.log('[Highlight Cutter] ✅ Merge complete');
                     resolve();

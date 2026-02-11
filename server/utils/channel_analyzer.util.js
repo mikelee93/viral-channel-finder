@@ -33,7 +33,7 @@ Please provide the output in JSON format with the following structure (Keep the 
 `;
 
     try {
-        const analysis = await geminiGenerateJSON(apiKey, 'gemini-2.0-flash', [{ text: prompt }]);
+        const analysis = await geminiGenerateJSON(apiKey, 'gemini-2.5-flash', [{ text: prompt }]);
         return analysis;
     } catch (error) {
         console.error('[Channel Analyzer] Gemini Error:', error);

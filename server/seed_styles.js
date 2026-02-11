@@ -11,6 +11,7 @@ async function seed() {
         await mongoose.connect(uri);
         console.log('Connected to DB');
 
+        /*
         const sample = {
             channelId: "SAMPLE_MRBEAST",
             channelTitle: "MrBeast (Style Sample)",
@@ -43,6 +44,7 @@ async function seed() {
         );
 
         console.log('✅ Seeded sample style:', result.channelTitle);
+        */
 
     } catch (e) {
         console.error('Seed Error:', e);

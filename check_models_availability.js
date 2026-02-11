@@ -12,7 +12,20 @@ async function listModels() {
 
         // Instead of listing which can be tricky with just the client, let's try to instantiate 2.5 and 3.0 and generating a simple "hello".
 
-        const modelsToTest = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-3.0-flash", "gemini-2.0-pro", "gemini-1.5-pro"];
+        const modelsToTest = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash-001",
+            "gemini-1.5-flash-002",
+            "gemini-1.5-pro",
+            "gemini-1.5-pro-latest",
+            "gemini-1.5-pro-001",
+            "gemini-1.5-pro-002",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-lite-preview-02-05",
+            "gemini-2.0-pro-exp-02-05"
+        ];
 
         console.log("Testing Model Availability...");
 
@@ -21,10 +34,12 @@ async function listModels() {
                 const model = genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent("Hello");
                 const response = await result.response;
-                console.log(`✅ ${modelName}: Available (Response: ${response.text().trim()})`);
+                console.log(`✅ ${modelName}: Available`);
             } catch (error) {
                 if (error.message.includes("404") || error.message.includes("not found")) {
                     console.log(`❌ ${modelName}: Not Found (404)`);
+                } else if (error.message.includes("429")) {
+                    console.log(`⚠️ ${modelName}: Rate Limited (429)`);
                 } else {
                     console.log(`⚠️ ${modelName}: Error - ${error.message.split('\n')[0]}`);
                 }

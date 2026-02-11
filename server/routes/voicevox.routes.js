@@ -323,7 +323,7 @@ JSON 형식으로 응답:
         // Gemini로 대본 생성
         const script = await geminiGenerateJSON(
             GEMINI_API_KEY,
-            'gemini-2.0-flash',
+            'gemini-2.5-flash',
             [{ text: prompt }]
         );
 

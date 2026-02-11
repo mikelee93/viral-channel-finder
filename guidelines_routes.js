@@ -382,10 +382,8 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
             // Analyze with Gemini Vision
             console.log('[Guidelines] Starting Gemini Vision analysis...');
             const analysis = await analyzeVideoWithGemini({
-                fileData: {
-                    fileUri: uploadedFile.uri,
-                    mimeType: uploadedFile.mimeType
-                }
+                fileUri: uploadedFile.uri,
+                mimeType: uploadedFile.mimeType
             }, {
                 title: title || 'Untitled',
                 description: description || ''
@@ -452,10 +450,8 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
 
             console.log('[Title Generation] Generating titles...');
             const titles = await generateShortsTitle({
-                fileData: {
-                    fileUri: uploadedFile.uri,
-                    mimeType: uploadedFile.mimeType
-                }
+                fileUri: uploadedFile.uri,
+                mimeType: uploadedFile.mimeType
             }, {
                 title: title || '',
                 description: description || ''
@@ -635,7 +631,7 @@ module.exports = function (app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_
                   "videoExplanation": "상세한 한국어 설명..."
                 }`;
 
-                const summaryResponse = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-1.5-flash', [{ text: summaryPrompt }]);
+                const summaryResponse = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [{ text: summaryPrompt }]);
                 videoExplanation = summaryResponse.videoExplanation;
             } catch (sumError) {
                 console.warn('[Transcript Extract] ⚠️ Video explanation generation failed:', sumError.message);
@@ -699,15 +695,18 @@ ${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
 - **나레이션-대사 교차**: 나레이션과 원본 대사를 번갈아 배치
 - **자연스러운 흐름**: 친근하고 편한 말투의 나레이션
 
-**📌 CRITICAL RULES (절대 규칙 - 반드시 준수):**
-1. ✅ **전체 영상 길이는 65-70초 (틱톡 수익화 조건: 1분 1초 이상)**
+1. ✅ **전체 영상 길이는 65-70초 (수익화 조건: 1분 이상)**
    - 모든 scene의 duration 합계가 65-70초 범위여야 함
-   - Outro는 2-3초로 제한 (짧은 CTA만)
+   - 씬 개수를 조절하여 총 길이를 맞출 것
    
-2. ✅ **연속된 대화 블록으로 구성 (티키타카 살리기)**
-   - 각 씬은 최소 10초 이상의 연속된 대화여야 함
-   - 2-4초짜리 짧은 씬은 절대 금지
-   - 대화의 자연스러운 흐름이 끊기지 않도록
+2. ✅ **각 씬은 3-7초로 구성 (빠른 호흡 유지)**
+   - **🚨 CRITICAL: 모든 씬(나레이션 포함)은 반드시 원본 영상의 \`start\`, \`end\` 타임스탬프를 가져야 함!**
+   - **start와 end는 반드시 숫자(number)여야 하며, null, undefined, 문자열 절대 금지!**
+   - **나레이션 씬도 반드시 배경 영상이 필요하므로 원본 영상의 타임스탬프를 지정해야 함**
+   - 타임스탬프가 없는 씬은 영상 편집이 불가능하므로 절대 금지
+   - 10초 이상의 긴 씬은 시청자가 지루해하므로 지양
+   - 대화가 긴 경우 여러 개의 3-5초 씬으로 나누어 구성 (나레이션과 교차)
+   - 대화의 자연스러운 흐름이 끊기지 않도록 순서대로 배치
    - 질문-답변, 주장-반박 등 완결된 대화 교환 포함
    
 3. ✅ **모든 scene에 text_kr, text_jp, text_pron을 반드시 포함 (자막용 "/" 구분)**
@@ -782,6 +781,11 @@ ${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
    - **나레이션 씬**: 상황 설명, 전환 (narration_kr/jp/pron 제공, text는 null)
    - **대사 씬**: 원본 핵심 대사 (original_transcript + text_kr/jp/pron 제공, narration은 null)
    - **🚨 각 씬은 최대 5초!** (copyright safety)
+   - **🚨 CRITICAL: 씬들의 타임스탬프는 절대 겹치면 안 됨!**
+     * 각 씬은 원본 영상의 **서로 다른 구간**을 사용해야 함
+     * 예: Scene 1 (0-5초), Scene 2 (5-10초), Scene 3 (10-15초) ✅
+     * 잘못된 예: Scene 1 (0-5초), Scene 2 (0-7초) ❌ (겹침!)
+     * 나레이션 씬도 배경 영상이 필요하므로 고유한 타임스탬프 필요
    - 원본 영상의 실제 타임스탬프 사용   
 
 3. **Climax (~5초):** 가장 재미있거나 충격적인 순간
@@ -792,30 +796,85 @@ ${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
    - 절대 "구독해주세요" 하지 말 것
    - "여러분의 생각은?", "진짜 어이없네 ㅋㅋ" 등 친구처럼 마무리
 
+**🚨🚨🚨 CRITICAL VALIDATION RULES (MUST FOLLOW!) 🚨🚨🚨**
+
+**EVERY scene MUST have valid numeric timestamps:**
+- ✅ CORRECT: "start": 12.5, "end": 16.5
+- ❌ WRONG: "start": null, "end": null
+- ❌ WRONG: "start": "12.5", "end": "16.5" (strings not allowed)
+- ❌ WRONG: Missing start or end fields
+
+**This applies to ALL scene types:**
+- Narration scenes (narration_intro, narration_bridge, narration_outro) → MUST have start/end
+- Original clip scenes (original_clip) → MUST have start/end
+- NO EXCEPTIONS! Every scene needs background video from the original footage!
+
+**🚨 TIMESTAMPS MUST NOT OVERLAP:**
+- ✅ CORRECT: Scene 1 (0-5s), Scene 2 (5-10s), Scene 3 (10-15s)
+- ❌ WRONG: Scene 1 (0-7s), Scene 2 (0-7s) ← Same timestamps!
+- ❌ WRONG: Scene 1 (0-7s), Scene 2 (5-12s) ← Overlapping!
+- Each scene must use a UNIQUE, NON-OVERLAPPING time range from the original video
+
 **Response JSON Format:**
 \`\`\`json
 {
+  "viralTitle_kr": "한국어 바이럴 제목 (호기심 유발)",
+  "viralTitle_jp": "일본어 바이럴 제목 (구어체)",
+  "viralTitle_pron": "일본어 제목 발음 (한글)",
   "viralReason": "왜 이 부분이 바이럴 될 것 같은지 1줄 설명",
   "targetAudience": "주 타겟층 (예: 20대 남성, 운전자 등)",
   "editorial_strategy": "1줄 편집 의도 (예: 긴장감 고조 후 반전 유머)",
+  "loopStrategy": "영상이 무한 반복되는 것처럼 느껴지게 하는 루프 전략 (마지막 대사가 처음과 이어지는 법 등)",
+  "thumbnailText": [
+    {
+      "strategy": "호기심 자극형",
+      "line1_kr": "한국어 문구 1",
+      "line1_jp": "일본어 문구 1",
+      "line1_pron": "발음 1",
+      "line2_kr": "한국어 문구 2",
+      "line2_jp": "일본어 문구 2",
+      "line2_pron": "발음 2"
+    },
+    {
+      "strategy": "공포/충격 강조형",
+      "line1_kr": "한국어 문구 1",
+      "line1_jp": "일본어 문구 1",
+      "line1_pron": "발음 1",
+      "line2_kr": "한국어 문구 2",
+      "line2_jp": "일본어 문구 2",
+      "line2_pron": "발음 2"
+    },
+    {
+      "strategy": "반전/결말 궁금증형",
+      "line1_kr": "한국어 문구 1",
+      "line1_jp": "일본어 문구 1",
+      "line1_pron": "발음 1",
+      "line2_kr": "한국어 문구 2",
+      "line2_jp": "일본어 문구 2",
+      "line2_pron": "발음 2"
+    }
+  ],
   "scenes": [
     {
-      "order": 1,
+      "order\": 1,
+      "stage": "Intro (Hook)", // "Intro (Hook)", "Body (Story)", "Climax", "Outro"
       "type": "narration_intro", // narration_intro, narration_bridge, narration_outro, original_clip
-      "start": 12.5, // Original timestamp (if clip)
-      "end": 16.5,   // Original timestamp (if clip, max 5s diff)
+      "start": 12.5, // 🚨 MUST be a valid number from original video! NEVER null!
+      "end": 16.5,   // 🚨 MUST be a valid number! NEVER null! end > start!
       "duration": 4.0,
       "narration_kr": "경찰이 문을 열라는데 도대체 왜 이러는 걸까요?", // required for narration type
       "narration_jp": "警察がドアを開けろって言ってるのに、一体どうしたんでしょう？", // required for narration type
       "narration_pron": "케이사츠가 도아오 아케로떼 잇떼루노니, 잇따이 도-시탄데쇼-?", // required for narration type
       "original_transcript": "",
-      "description": "Intro hook narration"
+      "description": "Intro hook narration",
+      "reason": "영상의 첫 부분에 시청자의 관심을 끌기 위한 강력한 훅 나레이션"
     },
     {
       "order": 2,
+      "stage": "Body (Context)",
       "type": "original_clip",
-      "start": 45.2,
-      "end": 50.1,
+      "start": 16.5,  // 🚨 Starts where Scene 1 ended! NO OVERLAP!
+      "end": 21.4,    // 🚨 Different time range from Scene 1!
       "duration": 4.9,
       "text_kr": "창문 좀 열어주시겠습니까? 면허증 보여주세요.", // required for clip type
       "text_jp": "窓開けてもらえます？／免許証見せてください", // required for clip type (Use / for split)
@@ -824,18 +883,22 @@ ${comments ? `"${comments}"` : '(제공된 댓글 없음)'}
       "narration_jp": null,
       "narration_pron": null,
       "original_transcript": "Can you roll down your window? License please.",
-      "description": "Police asks driver"
+      "description": "Police asks driver",
+      "reason": "실제 대화 장면을 삽입하여 현장감과 긴장감을 부여"
     }
     // ... more scenes (alternating narration/clip) ...
   ]
 }
 \`\`\`
 
+**중요 지침:**
+- 모든 장면(\`scenes\`)에는 반드시 \`"reason"\` 필드를 포함하여 이 장면이 왜 선택되었는지 한국어로 1문장 설명하세요.
+
 **Transcript Data:**
 ${segmentsText.substring(0, 25000)} // Limit to fit context
 `;
 
-            const highlights = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-1.5-pro', [{ text: prompt }]);
+            const highlights = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [{ text: prompt }]);
 
             // Optimize timestamps (find silent split points)
             // Ideally we would do this, but for now we trust Gemini's timestamps or use specific helper
@@ -843,6 +906,17 @@ ${segmentsText.substring(0, 25000)} // Limit to fit context
 
             res.json({
                 success: true,
+                directorPlan: highlights.scenes,
+                viralTitle: highlights.viralTitle_kr,
+                viralTitle_kr: highlights.viralTitle_kr,
+                viralTitle_jp: highlights.viralTitle_jp,
+                viralTitle_pron: highlights.viralTitle_pron,
+                loopStrategy: highlights.loopStrategy,
+                thumbnailText: highlights.thumbnailText,
+                viralReason: highlights.viralReason,
+                targetAudience: highlights.targetAudience,
+                editorial_strategy: highlights.editorial_strategy,
+                sourceInfo: 'YouTube Transcript',
                 highlights
             });
 

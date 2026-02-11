@@ -453,6 +453,192 @@
             renderPersonas();
         }
 
+        // --- New Features State ---
+        let selectionForCompare = [];
+        let moveTargetId = null;
+
+        // --- Move Category Logic ---
+        window.openMoveCategoryModal = (id) => {
+            moveTargetId = id;
+            const persona = allPersonas.find(p => p.id === id);
+            if (!persona) return;
+
+            document.getElementById('moveCategoryTargetName').innerText = `'${persona.name}' 채널을 이동할 카테고리를 선택하세요.`;
+
+            const selectEl = document.getElementById('moveCategorySelect');
+            selectEl.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = `${cat.icon} ${cat.name}`;
+                if (cat.id === persona.category) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+
+            document.getElementById('moveCategoryModal').classList.remove('hidden');
+        };
+
+        window.confirmMoveCategory = async () => {
+            const newCategory = document.getElementById('moveCategorySelect').value;
+            if (!moveTargetId || !newCategory) return;
+
+            try {
+                const res = await fetch('/api/channels/update-category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: moveTargetId, newCategory })
+                });
+                const json = await res.json();
+
+                if (json.success) {
+                    document.getElementById('moveCategoryModal').classList.add('hidden');
+                    // Refresh
+                    await loadPersonas();
+                    alert('카테고리가 변경되었습니다.');
+                } else {
+                    alert('오류: ' + json.error);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('서버 통신 오류');
+            }
+        };
+
+        // --- Comparison Logic ---
+        window.toggleCompare = (id) => {
+            const idx = selectionForCompare.indexOf(id);
+            if (idx > -1) {
+                selectionForCompare.splice(idx, 1);
+            } else {
+                if (selectionForCompare.length >= 2) {
+                    alert('최대 2개까지 비교할 수 있습니다.');
+                    // Uncheck the checkbox visually
+                    const cb = document.getElementById(`cb-compare-${id}`);
+                    if (cb) cb.checked = false;
+                    return;
+                }
+                selectionForCompare.push(id);
+            }
+            updateCompareButton();
+        };
+
+        function updateCompareButton() {
+            const btnDiv = document.getElementById('floatingCompareBtn');
+            const btnText = document.getElementById('compareBtnText');
+
+            if (selectionForCompare.length > 0) {
+                btnDiv.classList.remove('hidden', 'translate-y-20');
+                btnText.innerText = `비교하기 (${selectionForCompare.length}/2)`;
+            } else {
+                btnDiv.classList.add('translate-y-20');
+                setTimeout(() => btnDiv.classList.add('hidden'), 300);
+            }
+        }
+
+        window.openComparisonModal = () => {
+            if (selectionForCompare.length < 1) return;
+
+            const pA = allPersonas.find(p => p.id === selectionForCompare[0]);
+            const pB = selectionForCompare.length > 1 ? allPersonas.find(p => p.id === selectionForCompare[1]) : null;
+
+            renderComparisonColumn('compareColA', pA);
+            renderComparisonColumn('compareColB', pB); // Handles null gracefully
+
+            document.getElementById('comparisonModal').classList.remove('hidden');
+        };
+
+        function renderComparisonColumn(colId, p) {
+            const col = document.getElementById(colId);
+            if (!p) {
+                col.innerHTML = `
+                    <div class="h-full flex items-center justify-center text-slate-500">
+                        <div class="text-center">
+                            <span class="text-4xl block mb-2">❓</span>
+                            <p>비교할 두 번째 채널을<br>선택해주세요</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Tags
+            const vocabTags = (p.analysis.vocabulary_patterns?.adjectives || []).slice(0, 5).map(v => `<span class="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-300 rounded">${v}</span>`).join('');
+
+            // Generate Rules List
+            const rulesHtml = (p.analysis.director_rules || []).map(r => `<li class="text-xs text-slate-300 mb-1">• ${r}</li>`).join('');
+
+            // Structure Bar
+            let structureHtml = '';
+            if (p.analysis.structure_template) {
+                structureHtml = p.analysis.structure_template.map(block => {
+                    let bgClass = "bg-slate-600";
+                    if (block.type.includes('Hook')) bgClass = "bg-red-500";
+                    if (block.type.includes('Body')) bgClass = "bg-blue-500";
+                    if (block.type.includes('Climax')) bgClass = "bg-purple-500";
+                    if (block.type.includes('CTA')) bgClass = "bg-green-500";
+                    return `<div class="h-2 ${bgClass} rounded-full flex-1" title="${block.type} (${block.time})"></div>`;
+                }).join('');
+            }
+
+            col.innerHTML = `
+                <div class="text-center mb-6">
+                    <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white mb-3 relative">
+                        ${p.name.charAt(0)}
+                        <span class="absolute -bottom-2 -right-2 text-2xl">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white">${p.name}</h3>
+                    <p class="text-xs text-slate-400 mt-1">${p.sourceCount || 0} videos analyzed</p>
+                </div>
+
+                <div class="space-y-6">
+                     <!-- Summary -->
+                     <div class="bg-black/20 p-4 rounded-xl border border-white/5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase">AI Summary</label>
+                        <p class="text-sm text-slate-300 mt-1 leading-relaxed">"${p.analysis.summary || '-'}"</p>
+                     </div>
+
+                     <!-- Tone & Pace -->
+                     <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-800 p-3 rounded-lg text-center">
+                            <label class="text-[10px] text-slate-500 block">TONE</label>
+                            <span class="text-sm font-bold text-white">${p.analysis.tone || '-'}</span>
+                        </div>
+                         <div class="bg-slate-800 p-3 rounded-lg text-center">
+                            <label class="text-[10px] text-slate-500 block">PACING</label>
+                            <span class="text-sm font-bold text-white">${p.analysis.pacing || '-'}</span>
+                        </div>
+                     </div>
+
+                     <!-- Structure DNA -->
+                     <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase mb-2 block">Structure DNA</label>
+                        <div class="flex gap-1 mb-2 h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                            ${structureHtml}
+                        </div>
+                        <ul class="text-[10px] text-slate-500 list-none pl-1 space-y-1">
+                             ${(p.analysis.structure_template || []).map(s => `<li><b class="text-slate-300">${s.type}</b>: ${s.time}</li>`).join('')}
+                        </ul>
+                     </div>
+
+                     <!-- Vocabulary -->
+                     <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase mb-2 block">Key Vocabulary</label>
+                        <div class="flex flex-wrap gap-1">
+                            ${vocabTags || '<span class="text-xs text-slate-500">No data</span>'}
+                        </div>
+                     </div>
+
+                     <!-- Rules -->
+                     <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase mb-2 block">Director Rules</label>
+                        <ul class="pl-2 space-y-1">
+                            ${rulesHtml || '<li class="text-xs text-slate-500">No rules</li>'}
+                        </ul>
+                     </div>
+                </div>
+            `;
+        }
+
         function renderPersonas() {
             const filtered = activeFilter === 'all'
                 ? allPersonas
@@ -481,27 +667,28 @@
             filtered.forEach(p => {
                 // Determine style tags from analysis
                 const tags = [p.analysis.pacing, p.analysis.tone].filter(Boolean).slice(0, 2);
+                const isSelected = selectionForCompare.includes(p.id);
 
                 const card = document.createElement('div');
-                card.className = "glass-panel p-5 rounded-2xl hover:bg-slate-800 transition-colors relative group";
+                card.className = "glass-panel p-5 rounded-2xl hover:bg-slate-800 transition-colors relative group border-2 " + (isSelected ? "border-purple-500 bg-purple-900/10" : "border-transparent");
                 card.innerHTML = `
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3">
-                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
-                                ${p.name.charAt(0)}
+                            <div onclick="toggleCompare('${p.id}')" class="cursor-pointer w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white relative hover:scale-105 transition-transform">
+                                ${isSelected ? '<span class="absolute inset-0 flex items-center justify-center bg-purple-600 rounded-full border-2 border-white">✓</span>' : p.name.charAt(0)}
                             </div>
                             <div>
-                                <h4 class="font-bold text-white leading-tight">${p.name}</h4>
+                                <h4 class="font-bold text-white leading-tight cursor-pointer hover:text-blue-400" onclick="window.viewDNA('${p.id}')">${p.name}</h4>
                                 <a href="${p.url}" target="_blank" class="text-xs text-blue-400 hover:underline">YouTube ↗</a>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             ${p.sourceCount ? `<span class="bg-slate-700/50 text-slate-400 text-xs px-2 py-1 rounded-md font-mono border border-slate-600/50" title="학습된 영상 수">${p.sourceCount}</span>` : ''}
-                            <span class="text-2xl opacity-50">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
+                            <span class="text-2xl opacity-50 cursor-pointer hover:opacity-100 hover:scale-110 transition-transform" onclick="event.stopPropagation(); window.openMoveCategoryModal('${p.id}')" title="카테고리 이동">${CATEGORIES.find(c => c.id === p.category)?.icon || '📁'}</span>
                         </div>
                     </div>
                     
-                    <div class="mb-4 space-y-2">
+                    <div class="mb-4 space-y-2 cursor-pointer" onclick="window.viewDNA('${p.id}')">
                         <div class="bg-black/30 p-3 rounded-lg text-sm text-slate-300 border border-white/5">
                             <span class="text-purple-400 font-bold text-xs block mb-1">AI 요약</span>
                             "${p.analysis.summary || '요약 없음'}"
@@ -521,10 +708,18 @@
                         </button>
                     </div>
                     
-                    <div class="absolute top-2 right-2 z-50 opacity-70 hover:opacity-100 transition-all">
+                    <div class="absolute top-2 right-2 z-50 opacity-0 group-hover:opacity-100 transition-all flex gap-1">
+                         <button onclick="event.stopPropagation(); window.openMoveCategoryModal('${p.id}')" class="bg-slate-700 text-slate-300 p-2 rounded-lg hover:bg-white hover:text-black transition-all backdrop-blur-sm" title="카테고리 이동">
+                            📂
+                         </button>
                          <button onclick="event.stopPropagation(); deletePersona('${p.id}')" class="bg-red-500/20 text-red-200 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-all backdrop-blur-sm" title="삭제">
                             🗑️
                          </button>
+                    </div>
+                    
+                    <!-- Selection Checkbox Overlay (Top Left) -->
+                    <div class="absolute top-3 left-3 z-40">
+                         <input type="checkbox" id="cb-compare-${p.id}" onchange="toggleCompare('${p.id}')" ${isSelected ? 'checked' : ''} class="w-5 h-5 accent-purple-500 cursor-pointer rounded border-slate-500 bg-slate-800 opacity-50 group-hover:opacity-100 transition-opacity">
                     </div>
                 `;
                 personaGrid.appendChild(card);
@@ -1282,6 +1477,61 @@
 
             <div id="scriptTimelineContainer" class="pl-4">
                 <!-- Timeline items injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Category Modal -->
+    <div id="moveCategoryModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[80] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4">📂 카테고리 이동</h3>
+            <p class="text-sm text-slate-400 mb-4" id="moveCategoryTargetName">채널을 이동할 카테고리를 선택하세요.</p>
+
+            <select id="moveCategorySelect"
+                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mb-6 outline-none focus:border-blue-500">
+                <!-- Javascript populated -->
+            </select>
+
+            <div class="flex justify-end gap-2">
+                <button onclick="document.getElementById('moveCategoryModal').classList.add('hidden')"
+                    class="px-4 py-2 text-slate-400 hover:text-white font-medium">취소</button>
+                <button onclick="confirmMoveCategory()"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">이동</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Compare Button -->
+    <div id="floatingCompareBtn"
+        class="fixed bottom-8 right-8 z-40 hidden transition-all duration-300 transform translate-y-20">
+        <button onclick="openComparisonModal()"
+            class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:scale-105 transition-all text-lg border-2 border-white/20">
+            <span>⚔️</span>
+            <span id="compareBtnText">비교하기 (0/2)</span>
+        </button>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="comparisonModal"
+        class="fixed inset-0 bg-black/95 backdrop-blur-md hidden z-[90] overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">⚔️ DNA 비교 분석</h2>
+            <button onclick="document.getElementById('comparisonModal').classList.add('hidden')"
+                class="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-hidden flex divide-x divide-slate-800">
+            <!-- Left Column (Persona A) -->
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-900/50" id="compareColA">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Right Column (Persona B) -->
+            <div class="flex-1 overflow-y-auto p-6 bg-slate-900/50" id="compareColB">
+                <!-- Injected via JS -->
             </div>
         </div>
     </div>

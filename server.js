@@ -247,7 +247,7 @@ Output purely in JSON format without markdown code blocks:
         // 1. Analyze with Gemini
         let viralPoint = {};
         try {
-            viralPoint = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.0-flash-exp', [
+            viralPoint = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
                 { text: analysisPrompt }
             ]);
         } catch (e) {
@@ -734,7 +734,7 @@ app.post('/api/transcript-rewrite', async (req, res) => {
         } else {
             // Gemini API 호출 (기본)
             try {
-                scriptMarkdown = await geminiGenerateContent(GEMINI_API_KEY, 'gemini-2.0-flash', [
+                scriptMarkdown = await geminiGenerateContent(GEMINI_API_KEY, 'gemini-2.5-flash', [
                     { text: stylePrompt }
                 ]);
             } catch (e) {
@@ -1992,7 +1992,7 @@ ${koreanScript}
 
 JSON 형식으로만 출력하세요.`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
         const geminiRes = await fetch(geminiUrl, {
             method: 'POST',
@@ -2524,7 +2524,7 @@ ${viralExamplesText}
 }
 `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const result = await model.generateContent(prompt);
         let text = result.response.text();
 
@@ -4008,7 +4008,7 @@ app.post('/api/translate-to-japanese', async (req, res) => {
 
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const prompt = `
 당신은 전문 일본어 번역가이자 YouTube Shorts 콘텐츠 전문가입니다.
@@ -5252,7 +5252,7 @@ ${keywordList}
 
 JSON만 출력하고 다른 설명은 추가하지 마세요.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
