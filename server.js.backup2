@@ -172,7 +172,7 @@ if (!PERPLEXITY_API_KEY) {
 }
 
 const PORT = process.env.PORT || 4000;
-const googleSheetsService = require('./server/services/google_sheets_service');
+const googleSheetsService = require('./google_sheets_service');
 
 // YouTube Guidelines Routes
 require('./guidelines_routes')(app, GEMINI_API_KEY, PERPLEXITY_API_KEY, YOUTUBE_API_KEY, APIFY_TOKEN);
@@ -182,15 +182,11 @@ const voicevoxRoutes = require('./server/routes/voicevox.routes');
 const productionRoutes = require('./server/routes/production.routes');
 const guidelinesRoutes = require('./server/routes/guidelines.routes');
 const redditRoutes = require('./server/routes/reddit.routes');
-const audioLabRoutes = require('./server/routes/audio-lab.routes');
-const viralAnalysisRoutes = require('./server/routes/viral-analysis.routes');
 
 app.use('/api/voicevox', voicevoxRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/guidelines', guidelinesRoutes);
 app.use('/api/reddit', redditRoutes);
-app.use('/api/audio', audioLabRoutes);
-app.use('/api', viralAnalysisRoutes);
 
 // URL 분석 서비스
 const { analyzeVideoUrl, isValidUrl } = require('./server/services/url-analyzer.service');
@@ -229,7 +225,70 @@ function saveToLocalArchive(data) {
 }
 
 // API: Analyze & Save Viral Video
-// ═══════════════════════════════════════════════════════════════════════════// Viral Analysis Routes - Partially moved to server/routes/viral-analysis.routes.js// ═══════════════════════════════════════════════════════════════════════════// See: server/routes/viral-analysis.routes.js for core analysis endpoints// Note: Some analyze endpoints remain here - TODO: Complete migration
+app.post('/api/analyze-and-save', async (req, res) => {
+    try {
+        const { videoId, title, transcript, comments, viewCount } = req.body;
+        console.log(`[Viral Analysis] Analyzing: ${title}`);
+
+        // 1. Analyze with Gemini
+        const analysisPrompt = `
+Analyze this YouTube video transcript and comments to identify why it went viral.
+Video Title: ${title}
+Transcript Summary: ${transcript.slice(0, 1000)}...
+Comments Summary: ${comments.slice(0, 500)}...
+
+Output purely in JSON format without markdown code blocks:
+{
+  "hook": "The specific hook used (1 sentence)",
+  "structure": "The narrative structure (e.g., Build-up -> Twist -> Climax)",
+  "emotion": "The primary emotion targeted (e.g., Outrage, Curiosity, Heartwarming)",
+  "viral_reason": "Why this specific combination worked (1-2 sentences)",
+  "score": 85 (Estimated viral potential score 0-100)
+}
+`;
+        // 1. Analyze with Gemini
+        let viralPoint = {};
+        try {
+            viralPoint = await geminiGenerateJSON(GEMINI_API_KEY, 'gemini-2.5-flash', [
+                { text: analysisPrompt }
+            ]);
+        } catch (e) {
+            console.error("Gemini Analysis Error:", e);
+            viralPoint = { error: "Failed to analyze video with AI" };
+        }
+
+        const viralData = {
+            id: videoId,
+            title,
+            viewCount,
+            analyzedAt: new Date().toISOString(),
+            viralPoint
+        };
+
+        // 2. Save to Local JSON
+        saveToLocalArchive(viralData);
+
+        // 3. Save to Google Sheets (if available)
+        // Pass summary data
+        await googleSheetsService.appendRow({
+            title,
+            viewCount,
+            viralScore: viralPoint.score,
+            viralPoint: {
+                hook: viralPoint.hook,
+                structure: viralPoint.structure,
+                emotion: viralPoint.emotion,
+                summary: viralPoint.viral_reason
+            }
+        });
+
+        res.json({ success: true, data: viralData });
+
+    } catch (error) {
+        console.error('[Viral Analysis Error]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // API: Analyze Social Video (TikTok/Instagram) via Apify
 app.post('/api/analyze-social', async (req, res) => {
@@ -481,7 +540,116 @@ app.post('/api/transcript-rewrite', async (req, res) => {
     }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════// Audio AI Lab Routes - Moved to server/routes/audio-lab.routes.js// ═══════════════════════════════════════════════════════════════════════════// See: server/routes/audio-lab.routes.js for audio processing endpoints
+// --- Audio AI Lab Routes ---
+
+// Qwen3-TTS Route (Direct proxy to local Flask server)
+app.post('/api/audio/qwen-tts', async (req, res) => {
+    const { text, language, prompt } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: 'No text provided' });
+    }
+
+    try {
+        console.log(`[Qwen-TTS Proxy] Forwarding request for: "${text.substring(0, 30)}..."`);
+
+        // Forward to local TTS server
+        const response = await fetch('http://127.0.0.1:5001/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: text,
+                prompt: prompt || 'Natural speech'
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[Qwen-TTS Proxy] Local server error:', errorText);
+            throw new Error(`TTS Server Error: ${response.status}`);
+        }
+
+        // Stream audio back to client
+        const audioBuffer = await response.arrayBuffer();
+        res.set('Content-Type', 'audio/mpeg');
+        res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+        console.error('[Qwen-TTS Proxy] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PersonaPlex Chat Route
+app.post('/api/audio/persona-chat', async (req, res) => {
+    const { messages, persona, temperature } = req.body;
+    try {
+        const result = await generatePersonaDialogue(messages, { persona, temperature });
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PersonaPlex Dialogue (Tiki-Taka) Route
+app.post('/api/audio/dialogue', async (req, res) => {
+    const { topic, personaA, personaB, turns } = req.body;
+
+    if (!topic || !personaA || !personaB) {
+        return res.status(400).json({ error: 'Missing required parameters: topic, personaA, personaB' });
+    }
+
+    try {
+        console.log(`[Dialogue API] Starting dialogue on: ${topic}`);
+        const dialogue = await dialogueManager.generateDialogue(topic, personaA, personaB, turns || 3);
+        res.json({ success: true, dialogue });
+    } catch (error) {
+        console.error('[Dialogue API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// Custom Script Parsing Route
+app.post('/api/audio/parse-script', async (req, res) => {
+    const { script, personaA, personaB } = req.body;
+
+    if (!script) {
+        return res.status(400).json({ error: 'No script text provided' });
+    }
+
+    try {
+        console.log(`[Parse Script API] Parsing script...`);
+        // Use DialogueManager to parse
+        const dialogue = await dialogueManager.parseScriptToDialogue(script, personaA, personaB);
+        res.json({ success: true, dialogue });
+    } catch (error) {
+        console.error('[Parse Script API] Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// MS Phi-3-Voice ASR Route
+app.post('/api/audio/phi3-asr', async (req, res) => {
+
+    const { audioData, language } = req.body;
+    try {
+        let buffer;
+        if (audioData.startsWith('data:')) {
+            // Handle base64 data URL
+            const base64Data = audioData.split(',')[1];
+            buffer = Buffer.from(base64Data, 'base64');
+        } else {
+            buffer = Buffer.from(audioData, 'base64');
+        }
+
+        const transcript = await extractTranscriptPhi3(buffer, { language });
+        res.json({ success: true, transcript });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // 스타일별 프롬프트 생성 함수
 function getStylePrompt(style, title, comments, transcript, viralContext) {
@@ -6276,7 +6444,7 @@ connectDB();
 // ========================================
 // Cron Scheduler - Daily Updates (US Eastern Time)
 // ========================================
-const GoogleSheetsService = require('./server/services/google_sheets_service');
+const GoogleSheetsService = require('./google_sheets_service');
 
 // 15 YouTube Categories for Discovery
 const TARGET_CATEGORIES = [

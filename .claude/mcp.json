@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mongodb": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mongodb-mcp-server@latest",
+        "--readOnly"
+      ],
+      "env": {
+        "MDB_MCP_CONNECTION_STRING": "mongodb://gogohat12_db_user:KXef0hAeb8CuvuL4@ac-ogmfdim-shard-00-02.ukevz26.mongodb.net:27017/viral-shorts-db?ssl=true&authSource=admin&directConnection=true"
+      }
+    }
+  }
+}

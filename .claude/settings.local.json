@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(node --version:*)",
+      "Bash(npx -y mongodb-mcp-server@latest --version)",
+      "Bash(node test_reddit.js:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(ls:*)"
     ]
   }
 }

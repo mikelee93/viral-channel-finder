@@ -2682,6 +2682,7 @@
                     // ONLY include original_clip type (speaker dialogue), exclude all narration
                     const invalidScenes = [];
                     const narrationScenes = [];
+                    const speakerClips = [];
 
                     const highlights = window.currentDirectorPlan
                         .filter((scene, index) => {
@@ -2712,6 +2713,17 @@
                                     end: scene.end,
                                     description: scene.description || scene.text_kr || 'No description'
                                 });
+                            } else {
+                                // Valid speaker clip - save for logging
+                                speakerClips.push({
+                                    index: index + 1,
+                                    stage: scene.stage || 'Unknown',
+                                    type: scene.type || 'original_clip',
+                                    start: parseFloat(scene.start),
+                                    end: parseFloat(scene.end),
+                                    originalText: scene.original_transcript || scene.description || '',
+                                    koreanText: scene.text_kr || scene.description || ''
+                                });
                             }
 
                             return isValid;
@@ -2722,26 +2734,44 @@
                         }));
 
                     // Log filtering results
+                    console.log(`\n${'='.repeat(80)}`);
+                    console.log(`[Video Cut] 📹 원본 대사 클립 ${speakerClips.length}개 추출 완료`);
+                    console.log(`${'='.repeat(80)}\n`);
+
+                    if (speakerClips.length > 0) {
+                        speakerClips.forEach((clip, i) => {
+                            const duration = (clip.end - clip.start).toFixed(1);
+                            const startTime = formatTime(clip.start);
+                            const endTime = formatTime(clip.end);
+                            console.log(`📌 Clip ${i + 1}/${speakerClips.length} [${clip.stage}]`);
+                            console.log(`   ⏱️  원본 영상 시간: ${startTime} - ${endTime} (${duration}초)`);
+                            console.log(`   🇺🇸 원문: "${clip.originalText.substring(0, 80)}${clip.originalText.length > 80 ? '...' : ''}"`);
+                            console.log(`   🇰🇷 번역: "${clip.koreanText.substring(0, 80)}${clip.koreanText.length > 80 ? '...' : ''}"`);
+                            console.log('');
+                        });
+                    }
+
                     if (narrationScenes.length > 0) {
-                        console.log(`[Video Cut] 📝 Skipped ${narrationScenes.length} narration scenes (you'll add these manually):`);
+                        console.log(`\n[Video Cut] 📝 제외된 나레이션 씬: ${narrationScenes.length}개 (수동으로 추가 필요):`);
                         narrationScenes.forEach(scene => {
-                            console.log(`  Scene ${scene.index} (${scene.type}): ${scene.start}s - ${scene.end}s - "${scene.description.substring(0, 50)}..."`);
+                            console.log(`  Scene ${scene.index} (${scene.type}): ${formatTime(scene.start)} - ${formatTime(scene.end)} - "${scene.description.substring(0, 50)}..."`);
                         });
                     }
 
                     if (invalidScenes.length > 0) {
-                        console.warn('[Video Cut] ⚠️ Filtered out invalid scenes:', invalidScenes);
-                        console.warn('[Video Cut] Invalid scene details:');
+                        console.warn('\n[Video Cut] ⚠️ 유효하지 않은 씬 제외:', invalidScenes);
+                        console.warn('[Video Cut] 유효하지 않은 씬 상세:');
                         invalidScenes.forEach(scene => {
                             console.warn(`  Scene ${scene.index} (${scene.stage}/${scene.type}): start=${scene.start}, end=${scene.end} - "${scene.description.substring(0, 50)}..."`);
                         });
                     }
 
-                    console.log(`[Video Cut] ✅ ${highlights.length} speaker clips to cut (excluding ${narrationScenes.length} narration scenes)`);
+                    console.log(`\n[Video Cut] ✅ 원본 대사 클립 ${highlights.length}개 자르기 시작 (나레이션 ${narrationScenes.length}개 제외)\n`);
 
                     if (highlights.length === 0) {
                         const errorMsg = `편집할 수 있는 유효한 하이라이트 구간이 없습니다.\n\n` +
                             `전체 씬: ${window.currentDirectorPlan.length}개\n` +
+                            `나레이션 씬: ${narrationScenes.length}개 (제외됨)\n` +
                             `유효하지 않은 씬: ${invalidScenes.length}개\n\n` +
                             `문제가 있는 씬:\n` +
                             invalidScenes.map(s => `- Scene ${s.index} (${s.type}): start=${s.start}, end=${s.end}`).join('\n');
